@@ -106,7 +106,7 @@ public abstract class ProcessParameterIO {
     public static ProcessParameterIO find(Parameter<?> p, ApplicationContext context, String mime) {
         // enum special treatment
         if (p.type.isEnum()) {
-            return new LiteralPPIO(p.type);
+            return new EnumPPIO(p.type);
         }
 
         // TODO: come up with some way to flag one as "default"

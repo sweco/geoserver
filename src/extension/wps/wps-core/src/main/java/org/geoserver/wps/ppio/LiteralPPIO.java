@@ -28,6 +28,9 @@ public class LiteralPPIO extends ProcessParameterIO {
      * Decodes the parameter (as a string) to its internal object implementation. 
      */
     public Object decode( String value ) throws Exception {
+        if (getType().isEnum()) {
+            return getType().getMethod("valueOf", String.class).invoke(null, value.toUpperCase());
+        }
         return Converters.convert(value, getType());
     }
     
