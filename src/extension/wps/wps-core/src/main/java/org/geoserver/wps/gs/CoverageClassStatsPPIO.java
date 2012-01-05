@@ -31,6 +31,7 @@ public class CoverageClassStatsPPIO extends XMLPPIO {
             AttributesImpl atts = new AttributesImpl();
             atts.addAttribute(null, null, "lowerBound", null, range.getMin().toString());
             atts.addAttribute(null, null, "upperBound", null, range.getMax().toString());
+            atts.addAttribute(null, null, "count", null, results.count(i).toString());
             
             h.startElement(null, null, "Class", atts);
             for (Statistic stat : results.getStats()) {
