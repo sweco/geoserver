@@ -181,7 +181,8 @@
     <bean id="rangeLookupProcess" class="org.geotools.process.raster.gs.RangeLookupProcess" />
     <bean id="addCoveragesProcess" class="org.geotools.process.raster.gs.AddCoveragesProcess" />
     <bean id="coverageClassStats" class="org.geotools.process.raster.gs.CoverageClassStats" />
-    <bean id="coverageClassStatsPPIO" class="org.geoserver.wps.gs.CoverageClassStatsPPIO"/>
+    <bean id="featureClassStats" class="org.geotools.process.feature.gs.FeatureClassStats" />
+    <bean id="classificationStatsPPIO" class="org.geoserver.wps.gs.ClassificationStatsPPIO"/>
     
     <bean id="multiplyCoveragesProcess" class="org.geotools.process.raster.gs.MultiplyCoveragesProcess" />
     <bean id="gridProcess" class="org.geotools.process.feature.gs.GridProcess" />

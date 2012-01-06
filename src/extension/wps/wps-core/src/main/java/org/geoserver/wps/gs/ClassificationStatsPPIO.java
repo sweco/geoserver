@@ -5,22 +5,21 @@ import java.io.InputStream;
 import javax.xml.namespace.QName;
 
 import org.geoserver.wps.ppio.XMLPPIO;
-import org.geotools.process.raster.gs.CoverageClassStats;
-import org.geotools.process.raster.gs.CoverageClassStats.Results;
+import org.geotools.process.classify.ClassificationStats;
 import org.jaitools.numeric.Range;
 import org.jaitools.numeric.Statistic;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.helpers.AttributesImpl;
 
-public class CoverageClassStatsPPIO extends XMLPPIO {
+public class ClassificationStatsPPIO extends XMLPPIO {
 
-    protected CoverageClassStatsPPIO() {
-        super(CoverageClassStats.Results.class, CoverageClassStats.Results.class, new QName("Results"));
+    protected ClassificationStatsPPIO() {
+        super(ClassificationStats.class, ClassificationStats.class, new QName("Results"));
     }
 
     @Override
     public void encode(Object object, ContentHandler h) throws Exception {
-        Results results = (Results) object;
+        ClassificationStats results = (ClassificationStats) object;
 
         h.startDocument();
         h.startElement(null, null, "Results", null);
