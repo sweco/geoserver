@@ -55,12 +55,19 @@ import com.vividsolutions.jts.util.Stopwatch;
 @DescribeProcess(title = "BarnesSurface", description = "Interpolates a surface over a set of irregular data points using Barnes Analysis.")
 public class BarnesSurfaceProcess implements GSProcess {
 
+    /**------------------------
+     * Per-request state.
+     * RenderingTransformation processes are created on a per-SLD basis,
+     * so state with a shorter lifetime must be stored in a thread-local.
+     * --------------------------
+     */
     private static ThreadLocal<GridGeometry> threadGridGeom = new ThreadLocal() {
     };
 
-    // provided by the query information from invertQuery
-    //private GridGeometry queryGridGeom;
-
+    /**--------------------------
+     * Per-SLD state
+     * --------------------------
+     */
     private MathTransform crsToGrid;
 
     private double lengthScale = 0.0;
@@ -134,8 +141,14 @@ public class BarnesSurfaceProcess implements GSProcess {
          */
         Stopwatch sw = new Stopwatch();
         GridCoverage2D grid = computeSurfaceCoverage(pts);
-        System.out.println(this.toString() + "**************  Barnes Surface computed in " + sw.getTimeString());
-
+        System.out.println("**************  Barnes Surface computed in " + sw.getTimeString());
+        
+        /**---------------------------------------------
+         * Clean up after invocation
+         * ---------------------------------------------
+         */
+        threadGridGeom.remove();
+        
         return grid;
     }
 
@@ -314,8 +327,14 @@ public class BarnesSurfaceProcess implements GSProcess {
     }
     
     /**
-     * Given a target query and a target grid geometry returns the query to be used to read the input data of the process involved in rendering. In
-     * this process this method is used to determine the extent of the output grid.
+     * Given a target query and a target grid geometry 
+     * returns the query to be used to read the input data of the process involved in rendering. In
+     * this process this method is used to:
+     * <ul>
+     * <li>determine the extent & CRS of the output grid
+     * <li>expand the query envelope to ensure stable surface generation
+     * <li>modify the query hints to ensure point features are returned
+     * </ul>
      * 
      * @param targetQuery
      * @param gridGeometry
@@ -347,21 +366,4 @@ public class BarnesSurfaceProcess implements GSProcess {
                 new BBOXExpandingFilterVisitor(distance, distance, distance, distance), null);
     }
 
-    /**
-     * Given a target query and a target grid geometry returns the grid geometry to be used to read the input data of the process involved in
-     * rendering.
-     * <p>
-     * This method is not used in this process.
-     * 
-     * @param targetQuery
-     * @param gridGeometry
-     * @return null since the input is not a grid
-     */
-    /*
-    public GridGeometry invertGridGeometry(Map<String, Object> input, Query targetQuery,
-            GridGeometry targetGridGeometry) throws ProcessException {
-        // TODO Auto-generated method stub
-        return null;
-    }
-*/
 }
