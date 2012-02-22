@@ -179,6 +179,7 @@
     <bean id="simplifyProcess" class="org.geotools.process.feature.gs.SimplifyProcess"/>
     <bean id="rasterAsPointCollectionProcess" class="org.geotools.process.raster.gs.RasterAsPointCollectionProcess"/>
     <bean id="contourProcess" class="org.geotools.process.raster.gs.ContourProcess"/>
+    <bean id="barnesSurfaceProcess" class="org.geoserver.wps.surface.BarnesSurfaceProcess"/>
     <bean id="polygonExtractionProcess" class="org.geotools.process.raster.gs.PolygonExtractionProcess"/>
     <bean id="rclipProcess" class="org.geotools.process.feature.gs.RectangularClipProcess"/>
     <bean id="clipProcess" class="org.geotools.process.feature.gs.ClipProcess"/>
