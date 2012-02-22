@@ -42,13 +42,36 @@ import com.vividsolutions.jts.util.Stopwatch;
  * A Process that computes a GridCoverage that is an interpolated surface over a set of irregular data points
  * using Barnes Analysis.
  * <p>
+ * The implementation allows limiting the radius of influence of observations, in order to 
+ * prevent extrapolation into unsupported areas, and to increase performance (by reducing
+ * the number of observations considered).
+ * <p>
+ * It allows the surface raster to be computed at a lower resolution than the output coverage,
+ * to improve performance.  Interpolation is used during upsampling to maintain visual quality.
+ * <p>
  * This process can be used as a RenderingTransformation, since it
- * implements the {@link #invertQuery(Map, Query, GridGeometry) method.
+ * implements the {@link #invertQuery(Map, Query, GridGeometry)} method.
  * The query is rewritten to expand the query BBOX,
  * to ensure that enough data points are queried to make the 
  * computed surface stable under panning and zooming.  
  * 
- * 
+ * <h3>Parameters</h3>
+ * <i>M = mandatory, O = optional</i>
+ * <p>
+ * <ul>
+ * <li><b>data</b> (M) - the FeatureCollection containing the point observations
+ * <li><b>valueAttr</b> (M)- the attribute containing the observation value
+ * <li><b>scale</b> (M) - the Length Scale for the interpolation.  In units of the input data CRS.
+ * <li><b>convergence</b> (O) - the convergence factor for refinement.  Between 0 and 1 (values below 0.4 are safest).  (Default = 0.3)
+ * <li><b>passes</b> (O) - the number of passes to compute.  1 or greater. (Default = 2) 
+ * <li><b>minObservations</b> (O) - The minimum number of observations required to support a grid cell. (Default = 2)
+ * <li><b>maxObservationDistance</b> (O) - The maximum distance to an observation for it to support a grid cell.  0 means all observations are used. (Default = 0)
+ * <li><b>queryBufferDistance</b> (O) - The distance to expand the query envelope by. Larger values provide a more stable surface.  (Default = Length scale)
+ * <li><b>noDatavalue</b> (O) - The NO_DATA value to use for unsupported grid cells in the output coverage.  (Default = -999)
+ * <li><b>pixelsPerCell</b> (O) - The pixels-per-cell value determines the resolution of the computed grid. 
+ * Larger values improve performance, but degrade appearance. (Default = 1)
+ * </ul>
+ * <p>
  * @author mdavis
  *
  */
@@ -61,15 +84,13 @@ public class BarnesSurfaceProcess implements GSProcess {
      * so state with a shorter lifetime must be stored in a thread-local.
      * --------------------------
      */
-    private static ThreadLocal<GridGeometry> threadGridGeom = new ThreadLocal() {
+    private static ThreadLocal<GridGeometry> threadGridGeom = new ThreadLocal<GridGeometry>() {
     };
 
     /**--------------------------
      * Per-SLD state
      * --------------------------
      */
-    private MathTransform crsToGrid;
-
     private double lengthScale = 0.0;
 
     private double convergenceFactor = 0.3;
@@ -80,6 +101,8 @@ public class BarnesSurfaceProcess implements GSProcess {
 
     private double maxObservationDistance = 0.0;
     
+    private double queryBufferDistance = 0;
+
     private float noDataValue = -999;
 
     private int pixelsPerCell = 1;
@@ -93,6 +116,7 @@ public class BarnesSurfaceProcess implements GSProcess {
             @DescribeParameter(name = "passes", description = "The number of passes to compute", min=0, max=1) Integer argPasses,
             @DescribeParameter(name = "minObservations", description = "The minimum number of observations required to support a grid cell", min=0, max=1) Integer argMinObsCount,
             @DescribeParameter(name = "maxObservationDistance", description = "The maximum distance to a supporting observation", min=0, max=1) Double argMaxObsDistance,
+            @DescribeParameter(name = "queryBufferDistance", description = "The distance by which to expand the query window", min=0, max=1) Double argQueryBufferDist,
             @DescribeParameter(name = "noDatavalue", description = "The value to use for NO_DATA cells", min=0, max=1) Integer argNoDataValue,
             @DescribeParameter(name = "pixelsPerCell", description = "The number of pixels per grid cell", min=0, max=1) Integer argResolution,
            ProgressListener monitor) throws ProcessException {
@@ -115,6 +139,12 @@ public class BarnesSurfaceProcess implements GSProcess {
         if (argMinObsCount != null) minObservationCount = argMinObsCount;
         if (argMaxObsDistance != null) maxObservationDistance = argMaxObsDistance;
         if (argNoDataValue != null) noDataValue = argNoDataValue;
+        if (argQueryBufferDist != null) {
+            queryBufferDistance = argQueryBufferDist;
+        }
+        else {
+            queryBufferDistance = heuristicQueryBufferDistance();
+        }
         if (argResolution != null) {
             pixelsPerCell = argResolution;
             // ensure value is at least 1
@@ -122,12 +152,6 @@ public class BarnesSurfaceProcess implements GSProcess {
                 pixelsPerCell = 1;
         }
         
-        try {
-            crsToGrid = getQueryGridGeometry().getGridToCRS().inverse();
-        } catch (NoninvertibleTransformException e) {
-            throw new ProcessException(e);
-        }
-
         Coordinate[] pts = null;
         try {
             pts = PointExtracter.extract(obs, valueAttr);
@@ -151,6 +175,23 @@ public class BarnesSurfaceProcess implements GSProcess {
         
         return grid;
     }
+
+    /**
+     * To ensure that the computed surface is stable under zooming
+     * and panning, the query BBOX must be expanded
+     * to avoid obvious edge effects.
+     * The expansion distance depends on the 
+     * length scale, convergence factor, and data spacing in some complex way.
+     * It does NOT depend on the output window extent.
+     * It is chosen heuristically here.
+     * 
+     * @return the distance by which to expand the query BBOX
+     */
+    private double heuristicQueryBufferDistance()
+    {
+        return lengthScale;
+    }
+    
 
     private GridGeometry getQueryGridGeometry()
     {
@@ -217,62 +258,6 @@ public class BarnesSurfaceProcess implements GSProcess {
         return raster;
     }
 
-    private float[][] createDummyMatrix(int width, int height) {
-        float[][] matrix = new float[height][width];
-
-        // set a dummy set of values
-        for (int y = height / 3; y < (2 * height) / 3; y++) {
-            for (int x = y; x < (2 * width) / 3; x++) {
-                matrix[y][x] = 5;
-            }
-        }
-        return matrix;
-    }
-
-    private float[][] createPointSymbolMatrixSafe(Coordinate[] pts, int width, int height)
-    {
-    try {
-        return createPointSymbolMatrix(pts, width, height);
-    } catch (MismatchedDimensionException e) {
-        throw new ProcessException(e);
-    } catch (TransformException e) {
-        throw new ProcessException(e);
-    } 
-    }
-    
-    private float[][] createPointSymbolMatrix(Coordinate[] pts, int width, int height)
-            throws MismatchedDimensionException, TransformException {
-        float[][] matrix = new float[height][width];
-
-        // set NODATA values
-        // zero out the raster
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                matrix[y][x] = -999;
-            }
-        }
-
-        DirectPosition2D src = new DirectPosition2D();
-        DirectPosition2D dst = new DirectPosition2D();
-        // set a dummy set of values
-        for (Coordinate p : pts) {
-            src.setLocation(p.x, p.y);
-            crsToGrid.transform(src, dst);
-            int x = (int) dst.getOrdinate(0);
-            int y = (int) dst.getOrdinate(1);
-
-            // fill a box around point
-            for (int i = -5; i < 5; i++) {
-                for (int j = -5; j < 5; j++) {
-                    int xx = x + i;
-                    int yy = y + j;
-                    if (yy >= 0 && yy < height && xx >= 0 && xx < width)
-                        matrix[yy][xx] = (float) p.z;
-                }
-            }
-        }
-        return matrix;
-    }
 
     private float[][] createBarnesMatrix(Coordinate[] pts, int width, int height)
             throws MismatchedDimensionException, TransformException {
@@ -311,22 +296,6 @@ public class BarnesSurfaceProcess implements GSProcess {
     }
     
     /**
-     * To ensure that the computed surface is stable under zooming
-     * and panning, the query BBOX must be expanded
-     * to avoid obvious edge effects.
-     * The expansion distance depends on the 
-     * length scale, convergence factor, and data spacing in some complex way.
-     * It does NOT depend on the output window extent.
-     * It is chosen heuristically here.
-     * 
-     * @return the distance by which to expand the query BBOX
-     */
-    private double queryEnvelopeExpansionDistance()
-    {
-        return lengthScale;
-    }
-    
-    /**
      * Given a target query and a target grid geometry 
      * returns the query to be used to read the input data of the process involved in rendering. In
      * this process this method is used to:
@@ -350,7 +319,7 @@ public class BarnesSurfaceProcess implements GSProcess {
         //Object gdo = hints.get(Hints.GEOMETRY_DISTANCE);
         hints.put(Hints.GEOMETRY_DISTANCE, 0.0);
 
-        Filter expandedFilter = expandBBox(targetQuery.getFilter(), queryEnvelopeExpansionDistance());
+        Filter expandedFilter = expandBBox(targetQuery.getFilter(), queryBufferDistance);
         targetQuery.setFilter(expandedFilter);
         
         // clear properties to force all attributes to be read
@@ -366,4 +335,71 @@ public class BarnesSurfaceProcess implements GSProcess {
                 new BBOXExpandingFilterVisitor(distance, distance, distance, distance), null);
     }
 
+    /*
+     
+    // Test code to generate synthetic surfaces
+     
+    private float[][] createDummyMatrix(int width, int height) {
+        float[][] matrix = new float[height][width];
+
+        // set a dummy set of values
+        for (int y = height / 3; y < (2 * height) / 3; y++) {
+            for (int x = y; x < (2 * width) / 3; x++) {
+                matrix[y][x] = 5;
+            }
+        }
+        return matrix;
+    }
+
+    private float[][] createPointSymbolMatrixSafe(Coordinate[] pts, int width, int height) {
+        try {
+            return createPointSymbolMatrix(pts, width, height);
+        } catch (MismatchedDimensionException e) {
+            throw new ProcessException(e);
+        } catch (TransformException e) {
+            throw new ProcessException(e);
+        }
+    }
+
+    private float[][] createPointSymbolMatrix(Coordinate[] pts, int width, int height)
+            throws MismatchedDimensionException, TransformException {
+        float[][] matrix = new float[height][width];
+
+        // set NODATA values
+        // zero out the raster
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                matrix[y][x] = -999;
+            }
+        }
+
+        MathTransform crsToGrid;
+        try {
+            crsToGrid = getQueryGridGeometry().getGridToCRS().inverse();
+        } catch (NoninvertibleTransformException e) {
+            throw new ProcessException(e);
+        }
+
+        DirectPosition2D src = new DirectPosition2D();
+        DirectPosition2D dst = new DirectPosition2D();
+        // set a dummy set of values
+        for (Coordinate p : pts) {
+            src.setLocation(p.x, p.y);
+            crsToGrid.transform(src, dst);
+            int x = (int) dst.getOrdinate(0);
+            int y = (int) dst.getOrdinate(1);
+
+            // fill a box around point
+            for (int i = -5; i < 5; i++) {
+                for (int j = -5; j < 5; j++) {
+                    int xx = x + i;
+                    int yy = y + j;
+                    if (yy >= 0 && yy < height && xx >= 0 && xx < width)
+                        matrix[yy][xx] = (float) p.z;
+                }
+            }
+        }
+        return matrix;
+    }
+*/
 }
