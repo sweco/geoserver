@@ -730,6 +730,26 @@
         </dependency>
       </dependencies>
     </profile>
+    <profile>
+      <id>script-py</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.geoserver.script</groupId>
+          <artifactId>script-py</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>script-js</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.geoserver.script</groupId>
+          <artifactId>script-js</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
  </profiles>
 
 </project>
