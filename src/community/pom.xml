@@ -203,5 +203,11 @@
         <module>authkey</module>
       </modules>
     </profile>
+    <profile>
+      <id>script</id>
+      <modules>
+        <module>script</module>
+      </modules>
+    </profile>
   </profiles>
 </project>

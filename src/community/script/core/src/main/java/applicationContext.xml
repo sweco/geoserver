@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
+<beans>
+
+   <bean id="scriptDispatcherMapping" 
+        class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+    <property name="alwaysUseFullPath" value="true"/>
+    <property name="mappings">
+        <props>
+            <prop key="/scripts">restWrapper</prop>
+            <prop key="/scripts/**">restWrapper</prop>
+            <prop key="/apps">restWrapper</prop>
+            <prop key="/apps/**">restWrapper</prop>
+        </props>
+    </property>
+  </bean>
+
+  <bean id="scriptMgr" class="org.geoserver.script.ScriptManager">
+    <constructor-arg ref="dataDirectory"/>
+  </bean>
+
+  <bean id="scriptRestMapping" class="org.geoserver.rest.RESTMapping">
+    <property name="routes">
+      <map>
+        <entry>
+          <key><value>/{app}/index.{ext}</value></key>
+          <value>appFinder</value>
+        </entry>
+        <entry>
+          <key><value>/process</value></key>
+          <value>scriptFinder</value>
+        </entry>
+        <entry>
+          <key><value>/process/{name}.{ext}</value></key>
+          <value>scriptFinder</value>
+        </entry>
+      </map>
+    </property>
+  </bean>
+
+  <bean id="appFinder" class="org.geoserver.script.app.AppFinder">
+    <constructor-arg ref="scriptMgr"/>
+  </bean>
+  <bean id="scriptFinder" class="org.geoserver.script.rest.ScriptFinder">
+    <constructor-arg ref="scriptMgr"/>
+  </bean>
+
+</beans>
