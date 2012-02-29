@@ -20,6 +20,7 @@ import org.geotools.filter.text.cql2.CQLException;
 import org.geotools.filter.text.ecql.ECQL;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.process.ProcessException;
+import org.geotools.process.RenderingProcess;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
@@ -46,8 +47,10 @@ import com.vividsolutions.jts.util.Stopwatch;
  * prevent extrapolation into unsupported areas, and to increase performance (by reducing
  * the number of observations considered).
  * <p>
- * It allows the surface raster to be computed at a lower resolution than the output coverage,
- * to improve performance.  Interpolation is used during upsampling to maintain visual quality.
+ * The surface raster can be computed at a lower resolution than the output coverage.
+ * The surface is upsampled to match the required output 
+ * image size.  Interpolation is used during upsampling to maintain visual quality.
+ * This make a large improvement in performance, with minimal impact on visual quality for small cell sizes.
  * <p>
  * This process can be used as a RenderingTransformation, since it
  * implements the {@link #invertQuery(Map, Query, GridGeometry)} method.
@@ -261,19 +264,22 @@ public class BarnesSurfaceProcess implements GSProcess {
 
     private float[][] createBarnesMatrix(Coordinate[] pts, int width, int height)
             throws MismatchedDimensionException, TransformException {
-        BarnesInterpolator interp = new BarnesInterpolator(pts);
-        interp.setLengthScale(lengthScale);
-        interp.setConvergenceFactor(convergenceFactor);
-        interp.setPassCount(passes);
-        interp.setMinObservationCount(minObservationCount);
-        interp.setMaxObservationDistance(maxObservationDistance);
-        interp.setNoData(noDataValue);
+        BarnesInterpolator barnesInterp = new BarnesInterpolator(pts);
+        barnesInterp.setLengthScale(lengthScale);
+        barnesInterp.setConvergenceFactor(convergenceFactor);
+        barnesInterp.setPassCount(passes);
+        barnesInterp.setMinObservationCount(minObservationCount);
+        barnesInterp.setMaxObservationDistance(maxObservationDistance);
+        barnesInterp.setNoData(noDataValue);
 
         Envelope env = queryEnvelope(getQueryGridGeometry());
-        float[][] grid = interp.computeSurface(env, width / pixelsPerCell, height / pixelsPerCell);
+        float[][] grid = barnesInterp.computeSurface(env, width / pixelsPerCell, height / pixelsPerCell);
+        
+        // if required, upsample the grid to the output resolution
         float[][] outGrid = grid;
         if (pixelsPerCell > 1) {
-            outGrid = BilinearInterpolator.interpolate(grid, width, height, noDataValue);
+            BilinearInterpolator bi = new BilinearInterpolator(grid, noDataValue);
+            outGrid = bi.interpolate(width, height, true);
         }
         return outGrid;
     }

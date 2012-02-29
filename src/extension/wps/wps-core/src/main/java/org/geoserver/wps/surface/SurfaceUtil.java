@@ -45,20 +45,4 @@ public class SurfaceUtil
         return raster;
     }
 
-    public static float[][] upsample(float[][] src, int width, int height)
-    {
-        int srcWidth = src.length;
-        int srcHeight = src[0].length;
-        
-        float[][] dest = new float[width][height];
-        
-        for (int i = 0; i < width; i++) {
-            int isrc = i * srcWidth / width; 
-            for (int j = 0; j < height; j++) {
-                int jsrc = j * srcHeight / height; 
-                dest[i][j] = src[isrc][jsrc];
-            }
-        }
-        return dest;
-    }
 }
