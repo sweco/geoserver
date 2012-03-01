@@ -9,6 +9,8 @@ import java.io.Reader;
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
+import org.geoserver.script.ScriptHandler;
+import org.geoserver.script.ScriptPlugin;
 import org.restlet.data.Request;
 import org.restlet.data.Response;
 
@@ -25,7 +27,11 @@ import org.restlet.data.Response;
  * @author Justin Deoliveira, OpenGeo
  *
  */
-public abstract class AppHandler {
+public abstract class AppHandler extends ScriptHandler {
+
+    public AppHandler(ScriptPlugin plugin) {
+        super(plugin);
+    }
 
     /**
      * Handles a request.

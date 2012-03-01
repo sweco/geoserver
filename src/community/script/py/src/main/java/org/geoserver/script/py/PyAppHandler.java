@@ -51,6 +51,10 @@ public class PyAppHandler extends AppHandler {
     static Logger LOGGER = Logging.getLogger(PyAppHandler.class);
     static ThreadLocal<WSGIResponse> RESPONSE = new ThreadLocal<WSGIResponse>();
 
+    public PyAppHandler(PythonPlugin plugin) {
+        super(plugin);
+    }
+
     @Override
     public void run(Reader script, ScriptEngine engine, Request request, Response response) 
         throws ScriptException {
