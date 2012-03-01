@@ -15,6 +15,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.geoserver.config.GeoServerDataDirectory;
 import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.script.app.AppHandler;
+import org.geoserver.script.wps.WpsHandler;
 
 /**
  * Facade for the scripting subsystem, providing methods for obtaining script context and managing
@@ -82,6 +83,23 @@ public class ScriptManager {
     }
 
     /**
+     * Finds a script file with the specified filename located  in the specified directory path, 
+     * returning <code>null</code> if the file does not exist.
+     */
+    public File findScriptFile(String dirPath, String filename) throws IOException {
+        return findScriptFile(dirPath + File.separator + filename);
+    }
+
+    /**
+     * Finds a script file at the specified path, returning <code>null</code> if the file does not 
+     * exist.
+     */
+    public File findScriptFile(String path) throws IOException {
+        File f = new File(getScriptRoot(), path);
+        return f.exists() ? f : null;
+    }
+
+    /**
      * The root "apps" directory, located directly under {@link #getScriptRoot()}.
      */
     public File getAppRoot() throws IOException {
@@ -103,20 +121,10 @@ public class ScriptManager {
     }
 
     /**
-     * Finds a script file with the specified filename located  in the specified directory path, 
-     * returning <code>null</code> if the file does not exist.
+     * The root "wps" directory, located directly under {@link #getScriptRoot()} 
      */
-    public File findScriptFile(String dirPath, String filename) throws IOException {
-        return findScriptFile(dirPath + File.separator + filename);
-    }
-
-    /**
-     * Finds a script file at the specified path, returning <code>null</code> if the file does not 
-     * exist.
-     */
-    public File findScriptFile(String path) throws IOException {
-        File f = new File(getScriptRoot(), path);
-        return f.exists() ? f : null;
+    public File getWpsRoot() throws IOException {
+        return dataDir.findOrCreateDir("scripts", "wps");
     }
 
     /**
@@ -166,6 +174,18 @@ public class ScriptManager {
         for (ScriptPlugin plugin : plugins()) {
             if (ext.equalsIgnoreCase(plugin.getExtension())) {
                 return plugin.createAppHandler();
+            }
+        }
+
+        return null;
+    }
+
+    public WpsHandler lookupWpsHandler(File script) {
+        String ext = ext(script);
+
+        for (ScriptPlugin plugin : plugins()) {
+            if (ext.equalsIgnoreCase(plugin.getExtension())) {
+                return plugin.createWpsHandler();
             }
         }
 

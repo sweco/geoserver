@@ -38,6 +38,13 @@
    <version>2.5.1</version>
   </dependency>
   <dependency>
+   <groupId>org.geoserver.script</groupId>
+   <artifactId>script-core</artifactId>
+   <version>${project.version}</version>
+   <classifier>tests</classifier>
+   <scope>test</scope>
+  </dependency>
+  <dependency>
    <groupId>org.geotools</groupId>
    <artifactId>gt-shapefile</artifactId>
    <version>${gt.version}</version>

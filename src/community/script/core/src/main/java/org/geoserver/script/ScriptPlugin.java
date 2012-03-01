@@ -8,6 +8,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineFactory;
 
 import org.geoserver.script.app.AppHandler;
+import org.geoserver.script.wps.WpsHandler;
 
 /**
  * Base class for script plugins.
@@ -69,4 +70,14 @@ public abstract class ScriptPlugin {
         return null;
     }
 
+    /**
+     * Creates the handler for wps processes.
+     * <p>
+     * This default implementation returns <code>null</code>, subclass should override in order to 
+     * implement a custom handler.
+     * </p>
+     */
+    protected WpsHandler createWpsHandler() {
+        return null;
+    }
 }
