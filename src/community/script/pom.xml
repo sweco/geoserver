@@ -89,8 +89,9 @@
 
  <modules>
   <module>core</module>
-  <module>py</module>
+  <module>bsh</module>
   <module>js</module>
+  <module>py</module>
  </modules>
 
 </project>

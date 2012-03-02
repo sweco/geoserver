@@ -49,7 +49,7 @@ public class AppResource extends Resource {
             AppHandler handler = scriptMgr.lookupAppHandler(script);
             if (handler == null) {
                 //TODO: fall back on default
-                throw new RestletException(format("No handler found for %s" + script.getPath()), 
+                throw new RestletException(format("No handler found for %s", script.getPath()), 
                     Status.SERVER_ERROR_INTERNAL);
             }
 
