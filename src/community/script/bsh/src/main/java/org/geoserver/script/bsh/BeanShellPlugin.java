@@ -19,6 +19,21 @@ public class BeanShellPlugin extends ScriptPlugin {
     }
 
     @Override
+    public String getId() {
+        return "beanshell";
+    }
+
+    @Override
+    public String getDisplayName() {
+        return "BeanShell";
+    }
+
+    @Override
+    public String getEditorMode() {
+        return "javascript";
+    }
+
+    @Override
     protected AppHandler createAppHandler() {
         return new SimpleAppHandler(this);
     }

@@ -33,6 +33,16 @@ public class PythonPlugin extends ScriptPlugin {
     }
 
     @Override
+    public String getId() {
+        return "python";
+    }
+
+    @Override
+    public String getDisplayName() {
+        return "Python";
+    }
+
+    @Override
     protected AppHandler createAppHandler() {
         return new PyAppHandler(this);
     }

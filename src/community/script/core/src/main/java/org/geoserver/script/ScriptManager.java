@@ -169,27 +169,36 @@ public class ScriptManager {
      * </p>
      */
     public AppHandler lookupAppHandler(File script) {
-        String ext = ext(script);
-
-        for (ScriptPlugin plugin : plugins()) {
-            if (ext.equalsIgnoreCase(plugin.getExtension())) {
-                return plugin.createAppHandler();
-            }
-        }
-
-        return null;
+        ScriptPlugin p = plugin(script);
+        return p != null ? p.createAppHandler() : null;
     }
 
+    /**
+     * Looks up the wps handler for the speified script returning <code>null</code> if no such 
+     * handler can be found.
+     * <p>
+     * This method works by looking up all {@link ScriptPlugin} instances and delegating to 
+     * {@link ScriptPlugin#createWpsHandler()}.
+     * </p>
+     */
     public WpsHandler lookupWpsHandler(File script) {
-        String ext = ext(script);
+        ScriptPlugin p = plugin(script);
+        return p != null ? p.createWpsHandler() : null;
+    }
 
-        for (ScriptPlugin plugin : plugins()) {
-            if (ext.equalsIgnoreCase(plugin.getExtension())) {
-                return plugin.createWpsHandler();
-            }
-        }
+    public String lookupPluginId(File script) {
+        ScriptPlugin p = plugin(script);
+        return p != null ? p.getId() : null;
+    }
 
-        return null;
+    public String lookupPluginDisplayName(File script) {
+        ScriptPlugin p = plugin(script);
+        return p != null ? p.getDisplayName() : null;
+    }
+
+    public String lookupPluginEditorMode(File script) {
+        ScriptPlugin p = plugin(script);
+        return p != null ? p.getEditorMode() : null;
     }
 
     /*
@@ -204,6 +213,21 @@ public class ScriptManager {
             }
         }
         return plugins;
+    }
+
+    /*
+     * Looks up the plugin for the specified script.
+     */
+    ScriptPlugin plugin(File script) {
+        String ext = ext(script);
+
+        for (ScriptPlugin plugin : plugins()) {
+            if (ext.equalsIgnoreCase(plugin.getExtension())) {
+                return plugin;
+            }
+        }
+
+        return null;
     }
 
     /*

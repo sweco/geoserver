@@ -11,10 +11,15 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.wicket.ResourceReference;
+import org.apache.wicket.ajax.AbstractDefaultAjaxBehavior;
+import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.IAjaxCallDecorator;
 import org.apache.wicket.ajax.calldecorator.AjaxCallDecorator;
+import org.apache.wicket.ajax.form.AjaxFormComponentUpdatingBehavior;
 import org.apache.wicket.behavior.AbstractBehavior;
 import org.apache.wicket.markup.html.IHeaderResponse;
 import org.apache.wicket.markup.html.WebMarkupContainer;
@@ -30,14 +35,28 @@ import org.apache.wicket.model.Model;
 @SuppressWarnings("serial")
 public class CodeMirrorEditor extends FormComponentPanel<String> {
 
-    public static final ResourceReference REFERENCE = new ResourceReference(
-            CodeMirrorEditor.class, "js/codemirror/js/codemirror.js");
-    
-    private TextArea<String> editor;
+    static final ResourceReference JS_REF = new ResourceReference(
+        CodeMirrorEditor.class, "js/codemirror/codemirror.js");
 
+    static final ResourceReference CSS_REF = new ResourceReference(
+        CodeMirrorEditor.class, "js/codemirror/codemirror.css");
+
+    static Map<String,Object> DEFAULT_OPTIONS = new HashMap<String, Object>();
+    static {
+        DEFAULT_OPTIONS.put("mode", "xml");
+        DEFAULT_OPTIONS.put("lineNumbers", true);
+    }
+
+    private TextArea<String> editor;
     private WebMarkupContainer container;
+    private Map<String,Object> options;
+    private AbstractDefaultAjaxBehavior onBlurBehaviour;
 
     public CodeMirrorEditor(String id, IModel<String> model) {
+        this(id, model, null);
+    }
+    
+    public CodeMirrorEditor(String id, IModel<String> model, Map<String,Object> options) {
         super(id, model);
         
         container = new WebMarkupContainer("editorContainer");
@@ -45,11 +64,31 @@ public class CodeMirrorEditor extends FormComponentPanel<String> {
         add(container);
         
         editor = new TextArea<String>("editor", new Model<String>((String) model.getObject()));
+         
         container.add(editor);
         editor.setOutputMarkupId(true);
+
+        this.options = new HashMap<String, Object>(DEFAULT_OPTIONS);
+        if (options != null) {
+            this.options.putAll(options);
+        }
         editor.add(new CodeMirrorBehavior());
+
+        if (handleOnBlur()) {
+            onBlurBehaviour = new AbstractDefaultAjaxBehavior() {
+                @Override
+                protected void respond(AjaxRequestTarget target) {
+                    onBlur(target);
+                }
+            };
+            editor.add(onBlurBehaviour);
+        }
     }
-    
+
+    public Map<String, Object> getOptions() {
+        return options;
+    }
+
     @Override
     protected void onBeforeRender() {
         editor.setModelObject(getModelObject());
@@ -80,7 +119,7 @@ public class CodeMirrorEditor extends FormComponentPanel<String> {
         editor.validate();
         editor.clearInput();
     }
-    
+
     public IAjaxCallDecorator getSaveDecorator() {
         // we need to force CodeMirror to update the textarea contents (which it hid)
         // before submitting the form, otherwise the validation will use the old contents
@@ -93,24 +132,63 @@ public class CodeMirrorEditor extends FormComponentPanel<String> {
             }
         };
     }
-    
+
+    protected boolean handleOnBlur() {
+        return false;
+    }
+
+    protected void onBlur(AjaxRequestTarget target) {
+    }
+
     class CodeMirrorBehavior extends AbstractBehavior {
 
         @Override
         public void renderHead(IHeaderResponse response) {
             super.renderHead(response);
-            response.renderJavascriptReference(REFERENCE);
+            response.renderJavascriptReference(JS_REF);
+            response.renderCSSReference(CSS_REF);
+
+            String mode = (String) options.get("mode");
+            response.renderJavascriptReference(new ResourceReference(CodeMirrorEditor.class, 
+                String.format("js/codemirror/mode/%s/%s.js", mode, mode)));
 
             response.renderOnDomReadyJavascript(getInitJavascript());
         }
 
         private String getInitJavascript() {
+            //build up the option object
+            StringBuffer opts = new StringBuffer();
+
+            for (Map.Entry<String, Object> e: options.entrySet()) {
+                Object val = e.getValue(); 
+                if (val == null) {
+                    continue;
+                }
+                
+                opts.append(e.getKey()).append(":");
+                if (val instanceof String) {
+                    opts.append("'").append(val).append("'");
+                }
+                else {
+                    opts.append(val);
+                }
+                opts.append(",");
+            }
+            opts.setLength(opts.length() > 0 ? opts.length()-1 : opts.length());
+
             InputStream is = CodeMirrorEditor.class.getResourceAsStream("CodeMirrorEditor.js");
             String js = convertStreamToString(is);
+            js = js.replaceAll("\\$options", opts.toString());
             js = js.replaceAll("\\$componentId", editor.getMarkupId());
-            js = js.replaceAll("\\$syntax", "parsexml.js");
             js = js.replaceAll("\\$container", container.getMarkupId());
-            js = js.replaceAll("\\$stylesheet", "./resources/org.geoserver.web.wicket.CodeMirrorEditor/js/codemirror/css/xmlcolors.css");
+
+            if (onBlurBehaviour != null) {
+                js = js.replaceAll("\\$onBlurCallbackURL", "'" + onBlurBehaviour.getCallbackUrl() + "'");
+            }
+            else {
+                js = js.replaceAll("\\$onBlurCallbackURL", "0");
+            }
+
             return js;
         }
 

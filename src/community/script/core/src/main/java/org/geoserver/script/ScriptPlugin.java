@@ -42,6 +42,27 @@ public abstract class ScriptPlugin {
     }
 
     /**
+     * The id of the script plugin, examples: "python", "javascript", "ruby", etc...
+     */
+    public abstract String getId();
+
+    /**
+     * The id of the script plugin, meant for display, examples: "Python", "JavaScript", "Ruby", 
+     * etc...
+     */
+    public abstract String getDisplayName();
+
+    /**
+     * The value of the mode parameter to use for the CodeMirror editor.
+     * <p>
+     * Subclasses may override, the default for this method is to return {@link #getId()}.
+     * </p>
+     */
+    public String getEditorMode() {
+        return getId();
+    }
+
+    /**
      * The associated script engine factory for the script plugin.
      */
     public Class<? extends ScriptEngineFactory> getScriptEngineFactoryClass() {
