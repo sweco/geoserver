@@ -10,5 +10,21 @@
  <artifactId>script-core</artifactId>
  <packaging>jar</packaging>
  <name>Core Scripting Extension</name>
+ 
+ <dependencies>
+   <dependency>
+     <groupId>wicket-tree</groupId>
+     <artifactId>wicket-tree</artifactId>
+     <version>0.4.4</version>
+   </dependency>
+ </dependencies>
+
+ <repositories>
+   <repository> 
+     <id>wicket-tree</id> 
+     <name>Wicket-tree Repository</name> 
+     <url>http://wicket-tree.googlecode.com/svn/repo</url> 
+   </repository> 
+ </repositories>
 
 </project>

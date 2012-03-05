@@ -45,4 +45,12 @@
     <constructor-arg ref="scriptMgr"/>
   </bean>
 
+  <bean id="scriptMenuPage" class="org.geoserver.web.MenuPageInfo">
+        <property name="id" value="scriptMenuPage"/>
+        <property name="titleKey" value="ScriptsPage.title"/>
+        <property name="descriptionKey" value="ScriptsPage.description"/>
+        <property name="icon" value="script.png"/>
+        <property name="componentClass" value="org.geoserver.script.web.ScriptsPage"/>
+   </bean>
+
 </beans>
