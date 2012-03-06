@@ -141,6 +141,8 @@ public class AppSchemaTestPostgisSetup extends ReferenceDataPostgisSetup {
                     type = Classes.getShortName(desc.getType().getBinding());
                     if (type.equalsIgnoreCase("String")) {
                         type = "TEXT";
+                    } else if (type.equalsIgnoreCase("Double")) {
+                        type = "DOUBLE PRECISION";
                     }
                     field += type;
                     createParams.add(field);
@@ -218,6 +220,6 @@ public class AppSchemaTestPostgisSetup extends ReferenceDataPostgisSetup {
     @Override
     protected void runSqlInsertScript() throws Exception {
         System.out.println(sql);
-        this.run(sql);
+        this.run(sql, false);
     }
 }

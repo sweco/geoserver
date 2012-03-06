@@ -6,11 +6,13 @@ package org.geoserver.web.wicket;
 
 import org.apache.wicket.Component;
 import org.apache.wicket.markup.html.WebMarkupContainer;
+import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.FormComponentPanel;
 import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
+import org.apache.wicket.model.ResourceModel;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
@@ -24,11 +26,16 @@ import com.vividsolutions.jts.geom.Envelope;
  */
 public class EnvelopePanel extends FormComponentPanel {
 
-    Double minX,minY,maxX,maxY;
-    CoordinateReferenceSystem crs;
-    WebMarkupContainer crsContainer;
-    private CRSPanel crsPanel;
-    boolean crsRequired;
+    protected Label minXLabel, minYLabel, maxXLabel, maxYLabel;
+
+    protected Double minX,minY,maxX,maxY;
+
+    protected DecimalTextField minXInput, minYInput, maxXInput, maxYInput;
+
+    protected CoordinateReferenceSystem crs;
+    protected WebMarkupContainer crsContainer;
+    protected  CRSPanel crsPanel;
+    protected boolean crsRequired;
     
     public EnvelopePanel(String id ) {
         super(id);
@@ -66,14 +73,26 @@ public class EnvelopePanel extends FormComponentPanel {
     public void setCrsRequired(boolean crsRequired) {
         this.crsRequired = crsRequired;
     }
+    
+    public void setLabelsVisibility(boolean visible) {
+        minXLabel.setVisible(visible);
+        minYLabel.setVisible(visible);
+        maxXLabel.setVisible(visible);
+        maxYLabel.setVisible(visible);
+    }
 
     void initComponents() {
         updateFields();
         
-        add( new DecimalTextField( "minX", new PropertyModel(this, "minX")) );
-        add( new DecimalTextField( "minY", new PropertyModel(this, "minY")) );
-        add( new DecimalTextField( "maxX", new PropertyModel(this, "maxX") ));
-        add( new DecimalTextField( "maxY", new PropertyModel(this, "maxY")) );
+        add(minXLabel = new Label("minXL", new ResourceModel("minX")));
+        add(minYLabel = new Label("minYL", new ResourceModel("minY")));
+        add(maxXLabel = new Label("maxXL", new ResourceModel("maxX")));
+        add(maxYLabel = new Label("maxYL", new ResourceModel("maxY")));
+
+        add( minXInput = new DecimalTextField( "minX", new PropertyModel(this, "minX")) );
+        add( minYInput = new DecimalTextField( "minY", new PropertyModel(this, "minY")) );
+        add( maxXInput = new DecimalTextField( "maxX", new PropertyModel(this, "maxX") ));
+        add( maxYInput = new DecimalTextField( "maxY", new PropertyModel(this, "maxY")) );
         crsContainer = new WebMarkupContainer("crsContainer");
         crsContainer.setVisible(false);
         crsPanel = new CRSPanel("crs", new PropertyModel(this, "crs"));
