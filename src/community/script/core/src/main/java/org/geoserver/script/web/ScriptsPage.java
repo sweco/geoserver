@@ -5,9 +5,7 @@
 package org.geoserver.script.web;
 
 import java.io.IOException;
-import java.util.Map;
 
-import org.apache.wicket.RequestCycle;
 import org.apache.wicket.WicketRuntimeException;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.markup.html.form.Form;
@@ -17,6 +15,12 @@ import org.geoserver.script.ScriptManager;
 import org.geoserver.web.GeoServerSecuredPage;
 import org.geoserver.web.wicket.CodeMirrorEditor;
 
+/**
+ * Page providing a tree browser and an editor for scripts.
+ * 
+ * @author Justin Deoliveira, OpenGeo
+ *
+ */
 public class ScriptsPage extends GeoServerSecuredPage {
 
     FileTreePanel<Script> scripts;
@@ -26,10 +30,30 @@ public class ScriptsPage extends GeoServerSecuredPage {
          Form form = new Form("form");
          add(form);
 
-         ScriptManager mgr = getScriptManager();
          try {
-            form.add(scripts = new FileTreePanel<Script>("scripts",  
-                 new FileTreeProvider<Script>(mgr.getAppRoot(),mgr.getWpsRoot())));
+            form.add(scripts = new FileTreePanel<Script>("scripts", new ScriptProvider()) {
+                @Override
+                protected void onClick(Script file, AjaxRequestTarget target) {
+                    try {
+                        //upadte the editor contents
+                        editor.getModel().setObject(file.read());
+
+                        //set the mode depending on the file
+                        String mode = getScriptManager().lookupPluginEditorMode(file);
+                        if (mode != null) {
+                            editor.setMode(mode);
+                        }
+                        target.addComponent(editor);
+                    } catch (IOException e) {
+                        error(e);
+                    }
+                }
+                @Override
+                protected void onDelete(Script file, AjaxRequestTarget target) {
+                    editor.getModel().setObject("");
+                    target.addComponent(editor);
+                }
+            });
         } catch (IOException e) {
             throw new WicketRuntimeException(e);
         }
@@ -41,16 +65,14 @@ public class ScriptsPage extends GeoServerSecuredPage {
             }
 
             @Override
-            protected void onBlur(AjaxRequestTarget target) {
-                super.onBlur(target);
-
-                Map<String,String[]> map = RequestCycle.get().getRequest().getParameterMap();
-                for (String key : map.keySet()) {
-                    String[] val = map.get(key);
-                    if (val.length == 1 && "".equals(val[0])) {
-                        
-                    }
+            protected void onBlur(String contents, AjaxRequestTarget target) {
+                Script script = scripts.getSelected();
+                if (script == null) {
+                    return;
                 }
+
+                script.update(contents);
+                scripts.changed(script, target);
             }
          });
          editor.setOutputMarkupId(true);

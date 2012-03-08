@@ -7,16 +7,24 @@ package org.geoserver.script.web;
 import java.io.File;
 
 import org.apache.wicket.Component;
+import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.behavior.AbstractBehavior;
 import org.apache.wicket.extensions.ajax.markup.html.AjaxEditableLabel;
 import org.apache.wicket.markup.html.IHeaderResponse;
+import org.apache.wicket.markup.html.WebComponent;
 import org.apache.wicket.model.IModel;
 
 import wickettree.NestedTree;
 import wickettree.content.Folder;
 import wickettree.theme.WindowsTheme;
 
+/**
+ * File based tree.
+ * 
+ * @author Justin Deoliveira, OpenGeo
+ *
+ */
 public class FileTree<T extends File> extends NestedTree<T> {
 
     T selected;
@@ -47,10 +55,6 @@ public class FileTree<T extends File> extends NestedTree<T> {
     protected void onClick(T file, AjaxRequestTarget target) {
     }
 
-    protected boolean isModified(T file) {
-        return false;
-    }
-
     @Override
     protected Component newContentComponent(String id, IModel<T> model) {
         return new Folder<T>(id, this, model) {
@@ -59,16 +63,28 @@ public class FileTree<T extends File> extends NestedTree<T> {
                 T file = model.getObject();
 
                 if (getProvider().isRoot(file)) {
-                    return super.newLabelComponent(id, model); 
+                    return super.newLabelComponent(id, model).setEscapeModelStrings(false); 
                 }
                 
                 return new AjaxEditableLabel(id, newLabelModel(model)) {
+                    @Override
+                    protected WebComponent newLabel(MarkupContainer parent,
+                            String componentId, IModel model) {
+                        WebComponent c = super.newLabel(parent, componentId, model);
+                        c.setEscapeModelStrings(false);
+                        return c;
+                    }
+                    
                     protected String getLabelAjaxEvent() {
                         return "ondblclick";
                     }
 
                     protected void onSubmit(AjaxRequestTarget target) {
                         super.onSubmit(target);
+
+                        T file = getModelObject();
+                        select(file);
+                        updateNode(file, target);
                     };
                     
                 };
@@ -118,8 +134,7 @@ public class FileTree<T extends File> extends NestedTree<T> {
             T file = model.getObject();
             String label = file.getName();
             
-            if (isModified(file)) {
-                //label = "<i>" + label + "</i>";
+            if (getProvider().isModified(file)) {
                 label = "*<i>" + label + "</i>";
             }
             return label;

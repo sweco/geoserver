@@ -11,13 +11,10 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-import org.apache.wicket.AttributeModifier;
-import org.apache.wicket.Component;
+import org.apache.wicket.RequestCycle;
 import org.apache.wicket.ResourceReference;
 import org.apache.wicket.ajax.AbstractDefaultAjaxBehavior;
 import org.apache.wicket.ajax.AjaxRequestTarget;
@@ -30,7 +27,6 @@ import org.apache.wicket.markup.html.IHeaderResponse;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.form.FormComponentPanel;
 import org.apache.wicket.markup.html.form.TextArea;
-import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 
@@ -40,46 +36,6 @@ import org.apache.wicket.model.Model;
  */
 @SuppressWarnings("serial")
 public class CodeMirrorEditor extends FormComponentPanel<String> {
-
-//    public static enum Tool {
-//        NEW("new", "button-new") {
-//            @Override
-//            Component create(final CodeMirrorEditor editor) {
-//                return new ToolAjaxLink(id) {
-//                    @Override
-//                    public void onClick(AjaxRequestTarget target) {
-//                        editor.onNew(target);
-//                    }
-//                };
-//            }
-//        }, 
-//        SAVE("save", "button-save") {
-//            @Override
-//            Component create(final CodeMirrorEditor editor) {
-//                return new ToolAjaxLink(id) {
-//                    @Override
-//                    public void onClick(AjaxRequestTarget target) {
-//                        editor.onSave(target);
-//                    }
-//                };
-//            }
-//        }, 
-//        UNDO("undo", "button-undo") {}, 
-//        REDO("redo", "button-redo") {},
-//        GOTO("goto", "button-goto") {}, 
-//        FONT_SIZE("fontSize", "") {};
-//
-//        String id;
-//        String css;
-//        Tool(String id, String css) {
-//            this.id = id;
-//            this.css = css;
-//        }
-//
-//        Component create(CodeMirrorEditor editor) {
-//            return new WebMarkupContainer(id);
-//        }
-//    }
 
     static final ResourceReference JS_REF = new ResourceReference(
         CodeMirrorEditor.class, "js/codemirror/codemirror.js");
@@ -123,11 +79,25 @@ public class CodeMirrorEditor extends FormComponentPanel<String> {
             onBlurBehaviour = new AbstractDefaultAjaxBehavior() {
                 @Override
                 protected void respond(AjaxRequestTarget target) {
-                    onBlur(target);
+                    Map<String,String[]> map = RequestCycle.get().getRequest().getParameterMap();
+                    String contents = null;
+                    for (String key : map.keySet()) {
+                        String[] val = map.get(key);
+                        if (val.length == 1 && "".equals(val[0])) {
+                            contents = key;
+                        }
+                    }
+                    if (contents != null) {
+                        onBlur(contents, target);
+                    }
                 }
             };
             editor.add(onBlurBehaviour);
         }
+    }
+
+    public void setMode(String mode) {
+        options.put("mode", mode);
     }
 
     public Map<String, Object> getOptions() {
@@ -182,7 +152,7 @@ public class CodeMirrorEditor extends FormComponentPanel<String> {
         return false;
     }
 
-    protected void onBlur(AjaxRequestTarget target) {
+    protected void onBlur(String contents, AjaxRequestTarget target) {
     }
 
     protected void onNew(AjaxRequestTarget target) {
