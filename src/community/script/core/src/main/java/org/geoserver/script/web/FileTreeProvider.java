@@ -5,6 +5,7 @@
 package org.geoserver.script.web;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -15,6 +16,11 @@ import org.apache.wicket.model.Model;
 
 import wickettree.ITreeProvider;
 
+/**
+ * Provider used by {@link FileTree}
+ * 
+ * @author Justin Deoliveira, OpenGeo
+ */
 public class FileTreeProvider<T extends File> implements ITreeProvider<T> {
 
     List<T> roots;
@@ -63,6 +69,13 @@ public class FileTreeProvider<T extends File> implements ITreeProvider<T> {
                 it.remove();
             }
         };
+    }
+
+    protected boolean isModified(T file) {
+        return false;
+    }
+
+    protected void save(T file) throws IOException {
     }
 
     protected T file(File file) {

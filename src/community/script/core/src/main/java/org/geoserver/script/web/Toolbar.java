@@ -15,6 +15,12 @@ import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.Panel;
 
+/**
+ * Toolbar panel.
+ * 
+ * @author Justin Deoliveira, OpenGeo
+ *
+ */
 public class Toolbar extends Panel {
     
     ListView<Tool> tools;
