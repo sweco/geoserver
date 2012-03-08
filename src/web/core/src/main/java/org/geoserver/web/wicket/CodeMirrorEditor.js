@@ -11,13 +11,24 @@ if(!document.gsEditors) {
     document.gsEditors = {};
 }
 document.gsEditors.$componentId = editor;
+
+function enabled(el) {
+  return !el.getAttribute("class").match("disabled");
+}
 document.getElementById('cm_undo').onclick = function() {
-    editor.undo();
+    if (enabled(this)) {
+        editor.undo();
+    }
 };
 document.getElementById('cm_redo').onclick = function() {
-    editor.redo();
+    if (enabled(this)) {
+        editor.redo();
+    }
 };
 document.getElementById('cm_goto').onclick = function() {
+    if (!enabled(this)) {
+        return;
+    }
     var line = Number(prompt("Jump to line:", ""));
     var last = editor.lineCount();
     line = (line <= 1) ? 1 : (line > last) ? last : line;

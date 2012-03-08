@@ -1,24 +1,22 @@
+/* Copyright (c) 2001 - 2012 TOPP - www.openplans.org. All rights reserved.
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.script.web;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
 
 import org.apache.commons.io.FileUtils;
 
-public class ScriptFile implements Serializable {
+public class Script extends File {
 
-    File file;
+    public Script(File file) {
+        super(file.toURI());
+    }
+
     String contents;
-    
-    ScriptFile(File file) {
-        this.file = file;
-    }
-    
-    public File getFile() {
-        return file;
-    }
-    
+
     public void update(String contents) {
         this.contents = contents;
     }
@@ -28,12 +26,12 @@ public class ScriptFile implements Serializable {
     }
     
     public String read() throws IOException {
-        return contents != null ? contents : FileUtils.readFileToString(file);
+        return contents != null ? contents : FileUtils.readFileToString(this);
     }
     
     public void save() throws IOException {
         if (contents != null) {
-            FileUtils.writeStringToFile(file, contents);
+            FileUtils.writeStringToFile(this, contents);
         }
     }
 }
