@@ -28,7 +28,7 @@ public class PyAppTest extends GeoServerTestSupport {
         FileUtils.copyURLToFile(
             getClass().getResource("index-helloWorld.py"), new File(app, "index.py"));
 
-        MockHttpServletResponse resp = getAsServletResponse("/apps/foo/index.py");
+        MockHttpServletResponse resp = getAsServletResponse("/script/apps/foo/index.py");
         assertEquals(200, resp.getStatusCode());
         assertEquals("Hello World!", resp.getOutputStreamContent());
     }
@@ -37,7 +37,7 @@ public class PyAppTest extends GeoServerTestSupport {
         FileUtils.copyURLToFile(
             getClass().getResource("index-helloWorldJSON.py"), new File(app, "index.py"));
 
-        MockHttpServletResponse resp = getAsServletResponse("/apps/foo/index.py");
+        MockHttpServletResponse resp = getAsServletResponse("/script/apps/foo/index.py");
         assertEquals(200, resp.getStatusCode());
         assertEquals("application/json", resp.getContentType());
     }

@@ -6,9 +6,13 @@ package org.geoserver.script;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import javax.script.ScriptEngine;
+import javax.script.ScriptEngineFactory;
 import javax.script.ScriptEngineManager;
 
 import org.apache.commons.io.FilenameUtils;
@@ -16,6 +20,10 @@ import org.geoserver.config.GeoServerDataDirectory;
 import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.script.app.AppHandler;
 import org.geoserver.script.wps.WpsHandler;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.LoadingCache;
 
 /**
  * Facade for the scripting subsystem, providing methods for obtaining script context and managing
@@ -30,10 +38,13 @@ public class ScriptManager {
     ScriptEngineManager engineMgr;
 
     volatile List<ScriptPlugin> plugins;
+    Cache<Long, ScriptSession> sessions;
 
     public ScriptManager(GeoServerDataDirectory dataDir) {
         this.dataDir = dataDir;
         engineMgr = new ScriptEngineManager();
+        sessions = CacheBuilder.newBuilder()
+            .maximumSize(10).expireAfterAccess(10, TimeUnit.MINUTES).build();
     }
 
     /**
@@ -138,7 +149,33 @@ public class ScriptManager {
      * Creates a new script engine for the specified file extension.
      */
     public ScriptEngine createNewEngine(String ext) {
+        if (ext == null) {
+            return null;
+        }
         return initEngine(engineMgr.getEngineByExtension(ext));
+    }
+
+    public ScriptSession createNewSession(String ext) {
+        ScriptSession session = new ScriptSession(createNewEngine(ext), ext);
+        sessions.put(session.getId(), session);
+        return session;
+    }
+
+    public ScriptSession findSession(long id) {
+        return sessions.getIfPresent(id);
+    }
+
+    public List<ScriptSession> findSessions(String ext) {
+        List<ScriptSession> sids = new ArrayList();
+        for (Map.Entry<Long, ScriptSession> e : sessions.asMap().entrySet()) {
+            if (ext != null && !ext.equalsIgnoreCase(e.getValue().getExtension())) {
+                continue;
+            }
+
+            sids.add(e.getValue());
+        }
+        
+        return sids;
     }
 
     /*
@@ -199,6 +236,15 @@ public class ScriptManager {
     public String lookupPluginEditorMode(File script) {
         ScriptPlugin p = plugin(script);
         return p != null ? p.getEditorMode() : null;
+    }
+
+    public boolean hasEngineForExtension(String ext) {
+        for (ScriptEngineFactory f : engineMgr.getEngineFactories()) {
+            if (f.getExtensions().contains(ext)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /*
