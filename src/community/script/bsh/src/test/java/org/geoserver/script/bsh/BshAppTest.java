@@ -28,7 +28,7 @@ public class BshAppTest extends GeoServerTestSupport {
         FileUtils.copyURLToFile(
             getClass().getResource("index-helloWorld.bsh"), new File(app, "index.bsh"));
 
-        MockHttpServletResponse resp = getAsServletResponse("/apps/foo/index.bsh");
+        MockHttpServletResponse resp = getAsServletResponse("/script/apps/foo/index.bsh");
         assertEquals(200, resp.getStatusCode());
         assertEquals("Hello World!", resp.getOutputStreamContent());
 

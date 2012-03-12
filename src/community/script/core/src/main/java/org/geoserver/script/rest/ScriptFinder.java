@@ -4,6 +4,7 @@
  */
 package org.geoserver.script.rest;
 
+import org.geoserver.ows.util.ResponseUtils;
 import org.geoserver.script.ScriptManager;
 import org.restlet.Finder;
 import org.restlet.data.Request;
@@ -21,9 +22,11 @@ public class ScriptFinder extends Finder {
     @Override
     public Resource findTarget(Request request, Response response) {
         String name = (String) request.getAttributes().get("name");
-        String path = 
-            request.getResourceRef().getRelativeRef(request.getRootRef()).getPath();
 
+        //get a relative reference
+        String path = request.getResourceRef().getRelativeRef(request.getRootRef()).getPath();
+        path = ResponseUtils.stripBeginningPath(path);
+        
         if (name != null) {
             // direct script
             return new ScriptResource(scriptMgr, path, request, response);
