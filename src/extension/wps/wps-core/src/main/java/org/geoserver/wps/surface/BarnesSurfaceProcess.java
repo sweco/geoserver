@@ -1,128 +1,124 @@
+/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wps.surface;
 
-import java.awt.image.DataBuffer;
-import java.awt.image.RenderedImage;
-import java.awt.image.WritableRaster;
-import java.util.Map;
-
-import javax.media.jai.RasterFactory;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.geotools.coverage.CoverageFactoryFinder;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
-import org.geotools.coverage.grid.GridGeometry2D;
-import org.geotools.coverage.grid.RenderedImageFactoryTemp;
 import org.geotools.data.Query;
 import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.factory.Hints;
-import org.geotools.feature.FeatureCollection;
 import org.geotools.filter.text.cql2.CQLException;
 import org.geotools.filter.text.ecql.ECQL;
-import org.geotools.geometry.DirectPosition2D;
+import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.process.ProcessException;
-import org.geotools.process.RenderingProcess;
 import org.geotools.process.factory.DescribeParameter;
 import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.process.gs.GSProcess;
-import org.opengis.coverage.grid.GridEnvelope;
 import org.opengis.coverage.grid.GridGeometry;
+import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.filter.Filter;
-import org.opengis.geometry.DirectPosition;
-import org.opengis.geometry.MismatchedDimensionException;
-import org.opengis.referencing.operation.MathTransform;
-import org.opengis.referencing.operation.NoninvertibleTransformException;
-import org.opengis.referencing.operation.TransformException;
+import org.opengis.filter.expression.Expression;
 import org.opengis.util.ProgressListener;
 
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.CoordinateArrays;
 import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.util.Stopwatch;
+import com.vividsolutions.jts.geom.Geometry;
 
 /**
- * A Process that computes a GridCoverage that is an interpolated surface over a set of irregular data points
- * using Barnes Analysis.
+ * A Process that uses Barnes Analysis to compute an interpolated surface 
+ * over a set of irregular data points as a GridCoverage.
  * <p>
  * The implementation allows limiting the radius of influence of observations, in order to 
  * prevent extrapolation into unsupported areas, and to increase performance (by reducing
  * the number of observations considered).
  * <p>
- * The surface raster can be computed at a lower resolution than the output coverage.
- * The surface is upsampled to match the required output 
- * image size.  Interpolation is used during upsampling to maintain visual quality.
- * This make a large improvement in performance, with minimal impact on visual quality for small cell sizes.
+ * The surface grid can be computed at a lower resolution than the requested output image.
+ * The grid is upsampled to match the required image size.  
+ * Interpolation is used during upsampling to maintain visual quality.
+ * This gives a large improvement in performance, with minimal impact on visual quality for small cell sizes.
  * <p>
  * This process can be used as a RenderingTransformation, since it
- * implements the {@link #invertQuery(Map, Query, GridGeometry)} method.
+ * implements the <tt>invertQuery(... Query, GridGeometry)</tt> method.
+ * 
  * The query is rewritten to expand the query BBOX,
  * to ensure that enough data points are queried to make the 
  * computed surface stable under panning and zooming.  
+ * To ensure that the computed surface is stable 
+ * under zooming and panning (i.e. does not display obvious edge effects), 
+ * the query BBOX must be expanded to include a larger data area.
+ * The expansion distance depends on the 
+ * length scale, convergence factor, and data spacing 
+ * in a complex way, so must be manually determined.
+ * It does NOT depend on the output window extent.
+ * (A good heuristic is to set it expand by at least the length scale.)
  * 
  * <h3>Parameters</h3>
  * <i>M = mandatory, O = optional</i>
  * <p>
  * <ul>
  * <li><b>data</b> (M) - the FeatureCollection containing the point observations
- * <li><b>valueAttr</b> (M)- the attribute containing the observation value
+ * <li><b>valueAttr</b> (M)- the feature type attribute containing the observed surface value
  * <li><b>scale</b> (M) - the Length Scale for the interpolation.  In units of the input data CRS.
  * <li><b>convergence</b> (O) - the convergence factor for refinement.  Between 0 and 1 (values below 0.4 are safest).  (Default = 0.3)
  * <li><b>passes</b> (O) - the number of passes to compute.  1 or greater. (Default = 2) 
  * <li><b>minObservations</b> (O) - The minimum number of observations required to support a grid cell. (Default = 2)
  * <li><b>maxObservationDistance</b> (O) - The maximum distance to an observation for it to support a grid cell.  0 means all observations are used. (Default = 0)
- * <li><b>queryBufferDistance</b> (O) - The distance to expand the query envelope by. Larger values provide a more stable surface.  (Default = Length scale)
  * <li><b>noDatavalue</b> (O) - The NO_DATA value to use for unsupported grid cells in the output coverage.  (Default = -999)
  * <li><b>pixelsPerCell</b> (O) - The pixels-per-cell value determines the resolution of the computed grid. 
  * Larger values improve performance, but degrade appearance. (Default = 1)
+ * <li><b>queryBuffer</b> (O) - The distance to expand the query envelope by. Larger values provide a more stable surface.  (Default = 0)
+ * <li><b>destBBOX</b> (M) - The destination bounding box (env var = <tt>wms_bbox</tt>)
+ * <li><b>imageWidth</b> (M) - The final image width (env var = <tt>wms_width</tt>)
+ * <li><b>imageHeight</b> (M) - The final image height (env var = <tt>wms_height</tt>)
  * </ul>
+ * If used as a RenderingTransformation, the destination image parameters can be obtained 
+ * in the SLD by using the <tt>env</tt> function, with the variable names as specified above.
+ * <p>
+ * The output of the process is a {@linkplain GridCoverage2D} with a single band, containing cells with
+ * values in the same domain as the input observation field specified by <code>valueAttr</code>.
  * <p>
  * @author mdavis
  *
  */
-@DescribeProcess(title = "BarnesSurface", description = "Interpolates a surface over a set of irregular data points using Barnes Analysis.")
+@DescribeProcess(title = "BarnesSurface", description = "Uses Barnes Analysis to compute an interpolated surface over a set of irregular data points aa a GridCoverage.")
 public class BarnesSurfaceProcess implements GSProcess {
 
-    /**------------------------
-     * Per-request state.
-     * RenderingTransformation processes are created on a per-SLD basis,
-     * so state with a shorter lifetime must be stored in a thread-local.
-     * --------------------------
-     */
-    private static ThreadLocal<GridGeometry> threadGridGeom = new ThreadLocal<GridGeometry>() {
-    };
-
-    /**--------------------------
-     * Per-SLD state
-     * --------------------------
-     */
-    private double lengthScale = 0.0;
-
-    private double convergenceFactor = 0.3;
-      
-    private int passes  = 2;
-
-    private int minObservationCount = 2;
-
-    private double maxObservationDistance = 0.0;
+    // no process state is defined, since RenderingTransformation processes must be stateless
     
-    private double queryBufferDistance = 0;
-
-    private float noDataValue = -999;
-
-    private int pixelsPerCell = 1;
-
-    @DescribeResult(name = "result", description = "The interpolated raster surface ")
+    @DescribeResult(name = "result", description = "The interpolated surface as a raster")
     public GridCoverage2D execute(
-            @DescribeParameter(name = "data", description = "The features for the point observations to interpolate") SimpleFeatureCollection obs,
-            @DescribeParameter(name = "valueAttr", description = "The feature attribute that contains the observed value", min=1, max=1) String valueAttr,
-            @DescribeParameter(name = "scale", description = "The length scale to use for the interpolation", min=1, max=1) Double argScale,
-            @DescribeParameter(name = "convergence", description = "The convergence factor for the interpolation", min=0, max=1) Double argConvergence,
-            @DescribeParameter(name = "passes", description = "The number of passes to compute", min=0, max=1) Integer argPasses,
-            @DescribeParameter(name = "minObservations", description = "The minimum number of observations required to support a grid cell", min=0, max=1) Integer argMinObsCount,
-            @DescribeParameter(name = "maxObservationDistance", description = "The maximum distance to a supporting observation", min=0, max=1) Double argMaxObsDistance,
-            @DescribeParameter(name = "queryBufferDistance", description = "The distance by which to expand the query window", min=0, max=1) Double argQueryBufferDist,
-            @DescribeParameter(name = "noDatavalue", description = "The value to use for NO_DATA cells", min=0, max=1) Integer argNoDataValue,
-            @DescribeParameter(name = "pixelsPerCell", description = "The number of pixels per grid cell", min=0, max=1) Integer argResolution,
-           ProgressListener monitor) throws ProcessException {
+            
+            // process data
+            @DescribeParameter(name = "data", description = "Features containing the point observations to be interpolated") SimpleFeatureCollection obs,
+            
+            // process parameters
+            @DescribeParameter(name = "valueAttr", description = "Featuretype attribute containing the observed surface value", min=1, max=1) String valueAttr,
+            @DescribeParameter(name = "scale", description = "Length scale to use for the interpolation", min=1, max=1) Double argScale,
+            @DescribeParameter(name = "convergence", description = "Convergence factor for the interpolation (default: 0.3)", min=0, max=1) Double argConvergence,
+            @DescribeParameter(name = "passes", description = "Number of passes to compute (default: 2)", min=0, max=1) Integer argPasses,
+            @DescribeParameter(name = "minObservations", description = "Minimum number of observations required to support a grid cell (default: 2)", min=0, max=1) Integer argMinObsCount,
+            @DescribeParameter(name = "maxObservationDistance", description = "Maximum distance to a supporting observation (default: 0)", min=0, max=1) Double argMaxObsDistance,
+            @DescribeParameter(name = "noDatavalue", description = "Value to use for NO_DATA cells (default: -999)", min=0, max=1) Integer argNoDataValue,
+            @DescribeParameter(name = "pixelsPerCell", description = "Number of pixels per grid cell (default =: 1)", min=0, max=1) Integer argPixelsPerCell,
+            
+            // query modification parameters
+            @DescribeParameter(name = "queryBuffer", description = "Distance by which to expand the query window (default: 0)", min=0, max=1) Double argQueryBuffer,
+
+            // output image parameters
+            @DescribeParameter(name = "destBBOX", description = "Destination bounding box") ReferencedEnvelope argDestEnv,
+            @DescribeParameter(name = "imageWidth", description = "Final image width") Integer argImageWidth,
+            @DescribeParameter(name = "imageHeight", description = "Final image height") Integer argImageHeight,
+            
+            ProgressListener monitor) throws ProcessException {
 
         /**---------------------------------------------
          * Check that process arguments are valid
@@ -136,28 +132,32 @@ public class BarnesSurfaceProcess implements GSProcess {
          * Set up required information from process arguments.
          * ---------------------------------------------
          */
-        lengthScale = argScale;
-        if (argConvergence != null) convergenceFactor = argConvergence;
-        if (argPasses != null) passes = argPasses;
-        if (argMinObsCount != null) minObservationCount = argMinObsCount;
-        if (argMaxObsDistance != null) maxObservationDistance = argMaxObsDistance;
-        if (argNoDataValue != null) noDataValue = argNoDataValue;
-        if (argQueryBufferDist != null) {
-            queryBufferDistance = argQueryBufferDist;
+        double lengthScale = argScale;
+        double convergenceFactor = argConvergence != null ? argConvergence : 0.3;
+        int passes = argPasses != null ? argPasses : 2;
+        int minObsCount = argMinObsCount != null ? argMinObsCount : 2;
+        double maxObsDistance = argMaxObsDistance != null ? argMaxObsDistance : 0.0;
+        float noDataValue = argNoDataValue != null ? argNoDataValue : -999;
+        int pixelsPerCell = 1;
+        if (argPixelsPerCell != null && argPixelsPerCell > 1) {
+            pixelsPerCell = argPixelsPerCell;
         }
-        else {
-            queryBufferDistance = heuristicQueryBufferDistance();
-        }
-        if (argResolution != null) {
-            pixelsPerCell = argResolution;
-            // ensure value is at least 1
-            if (pixelsPerCell < 1)
-                pixelsPerCell = 1;
+        int imageWidth = argImageWidth;
+        int imageHeight = argImageHeight;
+        int gridWidth = imageWidth;
+        int gridHeight = imageHeight;
+        if (pixelsPerCell > 1) {
+            gridWidth = imageWidth / pixelsPerCell;
+            gridHeight = imageHeight / pixelsPerCell;
         }
         
+        /**---------------------------------------------
+         * Convert the input data
+         * ---------------------------------------------
+         */
         Coordinate[] pts = null;
         try {
-            pts = PointExtracter.extract(obs, valueAttr);
+            pts = extract(obs, valueAttr);
         } catch (CQLException e) {
             throw new ProcessException(e);
         }
@@ -166,105 +166,63 @@ public class BarnesSurfaceProcess implements GSProcess {
          * Do the processing
          * ---------------------------------------------
          */
-        Stopwatch sw = new Stopwatch();
-        GridCoverage2D grid = computeSurfaceCoverage(pts);
-        System.out.println("**************  Barnes Surface computed in " + sw.getTimeString());
+        //Stopwatch sw = new Stopwatch();
+        // interpolate the surface at the specified resolution
+        float[][] barnesGrid = createBarnesGrid(pts, lengthScale, convergenceFactor, passes, minObsCount, maxObsDistance, noDataValue, argDestEnv, gridWidth, gridHeight);
         
-        /**---------------------------------------------
-         * Clean up after invocation
-         * ---------------------------------------------
-         */
-        threadGridGeom.remove();
+        // flip now, since grid size may be smaller
+        barnesGrid = flipXY(barnesGrid);
         
-        return grid;
-    }
+        // upsample to output resolution if necessary
+        float[][] outGrid = barnesGrid;
+        if (pixelsPerCell > 1)
+            outGrid = upsample(barnesGrid, noDataValue, imageWidth, imageHeight);
+        
+        // convert to the GridCoverage2D required for output
+        GridCoverageFactory gcf = CoverageFactoryFinder.getGridCoverageFactory(null);
+        GridCoverage2D gridCov = gcf.create("Process Results", outGrid, argDestEnv);
+        
+        //System.out.println("**************  Barnes Surface computed in " + sw.getTimeString());
+        
+        return gridCov;
+    }    
 
     /**
-     * To ensure that the computed surface is stable under zooming
-     * and panning, the query BBOX must be expanded
-     * to avoid obvious edge effects.
-     * The expansion distance depends on the 
-     * length scale, convergence factor, and data spacing in some complex way.
-     * It does NOT depend on the output window extent.
-     * It is chosen heuristically here.
+     * Flips an XY matrix along the X=Y axis, and inverts the Y axis.
+     * Used to convert from "map orientation" into the "image orientation"
+     * used by GridCoverageFactory.
+     * The surface interpolation is done on an XY grid, with Y=0 being the bottom of the space.
+     * GridCoverages are stored in an image format, in a YX grid with 0 being the top.
      * 
-     * @return the distance by which to expand the query BBOX
+     * @param grid the grid to flip
+     * @return the flipped grid
      */
-    private double heuristicQueryBufferDistance()
+    private float[][] flipXY(float[][] grid)
     {
-        return lengthScale;
-    }
-    
+        int xsize = grid.length;
+        int ysize = grid[0].length;
 
-    private GridGeometry getQueryGridGeometry()
-    {
-        return threadGridGeom.get();
-    }
-    
-    public GridCoverage2D computeSurfaceCoverage(Coordinate[] pts) {
-        
-        GridEnvelope gridEnv = getQueryGridGeometry().getGridRange();
-
-        // image starts at 0, so add one to get true dimensions
-        int width = gridEnv.getHigh(0) + 1;
-        int height = gridEnv.getHigh(1) + 1;
-
-        /*
-         * // might be more efficient to write directly to a raster? WritableRaster raster = createDummyRaster(width, height);
-         * RenderedImageFactoryTemp rif = new RenderedImageFactoryTemp(); RenderedImage img = rif.create(raster);
-         */
-
-        //float[][] matrix = createPointSymbolMatrixSafe(pts, width, height);
-        float[][] matrix;
-        try {
-            matrix = createBarnesMatrix(pts, width, height);
-        } catch (MismatchedDimensionException e) {
-            throw new ProcessException(e);
-        } catch (TransformException e) {
-            throw new ProcessException(e);
-        }
-
-        // create the actual grid coverage to return
-        return createGridCoverage(matrix);
-    }
-
-    private GridCoverage2D createGridCoverage(float[][] matrix) {
-        RenderedImageFactoryTemp rif = new RenderedImageFactoryTemp();
-        RenderedImage img = rif.create(SurfaceUtil.createRaster(matrix, true));
-
-        GridCoverageFactory gcf = CoverageFactoryFinder.getGridCoverageFactory(null);
-        CharSequence name = "Process Results";
-        // GridCoverage2D grid = gcf.create(name, raster, resBounds);
-        GridGeometry2D gridGeom2D = (GridGeometry2D) getQueryGridGeometry();
-        GridCoverage2D grid = gcf.create(name, img, gridGeom2D, null, null, null);
-
-        return grid;
-    }
-
-    private WritableRaster createDummyRaster(int width, int height) {
-        WritableRaster raster = RasterFactory.createBandedRaster(DataBuffer.TYPE_FLOAT, width,
-                height, 1, null);
-
-        // zero out the raster
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                raster.setSample(x, y, 0, 0);
+        float[][] grid2 = new float[ysize][xsize];
+        for (int ix = 0; ix < xsize; ix++) {
+            for (int iy = 0; iy < ysize; iy++) {
+                int iy2 = ysize - iy - 1;
+                grid2[iy2][ix] = grid[ix][iy];
             }
         }
-
-        // set a dummy set of values
-        for (int y = height / 3; y < (2 * height) / 3; y++) {
-            for (int x = width / 3; x < (2 * width) / 3; x++) {
-                raster.setSample(x, y, 0, 5);
-            }
-        }
-        return raster;
+        return grid2;
     }
-
-
-    private float[][] createBarnesMatrix(Coordinate[] pts, int width, int height)
-            throws MismatchedDimensionException, TransformException {
-        BarnesInterpolator barnesInterp = new BarnesInterpolator(pts);
+    
+    private float[][] createBarnesGrid(Coordinate[] pts, 
+            double lengthScale,
+            double convergenceFactor,
+            int passes,
+            int minObservationCount,
+            double maxObservationDistance,
+            float noDataValue,
+            Envelope destEnv,
+            int width, int height)
+    {
+        BarnesSurfaceInterpolator barnesInterp = new BarnesSurfaceInterpolator(pts);
         barnesInterp.setLengthScale(lengthScale);
         barnesInterp.setConvergenceFactor(convergenceFactor);
         barnesInterp.setPassCount(passes);
@@ -272,35 +230,20 @@ public class BarnesSurfaceProcess implements GSProcess {
         barnesInterp.setMaxObservationDistance(maxObservationDistance);
         barnesInterp.setNoData(noDataValue);
 
-        Envelope env = queryEnvelope(getQueryGridGeometry());
-        float[][] grid = barnesInterp.computeSurface(env, width / pixelsPerCell, height / pixelsPerCell);
+        float[][] grid = barnesInterp.computeSurface(destEnv, width, height);
         
-        // if required, upsample the grid to the output resolution
-        float[][] outGrid = grid;
-        if (pixelsPerCell > 1) {
-            BilinearInterpolator bi = new BilinearInterpolator(grid, noDataValue);
-            outGrid = bi.interpolate(width, height, true);
-        }
+        return grid;
+    }
+
+    private float[][] upsample(float[][] grid,
+            float noDataValue, 
+            int width,
+            int height) {
+        BilinearInterpolator bi = new BilinearInterpolator(grid, noDataValue);
+        float[][] outGrid = bi.interpolate(width, height, true);
         return outGrid;
     }
 
-    private Envelope queryEnvelope(GridGeometry gridGeom) throws MismatchedDimensionException, TransformException
-    {
-        MathTransform gridToCRS = gridGeom.getGridToCRS();
-        GridEnvelope gridEnv = gridGeom.getGridRange();
-        
-        DirectPosition2D src = new DirectPosition2D();
-        src.setLocation(gridEnv.getLow(0), gridEnv.getLow(1));
-        DirectPosition2D crsLow = new DirectPosition2D();
-        gridToCRS.transform(src, crsLow);
-        
-        src.setLocation(gridEnv.getHigh(0), gridEnv.getHigh(1));
-        DirectPosition2D crsHigh = new DirectPosition2D();
-        gridToCRS.transform(src, crsHigh);
-
-         return new Envelope(crsLow.x, crsHigh.x, crsHigh.y, crsLow.y);
-    }
-    
     /**
      * Given a target query and a target grid geometry 
      * returns the query to be used to read the input data of the process involved in rendering. In
@@ -310,28 +253,38 @@ public class BarnesSurfaceProcess implements GSProcess {
      * <li>expand the query envelope to ensure stable surface generation
      * <li>modify the query hints to ensure point features are returned
      * </ul>
+     * Note that in order to pass validation, all parameters named here must also appear 
+     * in the parameter list of the <tt>execute</tt> method,
+     * even if they are not used there.
      * 
-     * @param targetQuery
-     * @param gridGeometry
+     * @param valueAttr the feature type attribute that contains the observed surface value
+     * @param argQueryBuffer the distance by which to expand the query window
+     * @param targetQuery the query used against the data source
+     * @param targetGridGeometry the grid geometry of the destination image
      * @return The transformed query
      */
-    public Query invertQuery(Map<String, Object> input, Query targetQuery, GridGeometry gridGeometry)
+    public Query invertQuery(
+            @DescribeParameter(name = "valueAttr", description = "The feature type attribute that contains the observed surface value", min=1, max=1) String valueAttr,
+            @DescribeParameter(name = "queryBuffer", description = "The distance by which to expand the query window", min=0, max=1) Double argQueryBuffer,
+            Query targetQuery, GridGeometry targetGridGeometry)
             throws ProcessException {
-        // find the output grid extent
-        threadGridGeom.set(gridGeometry);
+        
+        // default is no expansion
+        double queryBuffer = 0;
+        if (argQueryBuffer != null) {
+            queryBuffer = argQueryBuffer;
+        }
 
-        // set the decimation hint to ensure points are read
-        Hints hints = targetQuery.getHints();
-        //Object gdo = hints.get(Hints.GEOMETRY_DISTANCE);
-        hints.put(Hints.GEOMETRY_DISTANCE, 0.0);
-
-        Filter expandedFilter = expandBBox(targetQuery.getFilter(), queryBufferDistance);
-        targetQuery.setFilter(expandedFilter);
+        targetQuery.setFilter(expandBBox(targetQuery.getFilter(), queryBuffer));
         
         // clear properties to force all attributes to be read
         // (required because the SLD processor cannot see the value attribute specified in the transformation)
-        // TODO: set the properties to read only the value attribute
+        // TODO: set the properties to read only the specified value attribute
         targetQuery.setProperties(null);
+        
+        // set the decimation hint to ensure points are read
+        Hints hints = targetQuery.getHints();
+        hints.put(Hints.GEOMETRY_DISTANCE, 0.0);
 
         return targetQuery;
     }
@@ -341,71 +294,46 @@ public class BarnesSurfaceProcess implements GSProcess {
                 new BBOXExpandingFilterVisitor(distance, distance, distance, distance), null);
     }
 
-    /*
-     
-    // Test code to generate synthetic surfaces
-     
-    private float[][] createDummyMatrix(int width, int height) {
-        float[][] matrix = new float[height][width];
-
-        // set a dummy set of values
-        for (int y = height / 3; y < (2 * height) / 3; y++) {
-            for (int x = y; x < (2 * width) / 3; x++) {
-                matrix[y][x] = 5;
-            }
-        }
-        return matrix;
-    }
-
-    private float[][] createPointSymbolMatrixSafe(Coordinate[] pts, int width, int height) {
+    public static Coordinate[] extract(SimpleFeatureCollection obsPoints, String attrName) throws CQLException 
+    {
+        Expression attrExpr = ECQL.toExpression(attrName);
+        List<Coordinate> ptList = new ArrayList<Coordinate>();
+        SimpleFeatureIterator obsIt = obsPoints.features();
+        
+        int i = 0;
         try {
-            return createPointSymbolMatrix(pts, width, height);
-        } catch (MismatchedDimensionException e) {
-            throw new ProcessException(e);
-        } catch (TransformException e) {
-            throw new ProcessException(e);
-        }
-    }
-
-    private float[][] createPointSymbolMatrix(Coordinate[] pts, int width, int height)
-            throws MismatchedDimensionException, TransformException {
-        float[][] matrix = new float[height][width];
-
-        // set NODATA values
-        // zero out the raster
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                matrix[y][x] = -999;
-            }
-        }
-
-        MathTransform crsToGrid;
-        try {
-            crsToGrid = getQueryGridGeometry().getGridToCRS().inverse();
-        } catch (NoninvertibleTransformException e) {
-            throw new ProcessException(e);
-        }
-
-        DirectPosition2D src = new DirectPosition2D();
-        DirectPosition2D dst = new DirectPosition2D();
-        // set a dummy set of values
-        for (Coordinate p : pts) {
-            src.setLocation(p.x, p.y);
-            crsToGrid.transform(src, dst);
-            int x = (int) dst.getOrdinate(0);
-            int y = (int) dst.getOrdinate(1);
-
-            // fill a box around point
-            for (int i = -5; i < 5; i++) {
-                for (int j = -5; j < 5; j++) {
-                    int xx = x + i;
-                    int yy = y + j;
-                    if (yy >= 0 && yy < height && xx >= 0 && xx < width)
-                        matrix[yy][xx] = (float) p.z;
+            while (obsIt.hasNext()) {
+                SimpleFeature feature = obsIt.next();
+                
+                double val = 0;
+                
+                try {
+                    // get the observation value from the attribute (if non-null)
+                    Object valObj = attrExpr.evaluate(feature);
+                    if (valObj != null) {
+                        // System.out.println(evaluate);
+                        Number valNum = (Number) valObj;
+                        val = valNum.doubleValue();
+                        
+                        // get the point location from the geometry
+                        Geometry geom = (Geometry) feature.getDefaultGeometry();
+                        Coordinate p = geom.getCoordinate();
+                        Coordinate pobs = new Coordinate(p.x, p.y, val);
+                        ptList.add(pobs);
+                    }
+                }
+                catch (Exception e) {
+                    // just carry on for now (debugging)
+                    //throw new ProcessException("Expression " + attrExpr + " failed to evaluate to a numeric value", e);
                 }
             }
         }
-        return matrix;
+        finally {
+            obsIt.close();
+        }
+
+        Coordinate[] pts = CoordinateArrays.toCoordinateArray(ptList);
+        return pts;
     }
-*/
+
 }

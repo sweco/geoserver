@@ -1,3 +1,7 @@
+/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wps.surface;
 
 import com.vividsolutions.jts.geom.Coordinate;
@@ -66,7 +70,7 @@ import com.vividsolutions.jts.geom.Envelope;
  * @author mdavis
  * 
  */
-public class BarnesInterpolator {
+public class BarnesSurfaceInterpolator {
 
     /**
      * The default grid cell value used to indicate no data was computed for that cell
@@ -119,7 +123,7 @@ public class BarnesInterpolator {
      * 
      * @param data the observed data values
      */
-    public BarnesInterpolator(Coordinate[] observationData) {
+    public BarnesSurfaceInterpolator(Coordinate[] observationData) {
         this.inputObs = observationData;
     }
 
@@ -202,23 +206,23 @@ public class BarnesInterpolator {
         useObservationMask = minObservationCount > 0 && maxObservationDistance > 0.0;
 
         float[][] grid = new float[xSize][ySize];
-        GridSystem gridSys = new GridSystem(srcEnv, xSize, ySize);
+        GridTransform trans = new GridTransform(srcEnv, xSize, ySize);
 
-        grid = estimatedGrid(grid, gridSys);
+        grid = estimatedGrid(grid, trans);
 
         if (passCount > 1) {
             /**
              * First refinement pass requires observation points to be estimated as well
              */
             estimatedObs = computeEstimatedObservations();
-            refineGrid(grid, gridSys);
+            refineGrid(grid, trans);
             
             /**
              * For subsequent refinement passes, refine observations then recompute
              */
             for (int i = 3; i <= passCount; i++) {
                 estimatedObs = refineEstimatedObservations(estimatedObs);
-                refineGrid(grid, gridSys);              
+                refineGrid(grid, trans);              
             }
         }
         return grid;
@@ -258,11 +262,11 @@ public class BarnesInterpolator {
      * @param ySize
      * @return a grid with indices [X][Y]
      */
-    private float[][] estimatedGrid(float[][] grid, GridSystem gridSys) {
+    private float[][] estimatedGrid(float[][] grid, GridTransform trans) {
         for (int i = 0; i < grid.length; i++) {
             for (int j = 0; j < grid[0].length; j++) {
-                double x = gridSys.x(i);
-                double y = gridSys.y(j);
+                double x = trans.x(i);
+                double y = trans.y(j);
 
                 grid[i][j] = (float) noDataValue;
                 if (useObservationMask && !isSupportedGridPt(x, y))
@@ -276,11 +280,11 @@ public class BarnesInterpolator {
         return grid;
     }
 
-    private float[][] refineGrid(float[][] grid, GridSystem gridSys) {
+    private float[][] refineGrid(float[][] grid, GridTransform trans) {
         for (int i = 0; i < grid.length; i++) {
             for (int j = 0; j < grid[0].length; j++) {
-                double x = gridSys.x(i);
-                double y = gridSys.y(j);
+                double x = trans.x(i);
+                double y = trans.y(j);
 
                 // skip NO_DATA values
                 if (grid[i][j] == noDataValue)
@@ -431,5 +435,38 @@ public class BarnesInterpolator {
         double w = weight(effRadius, radius, 1.0);
         System.out.println(cutoffWeight + "   " + w);
         return effRadius;
+    }
+    
+    private static class GridTransform {
+
+        private Envelope env;
+
+        private int xSize;
+
+        private int ySize;
+
+        private double dx;
+
+        private double dy;
+
+        public GridTransform(Envelope env, int xSize, int ySize) {
+            this.env = env;
+            this.xSize = xSize;
+            this.ySize = ySize;
+            dx = env.getWidth() / (xSize - 1);
+            dy = env.getHeight() / (ySize - 1);
+        }
+
+        public double x(int i) {
+            if (i >= xSize - 1)
+                return env.getMaxX();
+            return env.getMinX() + i * dx;
+        }
+        public double y(int i)
+        {
+                if (i >= ySize - 1) return env.getMaxY();
+                return env.getMinY() + i * dy;
+        }
+
     }
 }
