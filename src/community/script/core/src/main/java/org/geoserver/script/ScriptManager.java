@@ -47,6 +47,10 @@ public class ScriptManager {
             .maximumSize(10).expireAfterAccess(10, TimeUnit.MINUTES).build();
     }
 
+    public GeoServerDataDirectory getDataDirectory() {
+        return dataDir;
+    }
+
     /**
      * Returns the underlying engine manager used to create and manage script engines.
      */

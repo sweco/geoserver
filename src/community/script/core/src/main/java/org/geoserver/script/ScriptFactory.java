@@ -23,12 +23,15 @@ public class ScriptFactory {
 
     /*
      * method to lookup script manager lazily, we do this because this factory is created as part
-     * of the SPI plugin process, which happens before spring context creation
+     * of the SPI plugin process, which happens before spring context creation. We don't store the 
+     * script manager in cases where it is looked up for testing reasons in which we don't want
+     * the singleton factory to hold on to old instances of the script manager.
      */
     protected ScriptManager scriptMgr() {
-        if (scriptMgr == null) {
-            scriptMgr = GeoServerExtensions.bean(ScriptManager.class);
+        if (scriptMgr != null) {
+            return scriptMgr;
         }
-        return scriptMgr;
+        
+        return GeoServerExtensions.bean(ScriptManager.class);
     }
 }
