@@ -87,11 +87,21 @@
   </dependency>
  </dependencies>
 
+ <build>
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+    </testResources>
+ </build>
+
  <modules>
   <module>core</module>
   <module>bsh</module>
+  <module>groovy</module>
   <module>js</module>
   <module>py</module>
+  <module>rb</module>
  </modules>
 
 </project>

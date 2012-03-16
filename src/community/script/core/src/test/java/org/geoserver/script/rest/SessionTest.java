@@ -1,6 +1,5 @@
 package org.geoserver.script.rest;
 
-import net.sf.json.JSON;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 

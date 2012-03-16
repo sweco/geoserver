@@ -18,12 +18,12 @@ import javax.script.ScriptEngineManager;
 import org.apache.commons.io.FilenameUtils;
 import org.geoserver.config.GeoServerDataDirectory;
 import org.geoserver.platform.GeoServerExtensions;
-import org.geoserver.script.app.AppHandler;
-import org.geoserver.script.wps.WpsHandler;
+import org.geoserver.script.app.AppHook;
+import org.geoserver.script.function.FunctionHook;
+import org.geoserver.script.wps.WpsHook;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
 
 /**
  * Facade for the scripting subsystem, providing methods for obtaining script context and managing
@@ -139,6 +139,13 @@ public class ScriptManager {
     }
 
     /**
+     * The root "function" directory, located directly under {@link #getScriptRoot()} 
+     */
+    public File getFunctionRoot() throws IOException {
+        return dataDir.findOrCreateDir("scripts", "function");
+    }
+
+    /**
      * Creates a new script engine for the specified script file.
      */
     public ScriptEngine createNewEngine(File script) {
@@ -166,7 +173,7 @@ public class ScriptManager {
     }
 
     public List<ScriptSession> findSessions(String ext) {
-        List<ScriptSession> sids = new ArrayList();
+        List<ScriptSession> sids = new ArrayList<ScriptSession>();
         for (Map.Entry<Long, ScriptSession> e : sessions.asMap().entrySet()) {
             if (ext != null && !ext.equalsIgnoreCase(e.getValue().getExtension())) {
                 continue;
@@ -198,29 +205,42 @@ public class ScriptManager {
 
     
     /**
-     * Looks up the app handler for the specified script returning <code>null</code> if no such 
-     * handler can be found.
+     * Looks up the app hook for the specified script returning <code>null</code> if no such 
+     * hook can be found.
      * <p>
      * This method works by looking up all {@link ScriptPlugin} instances and delegating to 
-     * {@link ScriptPlugin#createAppHandler()}.
+     * {@link ScriptPlugin#createAppHook()}.
      * </p>
      */
-    public AppHandler lookupAppHandler(File script) {
+    public AppHook lookupAppHook(File script) {
         ScriptPlugin p = plugin(script);
-        return p != null ? p.createAppHandler() : null;
+        return p != null ? p.createAppHook() : new AppHook(null);
     }
 
     /**
-     * Looks up the wps handler for the speified script returning <code>null</code> if no such 
-     * handler can be found.
+     * Looks up the wps hook for the specified script returning <code>null</code> if no such 
+     * hook can be found.
      * <p>
      * This method works by looking up all {@link ScriptPlugin} instances and delegating to 
-     * {@link ScriptPlugin#createWpsHandler()}.
+     * {@link ScriptPlugin#createWpsHook()}.
      * </p>
      */
-    public WpsHandler lookupWpsHandler(File script) {
+    public WpsHook lookupWpsHook(File script) {
         ScriptPlugin p = plugin(script);
-        return p != null ? p.createWpsHandler() : null;
+        return p != null ? p.createWpsHook() : null;
+    }
+
+    /**
+     * Looks up the filter hook for the specified script returning <code>null</code> if no such 
+     * hook can be found.
+     * <p>
+     * This method works by looking up all {@link ScriptPlugin} instances and delegating to 
+     * {@link ScriptPlugin#createFunctionHook()}.
+     * </p>
+     */
+    public FunctionHook lookupFilterHook(File script) {
+        ScriptPlugin p = plugin(script);
+        return p != null ? p.createFunctionHook() : new FunctionHook(null);
     }
 
     public String lookupPluginId(File script) {

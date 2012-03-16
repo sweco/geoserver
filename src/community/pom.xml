@@ -205,6 +205,9 @@
     </profile>
     <profile>
       <id>script</id>
+      <activation>
+        <property><name>script</name></property>
+      </activation> 
       <modules>
         <module>script</module>
       </modules>

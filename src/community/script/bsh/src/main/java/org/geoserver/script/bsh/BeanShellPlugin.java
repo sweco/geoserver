@@ -1,10 +1,11 @@
+/* Copyright (c) 2001 - 2012 TOPP - www.openplans.org. All rights reserved.
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.script.bsh;
 
 import org.geoserver.script.ScriptPlugin;
-import org.geoserver.script.app.AppHandler;
-import org.geoserver.script.app.SimpleAppHandler;
-
-import bsh.engine.BshScriptEngineFactory;
+import bsh.BshScriptEngineFactory;
 
 /**
  * Script plugin for BeanShell.
@@ -31,10 +32,5 @@ public class BeanShellPlugin extends ScriptPlugin {
     @Override
     public String getEditorMode() {
         return "javascript";
-    }
-
-    @Override
-    protected AppHandler createAppHandler() {
-        return new SimpleAppHandler(this);
     }
 }

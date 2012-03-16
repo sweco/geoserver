@@ -17,7 +17,7 @@ import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.geoserver.platform.GeoServerExtensions;
+import org.geoserver.script.ScriptFactory;
 import org.geoserver.script.ScriptManager;
 import org.geotools.data.Parameter;
 import org.geotools.feature.NameImpl;
@@ -31,27 +31,23 @@ import org.opengis.util.InternationalString;
 
 /**
  * Process factory that creates processes from scripts located in the data directory.
- *
  */
-public class ScriptProcessFactory implements ProcessFactory {
+public class ScriptProcessFactory extends ScriptFactory implements ProcessFactory {
 
     /** logger */
     static Logger LOGGER = Logging.getLogger(ScriptProcessFactory.class);
 
-    /** script manager */
-    ScriptManager scriptMgr;
-
     /**
      * softly cached process objects
      */
-    SoftValueHashMap<Name, ScriptProcess> processes = new SoftValueHashMap(10);
+    SoftValueHashMap<Name, ScriptProcess> processes = new SoftValueHashMap<Name,ScriptProcess>(10);
 
     public ScriptProcessFactory() {
-        this(null);
+        super(null);
     }
 
     public ScriptProcessFactory(ScriptManager scriptMgr) {
-        this.scriptMgr = scriptMgr;
+        super(scriptMgr);
     }
 
     public Set<Name> getNames() {
@@ -63,20 +59,18 @@ public class ScriptProcessFactory implements ProcessFactory {
         try {
             File wpsRoot = scriptMgr.getWpsRoot();
             for (String file : wpsRoot.list()) {
-                if (file.endsWith(".py")) {
-                    File f = new File(wpsRoot, file);
+                File f = new File(wpsRoot, file);
 
-                    WpsHandler handler = scriptMgr.lookupWpsHandler(f);
-                    if (handler == null) {
-                        LOGGER.fine("Skipping " + f.getName() + ", no handler found");
-                    }
-
-                    //TODO: support multiple processes in one file
-                    //TODO: support the process defining its namespace
-                    
-                    //use the extension as the namespace, and the basename as the process name 
-                    names.add(new NameImpl(getExtension(f.getName()), getBaseName(f.getName())));
+                WpsHook hook = scriptMgr.lookupWpsHook(f);
+                if (hook == null) {
+                    LOGGER.fine("Skipping " + f.getName() + ", no hook found");
                 }
+
+                //TODO: support multiple processes in one file
+                //TODO: support the process defining its namespace
+                
+                //use the extension as the namespace, and the basename as the process name 
+                names.add(new NameImpl(getExtension(f.getName()), getBaseName(f.getName())));
             }
         }
         catch (IOException e) {
@@ -144,17 +138,6 @@ public class ScriptProcessFactory implements ProcessFactory {
 
     public Map<Key, ?> getImplementationHints() {
         return null;
-    }
-
-    /*
-     * method to lookup script manager lazily, we do this because this factory is created as part
-     * of the SPI plugin process, which happens before spring context creation
-     */
-    ScriptManager scriptMgr() {
-        if (scriptMgr == null) {
-            scriptMgr = GeoServerExtensions.bean(ScriptManager.class);
-        }
-        return scriptMgr;
     }
 
     ScriptProcess process(Name name) {
