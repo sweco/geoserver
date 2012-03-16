@@ -11,6 +11,11 @@ import org.restlet.data.Request;
 import org.restlet.data.Response;
 import org.restlet.resource.Resource;
 
+/**
+ * Finder for {@linnk ScriptResource} instances.
+ * 
+ * @author Justin Deoliveira, OpenGeo
+ */
 public class ScriptFinder extends Finder {
 
     ScriptManager scriptMgr;

@@ -4,6 +4,8 @@
  */
 package org.geoserver.script.rest;
 
+import static java.lang.String.format;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -15,8 +17,6 @@ import org.restlet.data.Response;
 import org.restlet.data.Status;
 import org.restlet.resource.FileRepresentation;
 import org.restlet.resource.Resource;
-
-import static java.lang.String.format;
 
 /**
  * Resource for the contents of a script.

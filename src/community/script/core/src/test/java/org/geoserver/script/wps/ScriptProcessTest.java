@@ -4,34 +4,36 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
+import org.geoserver.script.ScriptIntTestSupport;
 import org.geoserver.script.ScriptManager;
-import org.geoserver.test.GeoServerTestSupport;
 import org.geotools.data.Parameter;
 import org.opengis.feature.type.Name;
 
-import com.vividsolutions.jts.awt.PointShapeFactory.Point;
-import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.io.WKTReader;
 
-public abstract class ScriptProcessTest extends GeoServerTestSupport {
+public abstract class ScriptProcessTest extends ScriptIntTestSupport {
 
-    protected ScriptManager scriptMgr;
     File script;
+    ScriptManager scriptMgr;
 
     @Override
-    protected final void setUpInternal() throws Exception {
-        super.setUpInternal();
+    protected void oneTimeSetUp() throws Exception {
+        super.oneTimeSetUp();
+    
+        scriptMgr = getScriptManager();
 
-        scriptMgr = new ScriptManager(getDataDirectory());
-        script = setUpInternal(scriptMgr);
+        File wps = scriptMgr.getWpsRoot();
+        script = new File(wps, "buffer." + getExtension());
+
+        FileUtils.copyURLToFile(getClass().getResource(script.getName()), script);
     }
 
-    protected abstract File setUpInternal(ScriptManager scriptMgr) throws Exception;
+    public abstract String getExtension();
 
-    public void testLookupHandler() throws Exception {
-        assertNotNull(scriptMgr.lookupWpsHandler(script));
+    public void testLookupHook() throws Exception {
+        assertNotNull(getScriptManager().lookupWpsHook(script));
     }
 
     public void testName() throws Exception {

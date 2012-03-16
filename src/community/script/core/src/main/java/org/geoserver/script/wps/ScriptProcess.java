@@ -6,14 +6,13 @@ package org.geoserver.script.wps;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.Map;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
 import org.geoserver.platform.FileWatcher;
+import org.geoserver.script.ScriptFileWatcher;
 import org.geoserver.script.ScriptManager;
 import org.geotools.data.Parameter;
 import org.geotools.process.Process;
@@ -24,7 +23,7 @@ import org.opengis.util.ProgressListener;
 /**
  * Implementation of {@link Process} backed by a script.
  * <p>
- * This class does its work by delegating all methods to the {@link WpsHandler} interface. This 
+ * This class does its work by delegating all methods to the {@link WpsHook} interface. This 
  * class maintains a link to the backing script {@link File} and uses a {@link FileWatcher} to 
  * detect changes to the underlying script. When changed a new {@link ScriptEngine} is created and 
  * the underlying script is reloaded. 
@@ -43,46 +42,35 @@ public class ScriptProcess implements Process {
     /** script manager */
     ScriptManager scriptMgr;
 
-    /** the handler for interacting with the script */
-    WpsHandler handler;
+    /** the hook for interacting with the script */
+    WpsHook hook;
 
     ScriptProcess(Name name, File script, ScriptManager scriptMgr) {
         this.name = name;
         this.scriptMgr = scriptMgr;
 
-        handler = scriptMgr.lookupWpsHandler(script);
-        fw = new FileWatcher<ScriptEngine>(script) {
-            @Override
-            protected ScriptEngine parseFileContents(InputStream in) throws IOException {
-                ScriptEngine engine = ScriptProcess.this.scriptMgr.createNewEngine(getFile());
-                try {
-                    engine.eval(new InputStreamReader(in));
-                } catch (ScriptException e) {
-                    throw new IOException(e);
-                }
-                return engine;
-            }
-        };
+        hook = scriptMgr.lookupWpsHook(script);
+        fw = new ScriptFileWatcher(script, scriptMgr);
     }
 
     String getTitle() throws ScriptException, IOException {
-        return handler.getTitle(fw.read());
+        return hook.getTitle(fw.read());
     }
 
     String getVersion() throws ScriptException, IOException {
-        return handler.getVersion(fw.read());
+        return hook.getVersion(fw.read());
     }
 
     public String getDescription() throws ScriptException, IOException {
-        return handler.getDescription(fw.read());
+        return hook.getDescription(fw.read());
     }
 
     public Map<String, Parameter<?>> getInputs() throws ScriptException, IOException {
-        return handler.getInputs(fw.read());
+        return hook.getInputs(fw.read());
     }
 
     public Map<String, Parameter<?>> getOutputs() throws ScriptException, IOException {
-        return handler.getOutputs(fw.read());
+        return hook.getOutputs(fw.read());
     }
 
     @Override
@@ -90,7 +78,7 @@ public class ScriptProcess implements Process {
             ProgressListener monitor) throws ProcessException {
 
         try {
-            return handler.run(input, fw.read());
+            return hook.run(input, fw.read());
         } catch (Exception e) {
             throw new ProcessException(e);
         }

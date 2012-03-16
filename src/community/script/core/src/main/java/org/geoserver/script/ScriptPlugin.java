@@ -7,8 +7,9 @@ package org.geoserver.script;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineFactory;
 
-import org.geoserver.script.app.AppHandler;
-import org.geoserver.script.wps.WpsHandler;
+import org.geoserver.script.app.AppHook;
+import org.geoserver.script.function.FunctionHook;
+import org.geoserver.script.wps.WpsHook;
 
 /**
  * Base class for script plugins.
@@ -81,24 +82,35 @@ public abstract class ScriptPlugin {
     }
 
     /**
-     * Creates the handler for "app" requests.
+     * Creates the hook for "app" requests.
      * <p>
      * This default implementation returns <code>null</code>, subclass should override in order to 
-     * implement a custom app handler.
+     * implement a custom app hook.
      * </p>
      */
-    protected AppHandler createAppHandler() {
+    public AppHook createAppHook() {
+        return new AppHook(this);
+    }
+
+    /**
+     * Creates the hook for wps processes.
+     * <p>
+     * This default implementation returns <code>null</code>, subclass should override in order to 
+     * implement a custom hook.
+     * </p>
+     */
+    public WpsHook createWpsHook() {
         return null;
     }
 
     /**
-     * Creates the handler for wps processes.
+     * Creates the hook for functions.
      * <p>
      * This default implementation returns <code>null</code>, subclass should override in order to 
-     * implement a custom handler.
+     * implement a custom hook.
      * </p>
      */
-    protected WpsHandler createWpsHandler() {
-        return null;
+    public FunctionHook createFunctionHook() {
+        return new FunctionHook(this);
     }
 }

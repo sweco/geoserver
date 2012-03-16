@@ -1,10 +1,13 @@
+/* Copyright (c) 2001 - 2012 TOPP - www.openplans.org. All rights reserved.
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.script.rest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
 
@@ -26,6 +29,19 @@ import org.restlet.resource.OutputRepresentation;
 import org.restlet.resource.Resource;
 import org.restlet.resource.StringRepresentation;
 
+/**
+ * Resource for a script session.
+ * <p>
+ * This resource provides access to {@link ScriptSession} instances. It allows for the following 
+ * operations:
+ * <ul>
+ *   <li>POST /sessions : create a new session, returning its identifier
+ *   <li>GET /sessions/[id] : return info about session [id]
+ *   <li>PUT /sessions/[id] : execute a statement in session [id]
+ * <ul> 
+ * </p>
+ * @author Justin Deoliveira, OpenGeo
+ */
 public class SessionResource extends Resource {
 
     ScriptManager scriptMgr;

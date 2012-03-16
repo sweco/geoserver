@@ -7,8 +7,8 @@ package org.geoserver.script.py;
 import java.util.HashMap;
 
 import org.geoserver.script.ScriptPlugin;
-import org.geoserver.script.app.AppHandler;
-import org.geoserver.script.wps.WpsHandler;
+import org.geoserver.script.app.AppHook;
+import org.geoserver.script.wps.WpsHook;
 import org.python.core.Py;
 import org.python.core.PyBoolean;
 import org.python.core.PyException;
@@ -43,13 +43,13 @@ public class PythonPlugin extends ScriptPlugin {
     }
 
     @Override
-    protected AppHandler createAppHandler() {
-        return new PyAppHandler(this);
+    public AppHook createAppHook() {
+        return new PyAppHook(this);
     }
 
     @Override
-    protected WpsHandler createWpsHandler() {
-        return new PyWpsHandler(this);
+    public WpsHook createWpsHook() {
+        return new PyWpsHook(this);
     }
 
     static HashMap<Class<? extends PyObject>, Class> pyToJava = new HashMap();
