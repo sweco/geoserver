@@ -4,8 +4,11 @@
  */
 package org.geoserver.script.py;
 
+import java.net.IDN;
 import java.util.HashMap;
+import java.util.Properties;
 
+import org.geoserver.script.ScriptManager;
 import org.geoserver.script.ScriptPlugin;
 import org.geoserver.script.app.AppHook;
 import org.geoserver.script.wps.WpsHook;
@@ -13,12 +16,19 @@ import org.python.core.Py;
 import org.python.core.PyBoolean;
 import org.python.core.PyException;
 import org.python.core.PyFloat;
+import org.python.core.PyFunction;
 import org.python.core.PyInteger;
 import org.python.core.PyLong;
+import org.python.core.PyNone;
 import org.python.core.PyObject;
 import org.python.core.PyString;
+import org.python.core.PyStringMap;
+import org.python.core.PyTuple;
 import org.python.core.PyType;
+import org.python.core.codecs;
 import org.python.jsr223.PyScriptEngineFactory;
+import org.python.util.PythonInterpreter;
+import org.springframework.beans.factory.InitializingBean;
 
 /**
  * Python script plugin.
@@ -30,6 +40,36 @@ public class PythonPlugin extends ScriptPlugin {
 
     public PythonPlugin() {
         super("py", PyScriptEngineFactory.class);
+    }
+
+    @Override
+    public void init(ScriptManager scriptMgr) throws Exception {
+        //add lib to python.path
+        Properties props = new Properties();
+        props.put("python.path", scriptMgr.getLibRoot("py").getAbsolutePath());
+        PythonInterpreter.initialize(null, props, null);
+
+        codecs.register(new PyObject() {
+            @Override
+            public PyObject __call__(PyObject arg0) {
+                if ("idna".equals(arg0.toString())) {
+                    return new PyTuple(
+                        new PyObject() {
+                            public PyObject __call__(PyObject v) {
+                                return new PyTuple(new PyString(IDN.toUnicode(v.toString())), new PyInteger(0));
+                            }
+                        }, 
+                        new PyObject() {
+                            public PyObject __call__(PyObject v) {
+                                return new PyTuple(new PyString(IDN.toASCII(v.toString())), new PyInteger(0));
+                            }
+                        }
+                    );
+                }
+                return Py.None;
+            }
+        });
+        
     }
 
     @Override
@@ -100,4 +140,5 @@ public class PythonPlugin extends ScriptPlugin {
         }
          return clazz;
     }
+
 }
