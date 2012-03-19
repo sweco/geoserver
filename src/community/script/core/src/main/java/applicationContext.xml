@@ -20,7 +20,11 @@
     <property name="routes">
       <map>
         <entry>
-          <key><value>/apps/{app}/index.{ext}</value></key>
+          <key><value>/apps/{app}</value></key>
+          <value>appFinder</value>
+        </entry>
+        <entry>
+          <key><value>/apps/{app}/</value></key>
           <value>appFinder</value>
         </entry>
         <entry>
@@ -61,12 +65,27 @@
     <constructor-arg ref="scriptMgr"/>
   </bean>
   
+  <bean id="scriptCategory" class="org.geoserver.web.Category">
+    <property name="nameKey" value="category.script" />
+    <property name="order" value="200" />
+  </bean>
+  
   <bean id="scriptMenuPage" class="org.geoserver.web.MenuPageInfo">
         <property name="id" value="scriptMenuPage"/>
         <property name="titleKey" value="ScriptsPage.title"/>
         <property name="descriptionKey" value="ScriptsPage.description"/>
+        <property name="category" ref="scriptCategory" />
         <property name="icon" value="script.png"/>
         <property name="componentClass" value="org.geoserver.script.web.ScriptsPage"/>
+   </bean>
+
+  <bean id="pluginMenuPage" class="org.geoserver.web.MenuPageInfo">
+        <property name="id" value="pluginMenuPage"/>
+        <property name="titleKey" value="PluginsPage.title"/>
+        <property name="descriptionKey" value="PluginsPage.description"/>
+        <property name="category" ref="scriptCategory" />
+        <property name="icon" value="plugin.png"/>
+        <property name="componentClass" value="org.geoserver.script.web.PluginsPage"/>
    </bean>
 
 </beans>
