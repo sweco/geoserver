@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineFactory;
@@ -21,6 +23,8 @@ import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.script.app.AppHook;
 import org.geoserver.script.function.FunctionHook;
 import org.geoserver.script.wps.WpsHook;
+import org.geotools.util.logging.Logging;
+import org.springframework.beans.factory.InitializingBean;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -32,7 +36,9 @@ import com.google.common.cache.CacheBuilder;
  * @author Justin Deoliveira, OpenGeo
  *
  */
-public class ScriptManager {
+public class ScriptManager implements InitializingBean {
+
+    static Logger LOGGER = Logging.getLogger(ScriptManager.class);
 
     GeoServerDataDirectory dataDir;
     ScriptEngineManager engineMgr;
@@ -56,6 +62,13 @@ public class ScriptManager {
      */
     public ScriptEngineManager getEngineManager() {
         return engineMgr;
+    }
+
+    /**
+     * Returns list of available script plugins.
+     */
+    public List<ScriptPlugin> getPlugins() {
+        return plugins();
     }
 
     /**
@@ -147,6 +160,10 @@ public class ScriptManager {
      */
     public File getFunctionRoot() throws IOException {
         return dataDir.findOrCreateDir("scripts", "function");
+    }
+
+    public File getLibRoot(String ext) throws IOException {
+        return findOrCreateScriptDir("lib/" + ext);
     }
 
     /**
@@ -279,6 +296,13 @@ public class ScriptManager {
             synchronized (this) {
                 if (plugins == null) {
                     plugins = GeoServerExtensions.extensions(ScriptPlugin.class);
+                    for (ScriptPlugin plugin : plugins) {
+                        try {
+                            plugin.init(this);
+                        } catch (Exception e) {
+                            LOGGER.log(Level.SEVERE, "Error initializing plugin", e);
+                        }
+                    }
                 }
             }
         }
@@ -310,5 +334,10 @@ public class ScriptManager {
             throw new IllegalArgumentException(script.getName() + " has no extension");
         }
         return ext;
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        plugins();
     }
 }

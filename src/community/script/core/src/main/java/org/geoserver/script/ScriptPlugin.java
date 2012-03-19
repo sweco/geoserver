@@ -4,6 +4,8 @@
  */
 package org.geoserver.script;
 
+import java.io.Serializable;
+
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineFactory;
 
@@ -19,7 +21,7 @@ import org.geoserver.script.wps.WpsHook;
  * @author Justin Deoliveira, OpenGeo
  *
  */
-public abstract class ScriptPlugin {
+public abstract class ScriptPlugin implements Serializable {
 
     String extension;
     Class<? extends ScriptEngineFactory> scriptEngineFactoryClass;
@@ -33,6 +35,9 @@ public abstract class ScriptPlugin {
     protected ScriptPlugin(String extension, Class<? extends ScriptEngineFactory> factoryClass) {
         this.extension = extension;
         this.scriptEngineFactoryClass = factoryClass;
+    }
+
+    public void init(ScriptManager scriptMgr) throws Exception {
     }
 
     /**

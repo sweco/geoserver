@@ -4,6 +4,8 @@
  */
 package org.geoserver.script.app;
 
+import java.io.IOException;
+
 import javax.script.Invocable;
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
@@ -40,7 +42,7 @@ public class AppHook extends ScriptHook {
      * 
      */
     public void run(Request request, Response response, ScriptEngine engine) 
-            throws ScriptException {
+        throws ScriptException, IOException {
         if (engine instanceof Invocable) {
             try {
                 ((Invocable)engine).invokeFunction("run", request, response);
@@ -52,7 +54,6 @@ public class AppHook extends ScriptHook {
             throw new ScriptException("Engine does not implement Invocable, plugin must implement"
                 + " custom app hook");
         }
-        System.out.println();
     }
 
 }

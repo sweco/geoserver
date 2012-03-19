@@ -54,18 +54,18 @@ public class AppFinder extends Finder {
             throw new RestletException(format("No such app %s", app), Status.CLIENT_ERROR_NOT_FOUND);
         }
 
-        //if no path after the name of the app look for an index resource
-        File index = null;
+        //look for main script
+        File main = null;
         for (File f : appDir.listFiles()) {
-            if ("index".equals(FilenameUtils.getBaseName(f.getName()))) {
-                index = f;
+            if ("main".equals(FilenameUtils.getBaseName(f.getName()))) {
+                main = f;
                 break;
             }
         }
-        if (index == null) {
-            throw new RestletException(format("No index file for app %s", app), Status.CLIENT_ERROR_NOT_FOUND);
+        if (main == null) {
+            throw new RestletException(format("No main file for app %s", app), Status.CLIENT_ERROR_NOT_FOUND);
         }
 
-        return new AppResource(index, scriptMgr, request, response);
+        return new AppResource(main, scriptMgr, request, response);
     }
 }
