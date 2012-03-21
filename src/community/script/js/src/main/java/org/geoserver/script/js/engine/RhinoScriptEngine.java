@@ -306,8 +306,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
                 filename = "<Unknown Source>";
             }
             
-            Scriptable scope = getRuntimeScope(context);
-            Script scr = cx.compileReader(scope, script, filename, 1, null);
+            Script scr = cx.compileReader(script, filename, 1, null);
             ret = new RhinoCompiledScript(this, scr);
         } catch (Exception e) {
             if (DEBUG) e.printStackTrace();
