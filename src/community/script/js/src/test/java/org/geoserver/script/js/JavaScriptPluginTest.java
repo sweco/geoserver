@@ -2,13 +2,13 @@ package org.geoserver.script.js;
 
 import javax.script.ScriptEngine;
 
-import org.geoserver.script.ScriptTestSupport;
+import org.geoserver.script.ScriptIntTestSupport;
 
-public class JavaScriptPluginTest extends ScriptTestSupport {
+public class JavaScriptPluginTest extends ScriptIntTestSupport {
     
     public void testSanity() throws Exception {
-        ScriptEngine engine = scriptMgr.createNewEngine("js");
-        engine.eval("print('hello sane world');");
+        ScriptEngine engine = getScriptManager().createNewEngine("js");
+        engine.eval("print('hello world');");
     }
 
 }

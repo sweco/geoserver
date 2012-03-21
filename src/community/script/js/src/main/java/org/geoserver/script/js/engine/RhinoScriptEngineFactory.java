@@ -22,7 +22,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.geoserver.script.js.engine.javascript;
+package org.geoserver.script.js.engine;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,7 +31,6 @@ import java.util.Properties;
 
 import javax.script.ScriptEngine;
 
-import org.geoserver.script.js.engine.util.ScriptEngineFactoryBase;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ContextFactory;
 

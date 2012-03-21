@@ -22,7 +22,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.geoserver.script.js.engine.javascript;
+package org.geoserver.script.js.engine;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;

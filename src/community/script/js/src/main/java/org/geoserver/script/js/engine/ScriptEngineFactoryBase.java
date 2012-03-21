@@ -22,65 +22,36 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.geoserver.script.js.engine.util;
+package org.geoserver.script.js.engine;
 
-import java.util.*;
-import javax.script.Bindings;
+import javax.script.*;
 
 /*
- * Abstract super class for Bindings implementations. Handles
- * global and local scopes.
+ * Abstract super class for factory implementations.
  *
- * @author Mike Grogan
  * @version 1.0
+ * @author Mike Grogan
  * @since 1.6
  */
-public abstract class BindingsImpl extends BindingsBase {
+public abstract class ScriptEngineFactoryBase implements ScriptEngineFactory {
     
-    //get method delegates to global if key is not defined in
-    //base class or local scope
-    protected Bindings global = null;
-    
-    //get delegates to local scope
-    protected Bindings local = null;
-    
-    public void setGlobal(Bindings n) {
-        global = n;
+    public String getName() {
+        return (String)getParameter(ScriptEngine.NAME);
     }
     
-    public void setLocal(Bindings n) {
-        local = n;
+    public String getEngineName() {
+        return (String)getParameter(ScriptEngine.ENGINE);
     }
     
-    public  Set<Map.Entry<String, Object>> entrySet() {
-        return new BindingsEntrySet(this);
+    public String getEngineVersion() {
+        return (String)getParameter(ScriptEngine.ENGINE_VERSION);
     }
     
-    public Object get(Object key) {
-        checkKey(key);
-        
-        Object ret  = null;
-        if ((local != null) && (null != (ret = local.get(key)))) {
-            return ret;
-        }
-        
-        ret = getImpl((String)key);
-        
-        if (ret != null) {
-            return ret;
-        } else if (global != null) {
-            return global.get(key);
-        } else {
-            return null;
-        }
+    public String getLanguageName() {
+        return (String)getParameter(ScriptEngine.LANGUAGE);
     }
     
-    public Object remove(Object key) {
-        checkKey(key);
-        Object ret = get(key);
-        if (ret != null) {
-            removeImpl((String)key);
-        }
-        return ret;
+    public String getLanguageVersion() {
+        return (String)getParameter(ScriptEngine.LANGUAGE_VERSION);
     }
 }

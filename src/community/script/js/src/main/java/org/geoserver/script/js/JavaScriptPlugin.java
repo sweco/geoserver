@@ -1,7 +1,8 @@
 package org.geoserver.script.js;
 
+import org.geoserver.script.ScriptManager;
 import org.geoserver.script.ScriptPlugin;
-import org.geoserver.script.js.engine.javascript.RhinoScriptEngineFactory;
+import org.geoserver.script.js.engine.RhinoScriptEngineFactory;
 
 public class JavaScriptPlugin extends ScriptPlugin {
 
@@ -10,7 +11,12 @@ public class JavaScriptPlugin extends ScriptPlugin {
     protected JavaScriptPlugin() {
         super("js", RhinoScriptEngineFactory.class);
     }
-
+    
+    @Override
+    public void init(ScriptManager scriptMgr) throws Exception {
+        super.init(scriptMgr);
+        scriptMgr.getEngineManager().registerEngineExtension("js", new RhinoScriptEngineFactory());
+    }
     @Override
     public String getId() {
         return "javascript";

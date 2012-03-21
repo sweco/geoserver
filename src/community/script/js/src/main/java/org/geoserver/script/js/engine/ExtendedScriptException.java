@@ -22,61 +22,56 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.geoserver.script.js.engine.util;
+package org.geoserver.script.js.engine;
 
-import javax.script.Bindings;
-import java.util.Map;
-import java.util.AbstractMap;
+import javax.script.ScriptException;
 
 /**
- * Abstract super class for Bindings implementations
- *
- * @version 1.0
- * @author Mike Grogan
- * @since 1.6
+ * An extension of javax.script.ScriptException that allows
+ * the cause of an exception to be set.
  */
-public abstract class BindingsBase extends AbstractMap<String, Object>
-        implements Bindings {
+public class ExtendedScriptException extends ScriptException {
     
-    //AbstractMap methods
-    public Object get(Object name) {
-        checkKey(name);
-        return getImpl((String)name);
+    /** serialVersionUID */
+    private static final long serialVersionUID = 1L;
+
+    private Throwable cause;
+    
+    public ExtendedScriptException(
+            Throwable cause,
+            String message,
+            String fileName,
+            int lineNumber,
+            int columnNumber) {
+        super(message, fileName, lineNumber, columnNumber);
+        this.cause = cause;
+    }
+
+    public ExtendedScriptException(String s) {
+        super(s);
     }
     
-    public Object remove(Object key) {
-        checkKey(key);
-        return removeImpl((String)key);
+    public ExtendedScriptException(Exception e) {
+        super(e);
     }
     
-    public Object put(String key, Object value) {
-        checkKey(key);
-        return putImpl(key, value);
+    public ExtendedScriptException(String message, String fileName, int lineNumber) {
+        super(message, fileName, lineNumber);
     }
     
-    public void putAll(Map<? extends String, ? extends Object> toMerge) {
-        for (Map.Entry<? extends String, ? extends Object> entry : toMerge.entrySet()) {
-            String key = entry.getKey();
-            checkKey(key);
-            putImpl(entry.getKey(), entry.getValue());
-        }
+    public ExtendedScriptException(Throwable cause, String message, String fileName, int lineNumber) {
+        super(message, fileName, lineNumber);
+        this.cause = cause;
+    }
+
+    public ExtendedScriptException(String message,
+            String fileName,
+            int lineNumber,
+            int columnNumber) {
+        super(message, fileName, lineNumber, columnNumber);
     }
     
-    //BindingsBase methods
-    public abstract Object putImpl(String name, Object value);
-    public abstract Object getImpl(String name);
-    public abstract Object removeImpl(String name);
-    public abstract String[] getNames();
-    
-    protected void checkKey(Object key) {
-        if (key == null) {
-            throw new NullPointerException("key can not be null");
-        }
-        if (!(key instanceof String)) {
-            throw new ClassCastException("key should be String");
-        }
-        if (key.equals("")) {
-            throw new IllegalArgumentException("key can not be empty");
-        }
+    public Throwable getCause() {
+        return cause;
     }
 }

@@ -22,14 +22,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.geoserver.script.js.engine.javascript;
+package org.geoserver.script.js.engine;
 
 import javax.script.CompiledScript;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
-import org.geoserver.script.js.engine.util.ExtendedScriptException;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.JavaScriptException;
 import org.mozilla.javascript.RhinoException;

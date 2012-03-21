@@ -22,11 +22,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.geoserver.script.js.engine.javascript;
+package org.geoserver.script.js.engine;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
@@ -46,13 +45,9 @@ import javax.script.ScriptException;
 import javax.script.SimpleBindings;
 import javax.script.SimpleScriptContext;
 
-import org.geoserver.script.js.engine.util.ExtendedScriptException;
-import org.geoserver.script.js.engine.util.InterfaceImplementor;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
-import org.mozilla.javascript.ImporterTopLevel;
 import org.mozilla.javascript.JavaScriptException;
-import org.mozilla.javascript.LazilyLoadedCtor;
 import org.mozilla.javascript.RhinoException;
 import org.mozilla.javascript.Script;
 import org.mozilla.javascript.Scriptable;
@@ -60,6 +55,7 @@ import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.Synchronizer;
 import org.mozilla.javascript.Undefined;
 import org.mozilla.javascript.Wrapper;
+import org.mozilla.javascript.tools.shell.Global;
 
 
 /**
@@ -83,15 +79,8 @@ public class RhinoScriptEngine extends AbstractScriptEngine
         implements  Invocable, Compilable {
     
     public static final boolean DEBUG = false;
-    private static final String TOPLEVEL_SCRIPT_NAME = "META-INF/toplevel.js";
 
-    /* Scope where standard JavaScript objects and our
-     * extensions to it are stored. Note that these are not
-     * user defined engine level global variables. These are
-     * variables have to be there on all compliant ECMAScript
-     * scopes. We put these standard objects in this top level.
-     */
-    private ScriptableObject topLevel;
+    private Global global;
 
     /* map used to store indexed properties in engine scope
      * refer to comment on 'indexedProps' in ExternalScriptable.java.
@@ -108,20 +97,9 @@ public class RhinoScriptEngine extends AbstractScriptEngine
        
         Context cx = enterContext();
 
-        try { 
-            /*
-             * RRC - modified this code to register JSAdapter and some functions
-             * directly, without using a separate RhinoTopLevel class
-             */
-            topLevel = new ImporterTopLevel(cx, false);
-            new LazilyLoadedCtor(topLevel, "JSAdapter",
-                "org.geoserver.script.js.engine.javascript.JSAdapter",
-                false);
-            // add top level functions
-            String names[] = { "bindings", "scope", "sync"  };
-            topLevel.defineFunctionProperties(names, RhinoScriptEngine.class, ScriptableObject.DONTENUM);
-            
-            processAllTopLevelScripts(cx);
+        try {
+            global = new Global();
+            global.initStandardObjects(cx, true);
         } finally {
             Context.exit();
         }
@@ -132,7 +110,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
         implementor = new InterfaceImplementor(this) {
                 protected Object convertResult(Method method, Object res)
                                             throws ScriptException {
-                    Class desiredType = method.getReturnType();
+                    Class<?> desiredType = method.getReturnType();
                     if (desiredType == Void.TYPE) {
                         return null;
                     } else {
@@ -164,7 +142,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
             }
             
             filename = filename == null ? "<Unknown source>" : filename;
-            ret = cx.evaluateReader(scope, preProcessScriptSource(reader), filename , 1,  null);
+            ret = cx.evaluateReader(scope, reader, filename , 1,  null);
         } catch (JavaScriptException jse) {
             if (DEBUG) jse.printStackTrace();
             int line = (line = jse.lineNumber()) == 0 ? -1 : line;
@@ -190,7 +168,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
         if (script == null) {
             throw new NullPointerException("null script");
         }
-        return eval(preProcessScriptSource(new StringReader(script)) , ctxt);
+        return eval(new StringReader(script) , ctxt);
     }
     
     public ScriptEngineFactory getFactory() {
@@ -205,7 +183,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
         return new SimpleBindings();
     }
     
-    //Invocable methods
+    //Invokable methods
     public Object invokeFunction(String name, Object... args)
     throws ScriptException, NoSuchMethodException {
         return invokeMethod(null, name, args);
@@ -221,7 +199,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
             }
 
             if (thiz != null && !(thiz instanceof Scriptable)) {
-                thiz = Context.toObject(thiz, topLevel);
+                thiz = Context.toObject(thiz, global);
             }
             
             Scriptable engineScope = getRuntimeScope(context);
@@ -295,9 +273,9 @@ public class RhinoScriptEngine extends AbstractScriptEngine
         // we create a scope for the given ScriptContext
         Scriptable newScope = new ExternalScriptable(ctxt, indexedProps);
 
-        // Set the prototype of newScope to be 'topLevel' so that
+        // Set the prototype of newScope to be 'global' so that
         // JavaScript standard objects are visible from the scope.
-        newScope.setPrototype(topLevel);
+        newScope.setPrototype(global);
 
         // define "context" variable in the new scope
         newScope.put("context", newScope, ctxt);
@@ -315,7 +293,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
     
     //Compilable methods
     public CompiledScript compile(String script) throws ScriptException {
-        return compile(preProcessScriptSource(new StringReader(script)));
+        return compile(new StringReader(script));
     }
     
     public CompiledScript compile(java.io.Reader script) throws ScriptException {
@@ -329,7 +307,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
             }
             
             Scriptable scope = getRuntimeScope(context);
-            Script scr = cx.compileReader(scope, preProcessScriptSource(script), filename, 1, null);
+            Script scr = cx.compileReader(scope, script, filename, 1, null);
             ret = new RhinoCompiledScript(this, scr);
         } catch (Exception e) {
             if (DEBUG) e.printStackTrace();
@@ -359,7 +337,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
         }
         Object[] res = new Object[args.length];
         for (int i = 0; i < res.length; i++) {
-            res[i] = Context.javaToJS(args[i], topLevel);
+            res[i] = Context.javaToJS(args[i], global);
         }
         return res;
     }
@@ -372,34 +350,6 @@ public class RhinoScriptEngine extends AbstractScriptEngine
         return result instanceof Undefined ? null : result;
     }
     
-    protected Reader preProcessScriptSource(Reader reader) throws ScriptException {
-        return reader;
-    }
-
-    protected void processAllTopLevelScripts(Context cx) {
-        processTopLevelScript(TOPLEVEL_SCRIPT_NAME, cx);
-    }
-
-    protected void processTopLevelScript(String scriptName, Context cx) {    
-        InputStream toplevelScript = this.getClass().getClassLoader().getResourceAsStream(scriptName);
-        if (toplevelScript != null) {
-            Reader reader = new InputStreamReader(toplevelScript);
-            try {
-                cx.evaluateReader(topLevel, reader, scriptName, 1, null);
-            }
-            catch (Exception e) {
-                if (DEBUG) e.printStackTrace();
-            }
-            finally {
-                try {
-                    toplevelScript.close();
-                }
-                catch (IOException e) {
-                }
-            }
-        }
-    }
-        
     /**
      * The bindings function takes a JavaScript scope object 
      * of type ExternalScriptable and returns the underlying Bindings

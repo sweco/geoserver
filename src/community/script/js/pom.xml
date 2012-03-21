@@ -21,5 +21,12 @@
             <artifactId>geoscript-js</artifactId>
             <version>0.13-SNAPSHOT</version>
         </dependency>
+        <dependency>
+            <groupId>org.geoserver.script</groupId>
+            <artifactId>script-core</artifactId>
+            <version>${project.version}</version>
+            <classifier>tests</classifier>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

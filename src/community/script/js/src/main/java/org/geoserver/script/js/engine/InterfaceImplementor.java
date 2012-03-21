@@ -22,7 +22,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.geoserver.script.js.engine.util;
+package org.geoserver.script.js.engine;
 
 import javax.script.*;
 import java.lang.reflect.*;
