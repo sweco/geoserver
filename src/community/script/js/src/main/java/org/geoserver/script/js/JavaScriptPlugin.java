@@ -16,6 +16,7 @@ import org.geoserver.script.ScriptManager;
 import org.geoserver.script.ScriptPlugin;
 import org.geoserver.script.js.engine.RhinoScriptEngine;
 import org.geoserver.script.js.engine.RhinoScriptEngineFactory;
+import org.geoserver.script.wps.WpsHook;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.commonjs.module.Require;
@@ -52,6 +53,7 @@ public class JavaScriptPlugin extends ScriptPlugin {
         scriptMgr.getEngineManager().registerEngineExtension("js", new RhinoScriptEngineFactory());
         libRoot = scriptMgr.getLibRoot("js");
         sharedGlobal = new Global();
+        Scriptable exports = null;
         Context cx = RhinoScriptEngine.enterContext();
         try {
             sharedGlobal.initStandardObjects(cx, true);
@@ -64,8 +66,14 @@ public class JavaScriptPlugin extends ScriptPlugin {
     public void initScriptEngine(ScriptEngine engine) {
         super.initScriptEngine(engine);
         Require require = createRequire();
-        Bindings scope = engine.getBindings(ScriptContext.GLOBAL_SCOPE);
+        Bindings scope = engine.getBindings(ScriptContext.ENGINE_SCOPE);
         scope.put("require", require);
+        Context cx = RhinoScriptEngine.enterContext();
+        try {
+            scope.put("exports", cx.newObject(sharedGlobal));
+        } finally {
+            Context.exit();
+        }
     }
     
     /**
@@ -184,6 +192,11 @@ public class JavaScriptPlugin extends ScriptPlugin {
         String userModulePath = libRoot.toURI().toString();
 
         return (List<String>) Arrays.asList(geoscriptModulePath, geoserverModulePath, userModulePath);
+    }
+    
+    @Override
+    public WpsHook createWpsHook() {
+        return new JavaScriptWpsHook(this);
     }
 
 }
