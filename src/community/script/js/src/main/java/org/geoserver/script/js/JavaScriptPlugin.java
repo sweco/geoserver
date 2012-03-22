@@ -53,7 +53,6 @@ public class JavaScriptPlugin extends ScriptPlugin {
         scriptMgr.getEngineManager().registerEngineExtension("js", new RhinoScriptEngineFactory());
         libRoot = scriptMgr.getLibRoot("js");
         sharedGlobal = new Global();
-        Scriptable exports = null;
         Context cx = RhinoScriptEngine.enterContext();
         try {
             sharedGlobal.initStandardObjects(cx, true);
