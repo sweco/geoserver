@@ -120,6 +120,7 @@ public class RhinoScriptEngine extends AbstractScriptEngine
         };
     }
     
+    
     public Object eval(Reader reader, ScriptContext ctxt)
     throws ScriptException {
         Object ret;
@@ -320,10 +321,15 @@ public class RhinoScriptEngine extends AbstractScriptEngine
     
     //package-private helpers
 
-    static Context enterContext() {
-        // call this always so that initializer of this class runs
-        // and initializes custom wrap factory and class shutter.
-        return Context.enter();
+    /**
+     * Associate a context with the current thread.  This calls Context.enter()
+     * and test the language version to 170.
+     * @return a Context associated with the thread
+     */
+    public static Context enterContext() {
+        Context cx = Context.enter();
+        cx.setLanguageVersion(170);
+        return cx;
     }
 
     void setEngineFactory(ScriptEngineFactory fac) {
