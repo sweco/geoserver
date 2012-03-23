@@ -6,7 +6,9 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.script.Bindings;
 import javax.script.ScriptContext;
@@ -18,7 +20,9 @@ import org.geoserver.script.js.engine.RhinoScriptEngine;
 import org.geoserver.script.js.engine.RhinoScriptEngineFactory;
 import org.geoserver.script.wps.WpsHook;
 import org.mozilla.javascript.Context;
+import org.mozilla.javascript.Function;
 import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.Wrapper;
 import org.mozilla.javascript.commonjs.module.Require;
 import org.mozilla.javascript.commonjs.module.RequireBuilder;
 import org.mozilla.javascript.commonjs.module.provider.SoftCachingModuleScriptProvider;
@@ -30,7 +34,7 @@ public class JavaScriptPlugin extends ScriptPlugin {
     private static final long serialVersionUID = 1L;
     
     private File libRoot;
-    private Global sharedGlobal;
+    private Global global;
     private RequireBuilder requireBuilder;
 
     protected JavaScriptPlugin() {
@@ -52,10 +56,10 @@ public class JavaScriptPlugin extends ScriptPlugin {
         super.init(scriptMgr);
         scriptMgr.getEngineManager().registerEngineExtension("js", new RhinoScriptEngineFactory());
         libRoot = scriptMgr.getLibRoot("js");
-        sharedGlobal = new Global();
+        global = new Global();
         Context cx = RhinoScriptEngine.enterContext();
         try {
-            sharedGlobal.initStandardObjects(cx, true);
+            global.initStandardObjects(cx, true);
         } finally {
             Context.exit();
         }
@@ -69,7 +73,7 @@ public class JavaScriptPlugin extends ScriptPlugin {
         scope.put("require", require);
         Context cx = RhinoScriptEngine.enterContext();
         try {
-            scope.put("exports", cx.newObject(sharedGlobal));
+            scope.put("exports", cx.newObject(global));
         } finally {
             Context.exit();
         }
@@ -84,7 +88,7 @@ public class JavaScriptPlugin extends ScriptPlugin {
         RequireBuilder rb = getRequireBuilder();
         Context cx = RhinoScriptEngine.enterContext();
         try {
-            require = rb.createRequire(cx, sharedGlobal);
+            require = rb.createRequire(cx, global);
         } finally {
             Context.exit();
         }
@@ -148,7 +152,7 @@ public class JavaScriptPlugin extends ScriptPlugin {
         Context cx = RhinoScriptEngine.enterContext();
         try {
             Object exportsObj = require.call(
-                    cx, sharedGlobal, sharedGlobal, new String[] {locator});
+                    cx, global, global, new String[] {locator});
             if (exportsObj instanceof Scriptable) {
                 exports = (Scriptable) exportsObj;
             } else {
@@ -159,6 +163,51 @@ public class JavaScriptPlugin extends ScriptPlugin {
             Context.exit();
         }
         return exports;
+    }
+    
+    public Object callFunction(Function function, Object[] args) {
+        Context cx = RhinoScriptEngine.enterContext();
+        Object result = null;
+        try {
+            result = function.call(cx, global, global, args);
+        } finally {
+            Context.exit();
+        }
+        return result;
+    }
+
+    public Scriptable mapToJsObject(Map<String,Object> map) {
+        Context cx = RhinoScriptEngine.enterContext();
+        Scriptable obj;
+        try {
+            obj = cx.newObject(global);
+            for (Map.Entry<String,Object> entry : map.entrySet()) {
+                obj.put(entry.getKey(), 
+                        obj, 
+                        Context.javaToJS(entry.getValue(), global));
+            }
+        } finally { 
+            Context.exit();
+        }
+        return obj;
+    }
+
+    public Map<String, Object> jsObjectToMap(Scriptable obj) {
+        Object[] ids = obj.getIds();
+        Map<String, Object> map = new HashMap<String, Object>();
+        for (Object idObj : ids) {
+            String id = (String)idObj;
+            Object value = obj.get(id, obj);
+
+            if (value instanceof Wrapper) {
+                map.put(id, ((Wrapper)value).unwrap());
+            } else if (value instanceof Function) {
+                // ignore functions?
+            } else {
+                map.put(id, value);
+            }
+        }
+        return map;
     }
 
     /**

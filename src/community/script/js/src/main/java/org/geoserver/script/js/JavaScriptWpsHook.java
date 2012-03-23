@@ -10,10 +10,11 @@ import javax.script.ScriptException;
 import org.geoserver.script.wps.WpsHook;
 import org.geotools.data.Parameter;
 import org.geotools.util.logging.Logging;
+import org.mozilla.javascript.Function;
 import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.Wrapper;
 import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.util.InternationalString;
-import org.mozilla.javascript.Wrapper;
 
 public class JavaScriptWpsHook extends WpsHook {
 
@@ -109,10 +110,28 @@ public class JavaScriptWpsHook extends WpsHook {
     @Override
     public Map<String, Object> run(Map<String, Object> input, ScriptEngine engine)
             throws ScriptException {
-        // TODO Auto-generated method stub
-        return null;
+
+        Map<String,Object> results = null;
+        
+        JavaScriptPlugin jsPlugin = (JavaScriptPlugin) plugin;
+
+        Scriptable exports = jsPlugin.require("geoserver/process");
+        Object executeWrapperObj = exports.get("execute", exports);
+        Function executeWrapper;
+        if (executeWrapperObj instanceof Function) {
+            executeWrapper = (Function) executeWrapperObj;
+        } else {
+            throw new ScriptException(
+                    "Can't find execute method in geoserver/process module.");
+        }
+        
+        Object[] args = {getProcess(engine), jsPlugin.mapToJsObject(input)};
+        Object result = jsPlugin.callFunction(executeWrapper, args);
+        results = jsPlugin.jsObjectToMap((Scriptable)result);
+
+        return results;
     }
-    
+
     private Scriptable getProcess(ScriptEngine engine) {
         Object exportsObj = engine.get("exports");
         Scriptable exports = null;

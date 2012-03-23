@@ -53,7 +53,7 @@ public class ScriptProcess implements Process {
         fw = new ScriptFileWatcher(script, scriptMgr);
     }
 
-    String getTitle() throws ScriptException, IOException {
+    public String getTitle() throws ScriptException, IOException {
         return hook.getTitle(fw.read());
     }
 
