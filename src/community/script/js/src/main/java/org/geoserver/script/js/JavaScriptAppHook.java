@@ -16,20 +16,18 @@ import org.geoserver.script.app.AppHook;
 import org.geoserver.script.js.engine.RhinoScriptEngine;
 import org.geotools.util.logging.Logging;
 import org.mozilla.javascript.Context;
-import org.mozilla.javascript.Function;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 import org.restlet.data.Form;
-import org.restlet.data.MediaType;
 import org.restlet.data.Reference;
 import org.restlet.data.Request;
 import org.restlet.data.Response;
-import org.restlet.data.Status;
-import org.restlet.resource.OutputRepresentation;
 
 public class JavaScriptAppHook extends AppHook {
 
     static Logger LOGGER = Logging.getLogger("org.geoserver.script.js");
+    
+    OutputStream out;
 
     public JavaScriptAppHook(ScriptPlugin plugin) {
         super(plugin);
@@ -38,6 +36,9 @@ public class JavaScriptAppHook extends AppHook {
     @Override
     public void run(Request request, Response response, ScriptEngine engine)
             throws ScriptException, IOException {
+
+        JavaScriptPlugin jsPlugin = (JavaScriptPlugin) plugin;
+
         Invocable invocable = (Invocable) engine;
         Object exportsObj = engine.get("exports");
         Scriptable exports = null;
@@ -55,81 +56,21 @@ public class JavaScriptAppHook extends AppHook {
         } finally {
             Context.exit();
         }
-        Object jsgiResponse = null;
+        Object appReturn = null;
         try {
-            jsgiResponse = invocable.invokeMethod(exports, "app", jsgiRequest);
+            appReturn = invocable.invokeMethod(exports, "app", jsgiRequest);
         } catch (NoSuchMethodException e) {
             throw new ScriptException(e);
         }
-        handleResponse(jsgiResponse, response);
-    }
-    
-    void handleResponse(Object jsgiResponse, Response response) throws ScriptException {
-        JavaScriptPlugin jsPlugin = (JavaScriptPlugin) plugin;
-
-        if (!(jsgiResponse instanceof Scriptable)) {
-            throw new ScriptException("bad return from jsgi app");
-        } else {
-            Scriptable jsgi = (Scriptable) jsgiResponse;
-
-            // set response status
-            int status  = 200;
-            Object statusObj = jsgi.get("status", jsgi);
-            if (statusObj instanceof Integer) {
-                status = (Integer) statusObj;
-            }
-            response.setStatus(new Status(status));
-            
-            // set response headers
-            Object headersObj = jsgi.get("headers", jsgi);
-            Form responseHeaders = (Form) response.getAttributes().get("org.restlet.http.headers");
-            if (responseHeaders == null) {
-                responseHeaders = new Form();
-                response.getAttributes().put("org.restlet.http.headers", responseHeaders);
-            }
-            if (headersObj instanceof ScriptableObject) {
-                ScriptableObject headers = (ScriptableObject) headersObj;
-                for (Object id : headers.getIds()) {
-                    String name = id.toString();
-                    String value = headers.get(name, headers).toString();
-                    responseHeaders.add(name, value);
-                }
-            }
-            
-            // TODO: deal with body
-            Object bodyObj = jsgi.get("body", jsgi);
-            if (bodyObj instanceof Scriptable) {
-                Scriptable body = (Scriptable) bodyObj;
-                Object forEachObj = body.get("forEach", body);
-                if (forEachObj instanceof Function) {
-                    Function forEach = (Function) forEachObj;
-                    Object[] args = {"writer"};
-                    Context cx = RhinoScriptEngine.enterContext();
-                    try {
-                        forEach.call(cx, jsPlugin.global, body, args);
-                    } finally {
-                        Context.exit();
-                    }
-                    MediaType mediaType;
-                    String type = responseHeaders.getFirstValue("content-type", true);
-                    if (type == null) {
-                        mediaType = MediaType.TEXT_PLAIN;
-                    } else {
-                        mediaType = new MediaType(type);
-                    }
-                    response.setEntity(new OutputRepresentation(mediaType) {
-                        
-                        @Override
-                        public void write(OutputStream outputStream) throws IOException {
-                            outputStream.write(("hello world").getBytes());
-                        }
-                        
-                    });
-                }
-            }
-            
+        if (!(appReturn instanceof Scriptable)) {
+            throw new ScriptException("bad return from JSGI app");
         }
-        
+        JsgiResponse jsgiResponse = new JsgiResponse((Scriptable) appReturn);
+        try {
+            jsgiResponse.commit(response, jsPlugin.global);
+        } catch (Exception e) {
+            throw new ScriptException("Failed to write response: " + e.getMessage());
+        }
     }
 
     /**
