@@ -16,6 +16,7 @@ import javax.script.ScriptEngine;
 
 import org.geoserver.script.ScriptManager;
 import org.geoserver.script.ScriptPlugin;
+import org.geoserver.script.app.AppHook;
 import org.geoserver.script.function.FunctionHook;
 import org.geoserver.script.js.engine.RhinoScriptEngine;
 import org.geoserver.script.js.engine.RhinoScriptEngineFactory;
@@ -35,7 +36,7 @@ public class JavaScriptPlugin extends ScriptPlugin {
     private static final long serialVersionUID = 1L;
     
     private File libRoot;
-    private Global global;
+    public Global global;
     private RequireBuilder requireBuilder;
 
     protected JavaScriptPlugin() {
@@ -251,6 +252,11 @@ public class JavaScriptPlugin extends ScriptPlugin {
     @Override
     public FunctionHook createFunctionHook() {
         return new JavaScriptFunctionHook(this);
+    }
+    
+    @Override
+    public AppHook createAppHook() {
+        return new JavaScriptAppHook(this);
     }
 
 }
