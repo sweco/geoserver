@@ -74,6 +74,10 @@ import org.mozilla.javascript.tools.shell.Global;
  *
  * @author Roberto Chinnici
  *
+ * Modified to remove the phobos top level additions.
+ * Modified to use JavaScript 1.8.
+ * 
+ * @author Tim Schaub
  */
 public class RhinoScriptEngine extends AbstractScriptEngine
         implements  Invocable, Compilable {
@@ -323,12 +327,12 @@ public class RhinoScriptEngine extends AbstractScriptEngine
 
     /**
      * Associate a context with the current thread.  This calls Context.enter()
-     * and test the language version to 170.
+     * and sets the language version to 1.8.
      * @return a Context associated with the thread
      */
     public static Context enterContext() {
         Context cx = Context.enter();
-        cx.setLanguageVersion(170);
+        cx.setLanguageVersion(Context.VERSION_1_8);
         return cx;
     }
 

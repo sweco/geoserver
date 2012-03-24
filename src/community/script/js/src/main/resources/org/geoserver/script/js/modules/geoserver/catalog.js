@@ -55,5 +55,3 @@ exports.getFeatureType = function(uri, name) {
 };
 
 
-// TODO: remove this after debugging
-exports._catalog = _catalog;

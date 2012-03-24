@@ -27,7 +27,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
     
     @Override
     protected void populateDataDirectory(MockData dataDirectory) throws Exception {
-        File fromDir = new File(getClass().getResource("wps/scripts").getFile());
+        File fromDir = new File(getClass().getResource("scripts").getFile());
         File toDir = new File(dataDirectory.getDataDirectoryRoot(), "scripts");
         IOUtils.deepCopy(fromDir, toDir);
         super.populateDataDirectory(dataDirectory);

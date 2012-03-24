@@ -41,6 +41,8 @@ import org.mozilla.javascript.ContextFactory;
  * @version 1.0
  * @author Mike Grogan
  * @since 1.6
+ * 
+ * Modified to use Version 1.8
  */
 public class RhinoScriptEngineFactory extends ScriptEngineFactoryBase {
     
@@ -75,11 +77,11 @@ public class RhinoScriptEngineFactory extends ScriptEngineFactoryBase {
         } else if (key.equals(ScriptEngine.ENGINE)) {
             return "Mozilla Rhino";
         } else if (key.equals(ScriptEngine.ENGINE_VERSION)) {
-            return "1.6R7";
+            return "1.7R3";
         } else if (key.equals(ScriptEngine.LANGUAGE)) {
             return "ECMAScript";
         } else if (key.equals(ScriptEngine.LANGUAGE_VERSION)) {
-            return "1.6";
+            return "1.8";
         } else if (key.equals("THREADING")) {
             return "MULTITHREADED";
         } else {
