@@ -3,13 +3,16 @@ package org.geoserver.script.js;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
+import java.util.logging.Logger;
 
 import javax.script.ScriptException;
 
 import org.geoserver.script.js.engine.RhinoScriptEngine;
+import org.geotools.util.logging.Logging;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.FunctionObject;
+import org.mozilla.javascript.NativeArray;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 import org.restlet.data.Form;
@@ -25,9 +28,11 @@ public class JsgiResponse {
     private Scriptable body;
     private Function forEach;
     
+    static Logger LOGGER = Logging.getLogger("org.geoserver.script.js");
+    
     static ThreadLocal<OutputStream> OUTPUT_STREAM = new ThreadLocal<OutputStream>();
     
-    public JsgiResponse(Scriptable obj) {
+    public JsgiResponse(Scriptable obj, Scriptable scope) {
 
         // extract status
         Object statusObj = obj.get("status", obj);
@@ -43,11 +48,29 @@ public class JsgiResponse {
         
         // extract body
         Object bodyObj = obj.get("body", obj);
+        if (bodyObj instanceof String) {
+            // be lenient and convert strings to arrays
+            Object[] array = {(String) bodyObj};
+            Context cx = RhinoScriptEngine.enterContext();
+            try {
+                bodyObj = cx.newArray(scope, array);
+            } finally {
+                Context.exit();
+            }
+        }
         if (bodyObj instanceof Scriptable) {
             body = (Scriptable) bodyObj;
             Object forEachObj = body.get("forEach", body);
             if (forEachObj instanceof Function) {
                 forEach = (Function) forEachObj;
+            } else {
+                NativeArray bodyArray = null;
+                if (body instanceof NativeArray) {
+                    bodyArray = (NativeArray) body;
+                }
+                if (bodyArray != null) {
+                    forEach = (Function) bodyArray.getPrototype().get("forEach", bodyArray);
+                }
             }
         }
         
@@ -110,12 +133,20 @@ public class JsgiResponse {
     }
     
     public static Object write(Context cx, Scriptable thisObj, Object[] args, Function func) throws ScriptException {
-        String msg = (String) args[0];
-        OutputStream outputStream = OUTPUT_STREAM.get();
-        try {
-            outputStream.write(msg.getBytes());
-        } catch (IOException e) {
-            throw new ScriptException("Failed to write to body.");
+        Object part = args[0];
+        byte[] bytes = null;
+        if (part instanceof String) {
+            bytes = ((String) part).getBytes();
+        } else {
+            LOGGER.severe("Unsupported response body type: " + part.toString());
+        }
+        if (bytes != null) {
+            OutputStream outputStream = OUTPUT_STREAM.get();
+            try {
+                outputStream.write(bytes);
+            } catch (IOException e) {
+                throw new ScriptException("Failed to write to body.");
+            }
         }
         return null;
     }
