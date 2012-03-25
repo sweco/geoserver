@@ -72,7 +72,9 @@ public class JsgiResponse {
             for (Object id : headers.getIds()) {
                 String name = id.toString();
                 String value = headers.get(name, headers).toString();
-                responseHeaders.add(name, value);
+                if (!name.equalsIgnoreCase("content-type")) {
+                    responseHeaders.add(name, value);
+                }
             }
         }
         

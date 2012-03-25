@@ -65,7 +65,7 @@ public class JavaScriptAppHook extends AppHook {
         if (!(appReturn instanceof Scriptable)) {
             throw new ScriptException("bad return from JSGI app");
         }
-        JsgiResponse jsgiResponse = new JsgiResponse((Scriptable) appReturn);
+        JsgiResponse jsgiResponse = new JsgiResponse((Scriptable) appReturn, jsPlugin.global);
         try {
             jsgiResponse.commit(response, jsPlugin.global);
         } catch (Exception e) {
