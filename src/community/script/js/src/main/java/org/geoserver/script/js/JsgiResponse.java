@@ -9,6 +9,7 @@ import javax.script.ScriptException;
 
 import org.geoserver.script.js.engine.RhinoScriptEngine;
 import org.geotools.util.logging.Logging;
+import org.mozilla.javascript.BoundFunction;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.FunctionObject;
@@ -29,9 +30,7 @@ public class JsgiResponse {
     private Function forEach;
     
     static Logger LOGGER = Logging.getLogger("org.geoserver.script.js");
-    
-    static ThreadLocal<OutputStream> OUTPUT_STREAM = new ThreadLocal<OutputStream>();
-    
+        
     public JsgiResponse(Scriptable obj, Scriptable scope) {
 
         // extract status
@@ -110,22 +109,21 @@ public class JsgiResponse {
             mediaType = new MediaType(type);
         }
         
-        Method writeMethod = getClass().getDeclaredMethod("write", Context.class, Scriptable.class, Object[].class, Function.class);
-        final FunctionObject writeFunc = new FunctionObject("bodyWriter", writeMethod, scope);
+        final Method writeMethod = getClass().getDeclaredMethod("write", Context.class, Scriptable.class, Object[].class, Function.class);
         
         response.setEntity(new OutputRepresentation(mediaType) {
             
             @Override
             public void write(OutputStream outputStream) throws IOException {
                 Context cx = RhinoScriptEngine.enterContext();
-                Object[] args = {writeFunc};
-                OUTPUT_STREAM.set(outputStream);
+                FunctionObject writeFunc = new FunctionObject("bodyWriter", writeMethod, scope);
+                BoundFunction boundWrite = new BoundFunction(cx, scope, writeFunc, body, new Object[] {outputStream});
+                Object[] args = {boundWrite};
                 try {
                     forEach.call(cx, scope, body, args);
                 } finally {
                     Context.exit();
                     outputStream.close();
-                    OUTPUT_STREAM.remove();
                 }
             }
             
@@ -133,7 +131,8 @@ public class JsgiResponse {
     }
     
     public static Object write(Context cx, Scriptable thisObj, Object[] args, Function func) throws ScriptException {
-        Object part = args[0];
+        OutputStream outputStream = (OutputStream) args[0];
+        Object part = args[1];
         byte[] bytes = null;
         if (part instanceof String) {
             bytes = ((String) part).getBytes();
@@ -141,7 +140,6 @@ public class JsgiResponse {
             LOGGER.severe("Unsupported response body type: " + part.toString());
         }
         if (bytes != null) {
-            OutputStream outputStream = OUTPUT_STREAM.get();
             try {
                 outputStream.write(bytes);
             } catch (IOException e) {
