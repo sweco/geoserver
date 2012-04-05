@@ -1,32 +1,40 @@
 <html>
   <wicket:head>
-     <!-- Make the line numbers look good -->
      <style type="text/css">
-      .CodeMirror-line-numbers {
-        width: 2.2em;
-        color: #aaa;
-        background-color: #eee;
-        text-align: right;
-        padding-right: .3em;
-        font-size: 12px;
-        font-family: monospace;
-        padding-top: .4em;
-        line-height: normal;
+      .CodeMirror {
+        font-size: 12px !important;
+        border: 1px solid #ccc;
       }
-      
-      .fullscreen {
-        display: block;
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 9999;
-        margin: 0;
-        padding: 0;
-        background: inherit;
+      .CodeMirror-scroll {
+         height: 450px !important;
+         
       }
-      
+      .CodeMirror-gutter {
+         width: 2em;
+         border-right: 1px solid #ccc !important;
+      }
+
+      .CodeMirror-fullscreen {
+         display: block;
+         position: absolute;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+         z-index: 9999;
+         margin: 0;
+         padding: 0;
+         border: 0px solid #BBBBBB;
+         opacity: 1;
+       }
+
+      .button-toolbar {
+        border: 1px solid #ccc;
+        border-bottom: 0px;
+        background-color: #F7F7F7;
+        padding:0.2em;
+      }
+
       .button-toolbar span {
            height: 16px;
            width: 16px;
@@ -41,12 +49,16 @@
            border: none;
        }
        a.separator {
-           /*border-right: 1px outset;
-           padding-right: 5px;*/
            margin-right: 5px;
        }
        div.disabled .button-toolbar {
          display: none !important;
+       a.disabled {
+           opacity: 0.4;
+           cursor: default;
+       }
+       span.icon em {
+         max-width: 16px;
        }
     </style>
     <wicket:link>
@@ -55,29 +67,27 @@
 <body>
 <wicket:panel>
   <div wicket:id="editorContainer" style="background-color: white">
-    <div style="border-top: 1px solid black; padding-top: 3px">
+    <div>
       <wicket:link>
-        <div class="button-group button-toolbar selfclear">
-              <!--  Sigh, does not work... oh well, commenting out for the time being and hoping
-                    a good soul might help 
-              <a class="button-fullscreen icon separator" href="#" title="View fullscreen" id="cm_fullscreen">
-                <span></span>
-              </a>
-               -->
-              <a class="button-undo icon" href="#" title="Undo" id="cm_undo">
-                <span></span>
-              </a>
-              <a class="button-redo icon separator" href="#" title="Redo" id="cm_redo">
-                <span></span>
-    
-              </a>
-              <a class="button-goto icon" href="#" title="Go to line ..." id="cm_goto">
-                <span></span>
-              </a>
-              <a class="button-reformat icon separator" href="#" title="Reformat" id="cm_reformat">
-                <span></span>
-              </a>
-              <select style="margin:0; position: " id="cm_font_size">
+        <div class="button-group button-toolbar selfclear" wicket:id="toolbar">
+          <!--  Sigh, does not work... oh well, commenting out for the time being and hoping
+                a good soul might help 
+
+           -->
+
+          <a class="button-undo icon" href="#" title="Undo" id="cm_undo">
+            <span></span>
+          </a>
+          <a class="button-redo icon" href="#" title="Redo" id="cm_redo">
+            <span></span>
+          </a>
+          <a class="button-goto icon separator" href="#" title="Go to line ..." id="cm_goto">
+            <span></span>
+          </a>
+          <!--a class="button-fullscreen icon separator" href="#" title="Fullscreen" id="cm_fullscreen">
+            <span></span>
+          </a-->
+          <select style="margin:0; position: " id="cm_font_size">
               <option value="8">8pt</option>
               <option value="10">10pt</option>
               <option value="12" selected="selected">12pt</option>
@@ -85,11 +95,11 @@
               <option value="16">16pt</option>
               <option value="18">18pt</option>
               <option value="20">20pt</option>
-            </select>
-            </div>
+          </select>
+        </div>
       </wicket:link>
     </div>
-     <div style="border: 1px solid black;">
+    <div>
       <textarea wicket:id="editor"></textarea>
     </div>
   </div>

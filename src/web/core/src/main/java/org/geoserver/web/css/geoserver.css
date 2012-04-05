@@ -556,7 +556,13 @@ padding-bottom: 5px;
 background-position: 0 50%;
 background-repeat: no-repeat;
 }
-
+.button-group a.enabled {
+opacity: 1;
+}
+.button-group span.disabled a {
+opacity: 0.4;
+cursor: default;
+}
 *:first-child+html .button-group a.icon div, /* IE7 */
 * html .button-group button a.icon div { /*IE6 */
 padding-top: 4px;
@@ -603,15 +609,33 @@ background: url(../img/icons/silk/arrow_redo.png) no-repeat;
 display: block;
 }
 .button-group .button-goto span {
-background: url(../img/icons/silk/xhtml_go.png) no-repeat;
+background: url(../img/icons/silk/page_go.png) no-repeat;
 display: block;
 }
 .button-group .button-reformat span {
 background: url(../img/icons/silk/text_align_right.png) no-repeat;
 display: block;
 }
-
-
+.button-group .button-page-new span {
+background: url(../img/icons/silk/page_add.png) no-repeat;
+display: block;
+}
+.button-group .button-save span {
+background-image: url(../img/icons/silk/page_save.png);
+display:block;
+}
+.button-group .button-save-all span {
+background-image: url(../img/icons/silk/page_save_all.png);
+display:block;
+}
+.button-group .button-folder-new span {
+background-image: url(../img/icons/silk/folder_add.png);
+display:block;
+}
+.button-group .button-delete span {
+background-image: url(../img/icons/silk/delete.png);
+display:block;
+}
 .button-group a img,
 button img {
 vertical-align: middle;
@@ -624,6 +648,25 @@ float: left;
 margin: 0 0.58em 0 0;
 }
 
+.button-toolbar {
+border: 1px solid #ccc;
+background-color: #F7F7F7;
+padding:0.2em;
+}
+
+.button-toolbar a {
+float: left;
+margin: 0;
+padding: 0;
+background: none;
+border: none;
+}
+
+.button-toolbar span {
+height: 16px;
+width: 16px;
+margin: 2px;
+}
 
 /*-----------------------
 Header

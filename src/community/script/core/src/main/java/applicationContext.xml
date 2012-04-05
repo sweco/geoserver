@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
+<beans>
+
+   <bean id="scriptDispatcherMapping" 
+        class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+    <property name="alwaysUseFullPath" value="true"/>
+    <property name="mappings">
+        <props>
+            <prop key="/script/**">restWrapper</prop>
+        </props>
+    </property>
+  </bean>
+
+  <bean id="scriptMgr" class="org.geoserver.script.ScriptManager">
+    <constructor-arg ref="dataDirectory"/>
+  </bean>
+
+  <bean id="scriptRestMapping" class="org.geoserver.rest.RESTMapping">
+    <property name="routes">
+      <map>
+        <entry>
+          <key><value>/apps/{app}</value></key>
+          <value>appFinder</value>
+        </entry>
+        <entry>
+          <key><value>/apps/{app}/</value></key>
+          <value>appFinder</value>
+        </entry>
+        <entry>
+          <key><value>/scripts/wps</value></key>
+          <value>scriptFinder</value>
+        </entry>
+        <entry>
+          <key><value>/scripts/wps/{name}.{ext}</value></key>
+          <value>scriptFinder</value>
+        </entry>
+        <entry>
+          <key><value>/sessions</value></key>
+          <value>sessionFinder</value>
+        </entry>
+        <entry>
+          <key><value>/sessions/{ext}</value></key>
+          <value>sessionFinder</value>
+        </entry>
+        <entry>
+          <key><value>/sessions/{ext}</value></key>
+          <value>sessionFinder</value>
+        </entry>
+        <entry>
+          <key><value>/sessions/{ext}/{session}</value></key>
+          <value>sessionFinder</value>
+        </entry>
+      </map>
+    </property>
+  </bean>
+
+  <bean id="appFinder" class="org.geoserver.script.app.AppFinder">
+    <constructor-arg ref="scriptMgr"/>
+  </bean>
+  <bean id="scriptFinder" class="org.geoserver.script.rest.ScriptFinder">
+    <constructor-arg ref="scriptMgr"/>
+  </bean>
+  <bean id="sessionFinder" class="org.geoserver.script.rest.SessionFinder">
+    <constructor-arg ref="scriptMgr"/>
+  </bean>
+  
+  <bean id="scriptCategory" class="org.geoserver.web.Category">
+    <property name="nameKey" value="category.script" />
+    <property name="order" value="200" />
+  </bean>
+  
+  <bean id="scriptMenuPage" class="org.geoserver.web.MenuPageInfo">
+        <property name="id" value="scriptMenuPage"/>
+        <property name="titleKey" value="ScriptsPage.title"/>
+        <property name="descriptionKey" value="ScriptsPage.description"/>
+        <property name="category" ref="scriptCategory" />
+        <property name="icon" value="script.png"/>
+        <property name="componentClass" value="org.geoserver.script.web.ScriptsPage"/>
+   </bean>
+
+  <bean id="pluginMenuPage" class="org.geoserver.web.MenuPageInfo">
+        <property name="id" value="pluginMenuPage"/>
+        <property name="titleKey" value="PluginsPage.title"/>
+        <property name="descriptionKey" value="PluginsPage.description"/>
+        <property name="category" ref="scriptCategory" />
+        <property name="icon" value="plugin.png"/>
+        <property name="componentClass" value="org.geoserver.script.web.PluginsPage"/>
+   </bean>
+
+</beans>
