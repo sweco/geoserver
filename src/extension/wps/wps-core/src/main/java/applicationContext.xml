@@ -205,6 +205,10 @@
       <property name="resourceManager" ref="wpsResourceManager" />
     </bean>
     
+    <bean id="barnesSurfaceProcess" class="org.geotools.process.raster.surface.BarnesSurfaceProcess"/>
+    <bean id="heatmapProcess" class="org.geotools.process.raster.surface.HeatMapProcess"/>
+    <bean id="pointStackerProcess" class="org.geotools.process.feature.gs.PointStackerProcess"/>
+    
     <bean id="getFullCoverage" class="org.geoserver.wps.gs.GetFullCoverage">
       <constructor-arg index="0" ref="catalog"/>
     </bean>

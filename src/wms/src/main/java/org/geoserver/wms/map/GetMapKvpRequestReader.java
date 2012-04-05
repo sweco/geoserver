@@ -1124,10 +1124,13 @@ public class GetMapKvpRequestReader extends KvpRequestReader implements HttpServ
         for (PropertyName attName : styleAttributes) {
         
             if ( attName.evaluate(type) == null ) {
-                throw new ServiceException(
+                //JD: disabling for now to make rendering transforms that add attributes 
+                // work, we can probably detect this case and perhaps just apply heuristics like
+                // ignoring properties inside of a raster symbolizer for a vector layer
+                /*throw new ServiceException(
                         "The requested Style can not be used with this layer.  The style specifies "
                                 + "an attribute of " + attName + " and the layer is: "
-                                + mapLayerInfo.getName());
+                                + mapLayerInfo.getName());*/
             }
         }
     }
