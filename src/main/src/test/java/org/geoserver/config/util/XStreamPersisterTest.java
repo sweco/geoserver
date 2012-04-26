@@ -15,6 +15,8 @@ import javax.xml.transform.stream.StreamSource;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.io.IOUtils;
+import org.custommonkey.xmlunit.XMLAssert;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CatalogFactory;
 import org.geoserver.catalog.CoverageStoreInfo;
@@ -575,6 +577,91 @@ public class XStreamPersisterTest extends TestCase {
         assertNotNull(vt2);
         assertEquals(vt, vt2);
     }
+
+    public void testTopLevelReferences() throws Exception {
+        persister.setEncodeByReference();
+
+        Catalog catalog = new CatalogImpl();
+        CatalogFactory cFactory = catalog.getFactory();
+        
+        WorkspaceInfo ws = cFactory.createWorkspace();
+        ws.setName( "foo" );
+
+        //test inline pre-save
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        persister.save(ws, bout);
+
+        Document dom = dom(in(bout));
+        assertEquals("workspace", dom.getDocumentElement().getNodeName());
+        XMLAssert.assertXpathNotExists("/workspace/id", dom);
+        XMLAssert.assertXpathEvaluatesTo(ws.getName(), "/workspace/name", dom);
+
+        catalog.add( ws );
+
+        bout = new ByteArrayOutputStream();
+        persister.save(ws, bout);
+
+        dom = dom(in(bout));
+        assertEquals("workspace", dom.getDocumentElement().getNodeName());
+        XMLAssert.assertXpathEvaluatesTo(ws.getId(), "/workspace/id", dom);
+        XMLAssert.assertXpathNotExists("/workspace/name", dom);
+
+        DataStoreInfo ds = cFactory.createDataStore();
+        ds.setWorkspace(ws);
+        ds.setName("bar");
+
+        bout = new ByteArrayOutputStream();
+        persister.save(ds, bout);
+        dom = dom(in(bout));
+
+        assertEquals("dataStore", dom.getDocumentElement().getNodeName());
+        XMLAssert.assertXpathNotExists("/dataStore/id", dom);
+        XMLAssert.assertXpathEvaluatesTo(ds.getName(), "/dataStore/name", dom);
+
+        catalog.add(ds);
+
+        bout = new ByteArrayOutputStream();
+        persister.save(ds, bout);
+        dom = dom(in(bout));
+
+        assertEquals("dataStore", dom.getDocumentElement().getNodeName());
+        XMLAssert.assertXpathEvaluatesTo(ds.getId(), "/dataStore/id", dom);
+        XMLAssert.assertXpathNotExists("/dataStore/name", dom);
+
+        String xml = "<workspace><id>" + ws.getId() + "</id></workspace>";
+        persister.setCatalog(catalog);
+        WorkspaceInfo ws2 = 
+            persister.load(new ByteArrayInputStream(xml.getBytes()), WorkspaceInfo.class);
+        assertNotNull(ws2);
+        assertEquals(ws.getName(), ws2.getName());
+    }
+
+    public void testEncodeByReference() throws Exception {
+        persister.setEncodeByReference();
+
+        Catalog catalog = new CatalogImpl();
+        persister.setCatalog(catalog);
+
+        CatalogFactory cFactory = catalog.getFactory();
+        
+        FeatureTypeInfo ft = cFactory.createFeatureType();
+        ft.setName("ft");
+        ft.setNativeName("ftNative");
+
+        LayerInfo l = cFactory.createLayer();
+        l.setResource(ft);
+
+        //test inline pre-save
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        persister.save(l, bout);
+        persister.save(l, System.out);
+
+        LayerInfo l2 = persister.load(in(bout), LayerInfo.class);
+        assertNotNull(l2.getResource());
+        assertEquals("ft", l2.getResource().getName());
+        assertEquals("ftNative", l2.getResource().getNativeName());
+    }
+
     
     ByteArrayOutputStream out() {
         return new ByteArrayOutputStream();

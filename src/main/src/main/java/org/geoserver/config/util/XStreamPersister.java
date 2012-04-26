@@ -32,6 +32,7 @@ import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.catalog.CoverageStoreInfo;
 import org.geoserver.catalog.DataStoreInfo;
 import org.geoserver.catalog.FeatureTypeInfo;
+import org.geoserver.catalog.Info;
 import org.geoserver.catalog.Keyword;
 import org.geoserver.catalog.KeywordInfo;
 import org.geoserver.catalog.LayerGroupInfo;
@@ -441,7 +442,34 @@ public class XStreamPersister {
     public void setHideFeatureTypeAttributes() {
         xs.omitField(FeatureTypeInfoImpl.class, "attributes");
     }
-    
+
+    public void setEncodeByReference() {
+        xs.registerConverter(new ReferenceOrInlineConverter(WorkspaceInfo.class, 
+            new SpaceInfoConverter()), XStream.PRIORITY_VERY_HIGH);
+        xs.registerConverter(new ReferenceOrInlineConverter(NamespaceInfo.class, 
+            new SpaceInfoConverter()), XStream.PRIORITY_VERY_HIGH);
+        xs.registerConverter(new ReferenceOrInlineConverter(StoreInfo.class, 
+            new StoreInfoConverter()), XStream.PRIORITY_VERY_HIGH);
+        xs.registerConverter(new ReferenceOrInlineConverter(ResourceInfo.class, 
+            new ResourceInfoConverter()), XStream.PRIORITY_VERY_HIGH);
+        xs.registerConverter(new ReferenceOrInlineConverter(FeatureTypeInfo.class, 
+            new FeatureTypeInfoConverter()), XStream.PRIORITY_VERY_HIGH);
+        xs.registerConverter(new ReferenceOrInlineConverter(CoverageInfo.class, 
+            new CoverageInfoConverter()), XStream.PRIORITY_VERY_HIGH);
+        xs.registerConverter(new ReferenceOrInlineConverter(LayerInfo.class, 
+            new LayerInfoConverter()), XStream.PRIORITY_VERY_HIGH);
+        xs.registerConverter(new ReferenceOrInlineConverter(LayerGroupInfo.class, 
+            new LayerGroupInfoConverter()), XStream.PRIORITY_VERY_HIGH);
+        xs.registerConverter(new ReferenceOrInlineConverter(StyleInfo.class, 
+            new ReflectionConverter(xs.getMapper(), xs.getReflectionProvider())));
+
+        xs.registerLocalConverter(impl(LayerInfo.class), "resource", 
+            new ReferenceOrInlineConverter(ResourceInfo.class, new MuxingResourceInfoConverter()));
+        xs.registerLocalConverter(impl(LayerInfo.class), "defaultStyle", 
+            new ReferenceOrInlineConverter(StyleInfo.class, 
+            new ReflectionConverter(xs.getMapper(), xs.getReflectionProvider())));
+    }
+
     /**
      * Saves an object to persistence.
      * 
@@ -878,6 +906,11 @@ public class XStreamPersister {
             else {
                 ref = reader.getValue();
             }
+
+            return resolve(ref);
+        }
+
+        Object resolve(String ref) {
             Object proxy = ResolvingProxy.create( ref, clazz );
             Object resolved = proxy;
             if ( catalog != null ) {
@@ -916,6 +949,50 @@ public class XStreamPersister {
             return context.convertAnother( current, clazz, new ReferenceConverter( clazz ) );
         }
     }
+
+    class ReferenceOrInlineConverter implements Converter {
+        
+        Class<? extends Info> clazz;
+        Converter inlineConverter;
+
+        public ReferenceOrInlineConverter( Class<? extends Info> clazz, Converter inlineConverter) {
+            this.clazz = clazz;
+            this.inlineConverter = inlineConverter;
+        }
+
+        public boolean canConvert(Class type) {
+            return type != null && clazz.isAssignableFrom( type );
+        }
+
+        public void marshal(Object source, HierarchicalStreamWriter writer,
+                MarshallingContext context) {
+            
+            Info obj = (Info) source;
+            if (obj.getId() != null) {
+                //encode by reference
+                new ReferenceConverter(clazz).marshal(source, writer, context);
+            }
+            else {
+                //encode inline
+                inlineConverter.marshal(source, writer, context);
+            }
+        }
+
+        public Object unmarshal(HierarchicalStreamReader reader,
+                UnmarshallingContext context) {
+
+            Info obj = (Info) inlineConverter.unmarshal(reader, context);
+            if (obj.getId() == null) {
+                //inline object, return it directly
+                return obj;
+            }
+            else {
+                //treat as reference
+                return new ReferenceConverter(clazz).resolve(obj.getId());
+            }
+        }
+    }
+
     /**
      * Converter which unwraps proxies in a collection.
      */
@@ -936,7 +1013,7 @@ public class XStreamPersister {
     /**
      * Converter for coordinate reference system objects that converts by SRS code.
      */
-    static class SRSConverter extends AbstractSingleValueConverter {
+    public static class SRSConverter extends AbstractSingleValueConverter {
         
         public boolean canConvert(Class type) {
             return CoordinateReferenceSystem.class.isAssignableFrom(type);
@@ -984,7 +1061,7 @@ public class XStreamPersister {
      * Converter for coordinate reference system objects that converts by WKT. 
      *
      */
-    static class CRSConverter extends AbstractSingleValueConverter {
+    public static class CRSConverter extends AbstractSingleValueConverter {
 
         @Override
         public boolean canConvert(Class type) {
@@ -1479,7 +1556,40 @@ public class XStreamPersister {
             callback.postEncodeCoverage((CoverageInfo)result, writer, context);
         }
     }
-    
+
+    class MuxingResourceInfoConverter implements Converter {
+
+        public boolean canConvert(Class type) {
+            return ResourceInfo.class.isAssignableFrom(type);
+        }
+
+        public void marshal(Object source, HierarchicalStreamWriter writer,
+                MarshallingContext context) {
+            if (source instanceof FeatureTypeInfo) {
+                new FeatureTypeInfoConverter().marshal(source, writer, context);
+            }
+            else if (source instanceof CoverageInfo ){
+                new CoverageInfoConverter().marshal(source, writer, context);
+            }
+            else {
+                new ResourceInfoConverter().marshal(source, writer, context);    
+            }
+        }
+
+        public Object unmarshal(HierarchicalStreamReader reader,
+                UnmarshallingContext context) {
+            String clazz = reader.getAttribute("class");
+            if ("featureType".equals(clazz)) {
+                return new FeatureTypeInfoConverter().unmarshal(reader, context);
+            }
+            else if ("coverage".equals(clazz)){
+                return new CoverageInfoConverter().unmarshal(reader, context);
+            }
+            
+            return new ResourceInfoConverter().unmarshal(reader, context);
+        }
+    }
+
     /**
      * Converter for layers.
      */
