@@ -17,6 +17,7 @@ import org.springframework.security.providers.anonymous.AnonymousAuthenticationT
 import org.apache.wicket.Application;
 import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.Component;
+import org.apache.wicket.Page;
 import org.apache.wicket.RequestCycle;
 import org.apache.wicket.ResourceReference;
 import org.apache.wicket.ajax.IAjaxIndicatorAware;
@@ -64,7 +65,17 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
      */
     protected FeedbackPanel feedbackPanel;
 
-	@SuppressWarnings("serial")
+    /**
+     * return page instance to return to when this page is done
+     */
+    protected Page returnPage;
+
+    /**
+     * return page class to return to when this page is done
+     */
+    protected Class<? extends Page> returnPageClass;
+
+    @SuppressWarnings("serial")
     public GeoServerBasePage() {
         //add css and javascript header contributions
 	    ResourceReference faviconReference = null;
@@ -310,4 +321,43 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
        return feedbackPanel;
    }
 
+   /**
+    * Sets the return page to navigate to when this page is done its task.
+    * @see #doReturn()
+    */
+   public GeoServerBasePage setReturnPage(Page returnPage) {
+       this.returnPage = returnPage;
+       return this;
+   }
+
+   /**
+    * Sets the return page class to navigate to when this page is done its task.
+    * @see #doReturn()
+    */
+   public GeoServerBasePage setReturnPageClass(Class<? extends Page> returnPageClass) {
+       this.returnPageClass = returnPageClass;
+       return this;
+   }
+
+   /**
+    * Returns from the page by navigating to one of {@link #returnPage} or {@link #returnPageClass},
+    * processed in that order.
+    * <p>
+    * This method should be called by pages that must return after doing some task on a form submit
+    * such as a save or a cancel. If no return page has been set via {@Link {@link #setReturnPage(Page)}} 
+    * or {@link #setReturnPageClass(Class)} then {@link GeoServerHomePage} is used.
+    * </p>
+    */
+   protected void doReturn() {
+       if (returnPage != null) {
+           setResponsePage(returnPage);
+           return;
+       }
+       if (returnPageClass != null) {
+           setResponsePage(returnPageClass);
+           return;
+       }
+
+       setResponsePage(GeoServerHomePage.class);
+   }
 }
