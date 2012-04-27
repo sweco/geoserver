@@ -60,8 +60,10 @@ public abstract class StoreEditPanel extends Panel {
         for (Param p : dsParams) {
             ParamInfo paramInfo = new ParamInfo(p);
 
-            // set default value
-            applyParamDefault(paramInfo, info);
+            if (!info.getConnectionParameters().containsKey(p.key)) {
+                // set default value
+                applyParamDefault(paramInfo, info);
+            }
         }
     }
 
