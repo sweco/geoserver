@@ -17,6 +17,7 @@ import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.DropDownChoice;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.link.BookmarkablePageLink;
+import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
 import org.apache.wicket.model.CompoundPropertyModel;
 import org.apache.wicket.model.IModel;
@@ -142,7 +143,12 @@ abstract class AbstractDataAccessPage extends GeoServerSecuredPage {
                 .getFormComponent(), dataStoreNamePanel.getFormComponent(), dataStoreInfoId);
         paramsForm.add(storeNameValidator);
 
-        paramsForm.add(new BookmarkablePageLink("cancel", StorePage.class));
+        paramsForm.add(new Link("cancel") {
+            @Override
+            public void onClick() {
+                doReturn();
+            }
+        });
 
         paramsForm.add(new AjaxSubmitLink("save", paramsForm) {
             private static final long serialVersionUID = 1L;
