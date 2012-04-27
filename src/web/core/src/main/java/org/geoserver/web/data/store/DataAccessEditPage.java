@@ -50,7 +50,7 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
         
         if(dsi == null) {
             error(new ParamResourceModel("DataAccessEditPage.notFound", this, wsName, storeName).getString());
-            setResponsePage(StorePage.class);
+            doReturn();
             return;
         }
 
@@ -58,7 +58,7 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
             initUI(dsi);
         } catch (IllegalArgumentException e) {
             error(e.getMessage());
-            setResponsePage(StorePage.class);
+            doReturn();
             return;
         }
     }
@@ -79,17 +79,25 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
 
         initUI(dataStoreInfo);
     }
+
+    public DataAccessEditPage(DataStoreInfo store) {
+        initUI(store);
+    }
     
     protected void initUI(final DataStoreInfo dataStoreInfo) {
+        returnPageClass = StorePage.class;
+
         // the confirm dialog
         dialog = new GeoServerDialog("dialog");
         add(dialog);
         
         super.initUI(dataStoreInfo);
 
-        final String wsId = dataStoreInfo.getWorkspace().getId();
-        workspacePanel.getFormComponent().add(
-                new CheckExistingResourcesInWorkspaceValidator(dataStoreInfo.getId(), wsId));
+        if (dataStoreInfo.getId() != null) {
+            final String wsId = dataStoreInfo.getWorkspace().getId();
+            workspacePanel.getFormComponent().add(
+                    new CheckExistingResourcesInWorkspaceValidator(dataStoreInfo.getId(), wsId));
+        }
     }
 
     /**
@@ -115,7 +123,7 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
                 LOGGER.finer("connection parameters verified for store " + info.getName()
                         + ". Got a " + dataStore.getClass().getName());
                 doSaveStore(info);
-                setResponsePage(StorePage.class);
+                doReturn();
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "Error obtaining datastore with the modified values", e);
                 confirmSaveOnConnectionFailure(info, requestTarget, e);
@@ -126,7 +134,7 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
         } else {
             // store's disabled, no need to check the connection parameters
             doSaveStore(info);
-            setResponsePage(StorePage.class);
+            doReturn();
         }
     }
 
@@ -170,13 +178,13 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
             @Override
             public void onClose(AjaxRequestTarget target) {
                 if (accepted) {
-                    setResponsePage(StorePage.class);
+                    doReturn();
                 }
             }
         });
     }
 
-    private void doSaveStore(final DataStoreInfo info) {
+    protected void doSaveStore(final DataStoreInfo info) {
         try {
             final Catalog catalog = getCatalog();
 

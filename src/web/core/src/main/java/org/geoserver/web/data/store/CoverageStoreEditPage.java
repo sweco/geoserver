@@ -37,7 +37,7 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
      * Dialog to ask for save confirmation in case the store can't be reached
      */
     private GeoServerDialog dialog;
-    
+
     /**
      * Uses a "name" parameter to locate the datastore
      * @param parameters
@@ -49,7 +49,7 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
         
         if(csi == null) {
             error(new ParamResourceModel("CoverageStoreEditPage.notFound", this, storeName, wsName).getString());
-            setResponsePage(StorePage.class);
+            doReturn();
             return;
         }
         
@@ -70,17 +70,25 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
 
         initUI(store);
     }
-    
+
+    public CoverageStoreEditPage(CoverageStoreInfo store) {
+        initUI(store);
+    }
+
     @Override
     void initUI(CoverageStoreInfo store) {
+        returnPageClass = StorePage.class;
+
         dialog = new GeoServerDialog("dialog");
         add(dialog);
         
         super.initUI(store);
         
-        String workspaceId = store.getWorkspace().getId();
-        workspacePanel.getFormComponent().add(
-                new CheckExistingResourcesInWorkspaceValidator(store.getId(), workspaceId));
+        if (store.getId() != null) {
+            String workspaceId = store.getWorkspace().getId();
+            workspacePanel.getFormComponent().add(
+                    new CheckExistingResourcesInWorkspaceValidator(store.getId(), workspaceId));
+        }
     }
 
     @SuppressWarnings("deprecation")
@@ -115,7 +123,7 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
                 LOGGER.info("Connection to store " + info.getName() + " validated. Got a "
                         + reader.getClass().getName() + ". Saving store");
                 doSaveStore(info);
-                setResponsePage(StorePage.class);
+                doReturn();
             } catch (IOException e) {
                 confirmSaveOnConnectionFailure(info, requestTarget, e);
             } catch (RuntimeException e) {
@@ -124,7 +132,7 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
         } else {
             // store's disabled, no need to check for availability
             doSaveStore(info);
-            setResponsePage(StorePage.class);
+            doReturn();
         }
     }
 
@@ -158,13 +166,13 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
             @Override
             public void onClose(AjaxRequestTarget target) {
                 if (accepted) {
-                    setResponsePage(StorePage.class);
+                    doReturn();
                 }
             }
         });
     }
 
-    private void doSaveStore(final CoverageStoreInfo info) {
+    protected void doSaveStore(final CoverageStoreInfo info) {
         try {
             Catalog catalog = getCatalog();
 
