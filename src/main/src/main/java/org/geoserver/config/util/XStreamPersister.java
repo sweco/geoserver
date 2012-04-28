@@ -982,13 +982,24 @@ public class XStreamPersister {
                 UnmarshallingContext context) {
 
             Info obj = (Info) inlineConverter.unmarshal(reader, context);
-            if (obj.getId() == null) {
+            String ref = obj.getId();
+            if (ref == null && referenceByName) {
+                try {
+                    ref = (String) OwsUtils.get(obj, "name");
+                }
+                catch(Exception e) {}
+            }
+
+            if (ref == null) {
                 //inline object, return it directly
                 return obj;
             }
             else {
-                //treat as reference
-                return new ReferenceConverter(clazz).resolve(obj.getId());
+                //attempt to resolve as reference
+                Object resolved = new ReferenceConverter(clazz).resolve(ref);
+
+                //fall back on original represetnation if could not resolve
+                return resolved != null ? resolved : obj;
             }
         }
     }
