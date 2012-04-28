@@ -74,14 +74,27 @@ public class ResolvingProxy extends ProxyBase {
                      return (T) ns;
                 }
                 if ( object instanceof StoreInfo ) {
+                    Object s = null;
                     if ( object instanceof DataStoreInfo ) {
-                        return (T) catalog.getDataStore( ref );
+                        s = catalog.getDataStore( ref );
+                        if (s == null) {
+                            s = catalog.getDataStoreByName((WorkspaceInfo)null, ref);
+                        }
                     }
-                    if ( object instanceof CoverageStoreInfo ) {
-                        return (T) catalog.getCoverageStore( ref );
+                    else if ( object instanceof CoverageStoreInfo ) {
+                        s = catalog.getCoverageStore( ref );
+                        if (s == null) {
+                            s = catalog.getCoverageStoreByName((WorkspaceInfo)null, ref);
+                        }
                     }
-                    
-                    return (T) catalog.getStore( ref, StoreInfo.class );
+                    else {
+                        s = catalog.getStore( ref, StoreInfo.class );
+                        if (s == null) {
+                            s = catalog.getStoreByName((WorkspaceInfo)null, ref, StoreInfo.class);
+                        }
+                    }
+
+                    return (T) s;
                 }
                 if ( object instanceof ResourceInfo ) {
                     if ( object instanceof FeatureTypeInfo ) {
