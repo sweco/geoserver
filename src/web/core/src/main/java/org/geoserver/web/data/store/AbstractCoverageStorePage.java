@@ -45,7 +45,7 @@ abstract class AbstractCoverageStorePage extends GeoServerSecuredPage {
             throw new IllegalArgumentException(msg);
         }
 
-        IModel model = new Model(store);
+        IModel<CoverageStoreInfo> model = new Model<CoverageStoreInfo>(store);
 
         // build the form
         paramsForm = new Form("rasterStoreForm", model);
