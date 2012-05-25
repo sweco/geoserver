@@ -26,6 +26,7 @@ import net.opengis.wfs.WfsFactory;
 
 import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.catalog.LayerInfo;
+import org.geoserver.catalog.ProjectionPolicy;
 import org.geoserver.catalog.WMSLayerInfo;
 import org.geoserver.platform.ServiceException;
 import org.geoserver.wms.featureinfo.FeatureCollectionDecorator;
@@ -246,8 +247,6 @@ public class GetFeatureInfo {
                                 GeoTools.getDefaultHints());
                 
                 
-                // get the original grid geometry
-                final GridGeometry2D coverageGeometry = (GridGeometry2D) cinfo.getGrid();
                 // set the requested position in model space for this request
                 final Coordinate middle = pixelToWorld(x, y, bbox, width, height);
                 DirectPosition position = new DirectPosition2D(requestedCRS, middle.x, middle.y);
@@ -256,9 +255,12 @@ public class GetFeatureInfo {
                 // area,
                 // TODO this code need to be made much more robust
                 if (requestedCRS != null) {
-
-                    final CoordinateReferenceSystem targetCRS = coverageGeometry
-                            .getCoordinateReferenceSystem();
+                    final CoordinateReferenceSystem targetCRS;
+                    if(cinfo.getProjectionPolicy() == ProjectionPolicy.NONE) {
+                        targetCRS = cinfo.getNativeCRS();
+                    } else {
+                        targetCRS = cinfo.getCRS();
+                    }
                     final TransformedDirectPosition arbitraryToInternal = new TransformedDirectPosition(
                             requestedCRS, targetCRS, new Hints(Hints.LENIENT_DATUM_SHIFT,
                                     Boolean.TRUE));
@@ -298,6 +300,21 @@ public class GetFeatureInfo {
                 
                 int size = collection.size();
                 if(size != 0) {
+
+                    // HACK HACK HACK
+                    // For complex features, we need the targetCrs and version in scenario where we have
+                    // a top level feature that does not contain a geometry(therefore no crs) and has a
+                    // nested feature that contains geometry as its property.Furthermore it is possible
+                    // for each nested feature to have different crs hence we need to reproject on each
+                    // feature accordingly.
+                    // This is a Hack, this information should not be passed through feature type
+                    // appschema will need to remove this information from the feature type again
+                	if (! (collection instanceof SimpleFeatureCollection)) {
+                       collection.getSchema().getUserData().put("targetCrs", request.getGetMapRequest().getCrs());
+                       collection.getSchema().getUserData().put("targetVersion", "wms:getfeatureinfo");
+                       
+                    }
+                	
                     results.add(collection);
                     
                     // don't return more than FEATURE_COUNT
@@ -381,7 +398,7 @@ public class GetFeatureInfo {
         return pixel;
     }
 
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private FeatureCollection identifyVectorLayer(Filter[] filters,
             final int x, final int y, final int buffer, final Map<String, String> viewParams,
             final CoordinateReferenceSystem requestedCRS, final int width, final int height,
@@ -461,8 +478,8 @@ public class GetFeatureInfo {
         // memory
         Filter postFilter = Filter.INCLUDE;
         Filter rulesFilters = buildRulesFilter(ff, rules);
-        if (!(rulesFilters instanceof Or)
-                || (rulesFilters instanceof Or && ((Or) rulesFilters).getChildren().size() <= 20)) {
+        if (!(featureSource.getSchema() instanceof SimpleFeatureType) || !(rulesFilters instanceof Or)
+                || (rulesFilters instanceof Or && ((Or) rulesFilters).getChildren().size() <= 20)) { 
             getFInfoFilter = ff.and(getFInfoFilter, rulesFilters);
         } else {
             postFilter = rulesFilters;
@@ -492,7 +509,7 @@ public class GetFeatureInfo {
         // if we could not include the rules filter into the query, post process in
         // memory
         if (!Filter.INCLUDE.equals(postFilter)) {
-            match = DataUtilities.simple(new FilteringFeatureCollection(match, postFilter));
+        	match = new FilteringFeatureCollection(match, postFilter);
         }
 
         // this was crashing Gml2FeatureResponseDelegate due to not setting

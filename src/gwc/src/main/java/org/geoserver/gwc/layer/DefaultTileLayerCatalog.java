@@ -53,6 +53,8 @@ public class DefaultTileLayerCatalog implements TileLayerCatalog {
 
     private final String baseDirectory;
 
+    private volatile boolean initialized;
+
     public DefaultTileLayerCatalog(GeoServerResourceLoader resourceLoader,
             XMLConfiguration xmlPersisterFactory) throws IOException {
         this(resourceLoader, xmlPersisterFactory.getConfiguredXStream(new XStream()));
@@ -68,7 +70,13 @@ public class DefaultTileLayerCatalog implements TileLayerCatalog {
         BiMap<String, String> baseBiMap = HashBiMap.create();
         this.layersById = Maps.synchronizedBiMap(baseBiMap);
         this.layersByName = layersById.inverse();
+        this.initialized = false;
+    }
 
+    @Override
+    public void reset() {
+        layersById.clear();
+        this.initialized = false;
     }
 
     @Override
@@ -110,10 +118,12 @@ public class DefaultTileLayerCatalog implements TileLayerCatalog {
                 LOGGER.finer("Loaded tile layer '" + info.getName() + "'");
             }
         }
+        this.initialized = true;
     }
 
     @Override
     public GeoServerTileLayerInfo getLayerById(final String id) {
+        checkInitialized();
         if (!layersById.containsKey(id)) {
             return null;
         }
@@ -129,8 +139,15 @@ public class DefaultTileLayerCatalog implements TileLayerCatalog {
         return null;
     }
 
+    private synchronized void checkInitialized() {
+        if (!initialized) {
+            initialize();
+        }
+    }
+
     @Override
     public GeoServerTileLayerInfo getLayerByName(String layerName) {
+        checkInitialized();
         String id = layersByName.get(layerName);
         if (id == null) {
             return null;
@@ -140,21 +157,25 @@ public class DefaultTileLayerCatalog implements TileLayerCatalog {
 
     @Override
     public Set<String> getLayerIds() {
+        checkInitialized();
         return ImmutableSet.copyOf(layersById.keySet());
     }
 
     @Override
     public boolean exists(String layerId) {
+        checkInitialized();
         return layersById.containsKey(layerId);
     }
 
     @Override
     public Set<String> getLayerNames() {
+        checkInitialized();
         return ImmutableSet.copyOf(layersByName.keySet());
     }
 
     @Override
     public GeoServerTileLayerInfo delete(final String tileLayerId) {
+        checkInitialized();
         try {
             GeoServerTileLayerInfo info = getLayerById(tileLayerId);
             if (info != null) {
@@ -171,7 +192,7 @@ public class DefaultTileLayerCatalog implements TileLayerCatalog {
 
     @Override
     public GeoServerTileLayerInfo save(final GeoServerTileLayerInfo newValue) {
-
+        checkInitialized();
         GeoServerTileLayerInfoImpl oldValue = null;
 
         final String tileLayerId = newValue.getId();
@@ -186,7 +207,13 @@ public class DefaultTileLayerCatalog implements TileLayerCatalog {
                 throw propagate(other);
             }
 
-            if (oldValue != null) {
+            if (oldValue == null) {
+                final String duplicateNameId = layersByName.get(newValue.getName());
+                if (null != duplicateNameId) {
+                    throw new IllegalArgumentException("TileLayer with same name already exists: "
+                            + newValue.getName() + ": <" + duplicateNameId + ">");
+                }
+            } else {
                 layersByName.remove(oldValue.getName());
             }
 
@@ -261,7 +288,7 @@ public class DefaultTileLayerCatalog implements TileLayerCatalog {
     }
 
     private GeoServerTileLayerInfoImpl depersist(final File file) throws IOException {
-
+        LOGGER.info("Depersisting GeoServerTileLayerInfo from " + file.getAbsolutePath());
         GeoServerTileLayerInfoImpl info;
         Reader reader = new InputStreamReader(new FileInputStream(file), "UTF-8");
         try {
@@ -290,6 +317,18 @@ public class DefaultTileLayerCatalog implements TileLayerCatalog {
         } else {
             source.renameTo(dest);
         }
+    }
+
+    @Override
+    public String getLayerId(String layerName) {
+        checkInitialized();
+        return layersByName.get(layerName);
+    }
+
+    @Override
+    public String getLayerName(String layerId) {
+        checkInitialized();
+        return layersById.get(layerId);
     }
 
 }

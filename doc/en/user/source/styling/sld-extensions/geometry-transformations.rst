@@ -3,20 +3,34 @@
 Geometry transformations in SLD
 ===============================
 
-Each symbolizer in SLD 1.0 contains a `<Geometry>` element allowing the user to specify which geometry is to be used for rendering. In the most common case it is not specified, but it becomes useful in the case a feature has multiple geometries inside.
+In SLD symbolizers may contain an optional ``<Geometry>`` element, which allows specifying which geometry attribute is to be rendered. 
+In the common case of a featuretype with a single geometry attribute this element is usually omitted, 
+but it is useful when a featuretype has multiple geometry-valued attributes.
 
-SLD 1.0 forces the `<Geometry>` content to be a `<ogc:PropertyName>`, GeoServer relaxes this constraint and allows a generic `sld:expression` to be used instead. Common expressions cannot manipulate geometries, but GeoServer provides a number of filter functions that can actually manipulate geometries by transforming them into something different: this is what we call *geometry transformations* in SLD.
+SLD 1.0 requires the ``<Geometry>`` content to be a ``<ogc:PropertyName>``.
+GeoServer extends this to allow a general SLD expression to be used. 
+The expression can contain  filter functions that manipulate geometries by transforming them into something different.  
+This facility is called SLD *geometry transformations*.
 
-A full list of transformations is available in the :ref:`filter_function_reference`.
+GeoServer provides a number of filter functions that can transform geometry.  
+A full list is available in the :ref:`filter_function_reference`.
+They can be used to do things such as extracting line vertices or endpoints,
+offsetting polygons, or buffering geometries.
 
-Transformations are pretty flexible, the major limitation of them is that they happen in the geometry own reference system and unit, before any reprojection and rescaling to screen happens.
+Geometry transformations are computed in the geometry's original coordinate reference system, before any reprojection and rescaling to the output map is performed.
+For this reason, transformation parameters must be expressed in the units of the geometry CRS.
+This must be taken into account when using geometry transformations at different screen scales,
+since the parameters will not change with scale.
 
-Let's look into some examples.
+Examples
+--------
+
+Let's look at some examples.
 
 Extracting vertices
--------------------
+^^^^^^^^^^^^^^^^^^^
 
-Here is an example that allows one to extract all the vertices of a geometry, and make them visible in a map, using the `vertices` function:
+Here is an example that allows one to extract all the vertices of a geometry, and make them visible in a map, using the ``vertices`` function:
 
 .. code-block:: xml 
    :linenos: 
@@ -49,7 +63,7 @@ Applied to the sample `tasmania_roads` layer this will result in:
    
    
 Start and end point
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 The `startPoint` and `endPoint` functions can be used to extract the start and end point of a line. 
 
@@ -101,9 +115,10 @@ Applied to the sample `tasmania_roads` layer this will result in:
 
 
 Drop shadow
------------
+^^^^^^^^^^^
 
-The `offset` function can be used to create drop shadow effects below polygons. Notice the odd offset value, set this way because the data used in the example is in geographic coordinates.
+The `offset` function can be used to create drop shadow effects below polygons. 
+Notice that the offset values reflect the fact that the data used in the example is in a geographic coordinate system.
 
 .. code-block:: xml 
    :linenos: 
@@ -130,14 +145,19 @@ Applied to the sample `tasmania_roads` layer this will result in:
    
    *Dropping building shadows*
 
-Other possibilities
--------------------
+Performance tips
+----------------
 
-GeoServer set of transformations functions also contains a number of set related or constructive transformations, such as buffer, intersection, difference and so on. However, those functions are quite heavy in terms of CPU consumption so it is advise to use them with care, activating them only at the higher zoom levels.
+GeoServer's filter functions contain a number of set-related or constructive geometric functions, 
+such as ``buffer``, ``intersection``, ``difference`` and others.
+These can be used as geometry transformations, but they be can quite heavy in terms of CPU consumption so it is advisable to use them with care.
+One strategy is to activate them only at higher zoom levels, so that fewer features are processed.
 
-Buffering can often be approximated by adopting very large strokes and round line joins and line caps, without actually have to perform the geometry transformation.
+Buffering can often be visually approximated by using very large strokes together with round line joins and line caps.
+This avoids incurring the performance cost of a true geometric buffer transformation.
 
 Adding new transformations
 --------------------------
-
-Filter functions are pluggable, meaning it's possible to build new ones in Java and then drop the resulting .jar file in GeoServer as a plugin. A guide is not available at this time, but have a look into the GeoTools main module for examples.
+  
+Additional filter functions can be developed in Java and then deployed in a JAR file as a GeoServer plugin. 
+A guide is not available at this time, but see the GeoTools ``main`` module for examples.

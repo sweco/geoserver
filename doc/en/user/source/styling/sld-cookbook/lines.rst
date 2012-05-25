@@ -144,7 +144,8 @@ black (``#000000``), while **line 6** specifies the width of the lines to be 3 p
 Line with border
 ----------------
 
-This example draws lines with a blue fill of 3 pixels and a gray stroke of 1 pixel.
+This example shows how to draw lines with borders (sometimes called "cased lines").
+In this case the lines are drawn with a 3 pixel blue center and a 1 pixel wide gray border.
 
 .. figure:: images/line_linewithborder.png
    :align: center
@@ -190,17 +191,18 @@ Lines in SLD have no notion of a "fill", only "stroke". Thus, unlike points or p
 certain width and again with a slightly smaller width.  This gives the illusion of fill and stroke by obscuring the
 larger lines everywhere except along the edges of the smaller lines.
 
-Since every line is drawn twice, the order of the rendering is *very* important.  In this style, all of the gray lines
-are drawn first via the first ``<FeatureTypeStyle>``, followed by all of the blue lines in a second
-``<FeatureTypeStyle>``.  GeoServer will render every ``<FeatureTypeStyle>`` in the order that they are presented in the
-SLD.  This not only ensures that the blue lines won't be obscured by the gray lines, but also ensures proper rendering
-at intersections, so that the blue lines "connect".
+Since every line is drawn twice, the order of the rendering is *very* important.  
+GeoServer renders ``<FeatureTypeStyle>``\ s in the order that they are presented in the SLD.
+In this style, the gray border lines
+are drawn first via the first ``<FeatureTypeStyle>``, followed by the blue center lines in a second
+``<FeatureTypeStyle>``.    This ensures that the blue lines are not obscured by the gray lines, 
+and also ensures proper rendering at intersections, so that the blue lines "connect".
 
 In this example, **lines 1-11** comprise the first ``<FeatureTypeStyle>``, which is the outer line (or "stroke"). 
 **Line 5** specifies the color of the line to be dark gray (``#333333``), **line 6** specifies the width of this line
-to be 5 pixels, and **line 7** renders the edges of the line to be rounded instead of flat.  (When working with lines
-that have borders, using the ``stroke-linecap`` parameter ensures that the ends of the lines will have a properly-drawn
-border.)
+to be 5 pixels, and in **line 7** a ``stroke-linecap`` parameter of ``round`` 
+renders the ends of the line as rounded instead of flat.  
+(When working with bordered lines using a round line cap ensures that the border connects properly at the ends of the lines.)
 
 **Lines 12-22** comprise the second ``<FeatureTypeStyle>``, which is the the inner line (or "fill").  **Line 16**
 specifies the color of the line to be a medium blue (``#6699FF``), **line 17** specifies the width of this line to be 3
@@ -277,8 +279,6 @@ Code
               <CssParameter name="stroke-width">3</CssParameter>
             </Stroke>
           </LineSymbolizer> 
-        </Rule>         
-        <Rule>
           <LineSymbolizer>
             <Stroke>
               <GraphicStroke>
@@ -301,25 +301,27 @@ Code
 Details
 ~~~~~~~
 
-In this example, there are two rules, each containing a ``<LineSymbolizer>``.  (Each ``<LineSymbolizer>`` must exist in
-its own rule.)  The first rule, on **lines 2-8**, draws a standard line, with **line 5** drawing the lines as dark gray
+In this example there are two ``<LineSymbolizer>``\ s.  
+The first symbolizer, on **lines 3-8**, draws a standard line, with **line 5** drawing the lines as dark gray
 (``#333333``) and **line 6** setting the width of the lines to be 2 pixels.
 
-The hatching is invoked in the second rule, on **lines 10-27**. **Line 16** specifies that the rule draw a vertical line
-hatch (``shape://vertline``) perpendicular to the line geometry. **Lines 18-19** set the hatch color to dark gray
-(``#333333``) and width to 1 pixel. Finally, ``line 22`` specifies both the length of the hatch and the distance
+The hatching is invoked in the second symbolizer, on **lines 9-24**. **Line 14** specifies that the symbolizer draw a vertical line
+hatch (``shape://vertline``) perpendicular to the line geometry. **Lines 16-17** set the hatch color to dark gray
+(``#333333``) and width to 1 pixel. Finally, **line 20** specifies both the length of the hatch and the distance
 between each hatch to both be 12 pixels.
 
 Spaced graphic symbols
 ----------------------
 
-This example uses a graphic stroke along with dash arrays to create a "dot and space" line type.  Without using the dash
-array the lines would be densely populated with subsequent dots, each one touching the previous one.
-
+This example uses a graphic stroke along with dash arrays to create a "dot and space" line type.  
 Adding the dash array specification allows to control the amount of space between one symbol and the next one.
+Without using the dash
+array the lines would be densely populated with dots, each one touching the previous one.
 
-.. note:: This example is not likely to work with other systems supporting SLD. While the SLD is perfectly compliant we are not aware of other systems allowing to combine the usage of ``dasharray`` and graphics strokes (the SLD specification does not say what this combination is supposed to produce). 
+.. note:: This example may not work in other systems using SLD, since they may not support combining the use of ``stroke-dasharray`` and ``GraphicStroke``. 
+          While the SLD is spec-compliant, the SLD specification does not state what this combination is supposed to produce. 
 
+          
 .. figure:: images/line_dashspace.png
    :align: center
 
@@ -341,18 +343,18 @@ Code
                 <Graphic>
                   <Mark>
                     <WellKnownName>circle</WellKnownName>
+                    <Fill>
+                      <CssParameter name="fill">#666666</CssParameter>  
+                    </Fill>
                     <Stroke>
                       <CssParameter name="stroke">#333333</CssParameter>
                       <CssParameter name="stroke-width">1</CssParameter>
                     </Stroke>
-                    <Fill>
-                      <CssParameter name="stroke">#666666</CssParameter>  
-                    </Fill>
                   </Mark>
                   <Size>4</Size>
-                  <CssParameter name="stroke-dasharray">4 6</CssParameter>
                 </Graphic>
               </GraphicStroke>
+              <CssParameter name="stroke-dasharray">4 6</CssParameter>
             </Stroke>
           </LineSymbolizer>
         </Rule>
@@ -361,9 +363,9 @@ Code
 Details
 ~~~~~~~
 This example, like others before, uses a ``GraphicStroke`` to place a graphic symbol along a line. The symbol, defined
-at **lines 7-16** is a 4 pixels gray circle with a dark gray outline. The spacing between symbols is controlled with
-the ``dasharray`` at **line 18**, setting 4 pixels pen down, just enough to draw the circle, and 6 pixels pen up, which
-results in the spacing.
+at **lines 7-16** is a 4 pixel gray circle with a dark gray outline. The spacing between symbols is controlled with
+the ``stroke-dasharray`` at **line 20**, which specifies 4 pixels of pen-down (just enough to draw the circle) and 6 pixels of pen-up, 
+to provide the spacing.
 
 
 .. _sld_cookbook_lines_defaultlabel:
@@ -371,27 +373,30 @@ results in the spacing.
 Alternating symbols with dash offsets
 -------------------------------------
 
-This example shows how to create a complex line style which alternates a symbol and a line segment. The example builds
-on the knowledge gathered in previous sections:
+This example shows how to create a complex line style which alternates a dashed line and a graphic symbol. 
+The code builds on features shown in the previous examples:
 
-  * `dasharray` allows to control pen down/pen up behavior and generate dashed lines
-  * `GraphicStroke` allows to place symbols along a line
-  * combining the two togheter it's possible to control symbol spacing
+  * ``stroke-dasharray`` controls pen-down/pen-up behavior to generate dashed lines
+  * ``GraphicStroke`` places symbols along a line
+  * combining the two allows control of symbol spacing
   
-This example adds the usage of `dashoffset`, which controls at which point of the ``dasharray`` sequence the renderer
-starts drawing the repeating pattern. For example, having a dash array of ``5 10`` and a dash offset of ``7`` the
-renderer would start the repeating pattern 7 pixels after its beginnig, so it would jump over the "5 pixels pen down"
-section and 2 more pixels in the pen up section, performing a residual of 8 pixels up, then 5 down, 10 up, and so on.
+This also shows the usage of a `dash offset`, which controls where rendering starts
+in the dash array.
+For example, with a dash array of ``5 10`` and a dash offset of ``7`` the
+renderer starts drawing the pattern 7 pixels from the beginning.  It skips the 5 pixels pen-down
+section and 2 pixels of the pen-up section, then draws the remaining 8 pixels of pen-up, then 5 down, 10 up, and so on.
 
-This can be used to create two synchronized sequences of dash arrays, one drawing line segments, and the other symbols
-along a line, like in the following example.
+The example shows how to use these features to create two synchronized sequences of dash arrays, 
+one drawing line segments and the other symbols.
 
-.. note:: This example is not likely to work with other systems supporting SLD. While the SLD is perfectly compliant we are not aware of other systems allowing to combine the usage of ``dasharray`` and graphics strokes (the SLD specification does not say what this combination is supposed to produce). 
+.. note:: This example may not work in other systems using SLD, since they may not support combining the use of ``stroke-dasharray`` and ``GraphicStroke``. 
+          While the SLD is spec-compliant, the SLD specification does not state what this combination is supposed to produce. 
+
 
 .. figure:: images/line_dashdot.png
    :align: center
 
-   *Dash and symbol*
+   *Alternating dash and symbol*
 
 Code
 ~~~~
@@ -422,10 +427,10 @@ Code
                     </Stroke>
                   </Mark>
                   <Size>5</Size>
-                  <CssParameter name="stroke-dasharray">5 15</CssParameter>
-                  <CssParameter name="stroke-dashoffset">7.5</CssParameter>
                 </Graphic>
               </GraphicStroke>
+              <CssParameter name="stroke-dasharray">5 15</CssParameter>
+              <CssParameter name="stroke-dashoffset">7.5</CssParameter>
             </Stroke>
           </LineSymbolizer>
         </Rule>
@@ -434,12 +439,20 @@ Code
 Details
 ~~~~~~~
 
-In this example two dash array based line symbolizers are used to generate an alternating sequence. The first one,
-defined at **lines 3-9** is a simple line dash array alternating 10 pixels of pen down with 10 pixels of pen up. The
-second one, defined at **lines 10-27** alternates a 5 pixels wide empty circle with 15 pixels of white space. In order
-to have the two symbolizers alternate the second one uses a dashoffset of 7.5, making the sequence start with 12.5
-pixels of white space, then a circle (which is then centered between the two line segments of the other pattern), then
-15 pixels of white space, and so on.
+In this example two ``LineSymbolizer``\ s use ``stroke-dasharray``  and different symbology
+to produce a sequence of alternating dashes and symbols. The first symbolizer
+(**lines 3-9**) is a simple dashed line alternating 10 pixels of pen-down with 10 pixels of pen-up. 
+The second symbolizer (**lines 10-27**) alternates a 5 pixel empty circle with 15 pixels of white space.
+The circle symbol is produced by a ``Mark`` element, with its symbology specified
+by ``stroke`` parameters (**lines 17-18**).
+The spacing between symbols is controlled with
+the ``stroke-dasharray`` (**line 24**), which specifies 5 pixels of pen-down (just enough to draw the circle) and 15 pixels of pen-up.
+In order to have the two sequences positioned correctly the second one uses a ``stroke-dashoffset`` of 7.5 (**line 25**).  
+This makes the sequence start with 12.5
+pixels of white space, then a circle (which is then centered between the two line segments of the other pattern), 
+then 15 pixels of white space, and so on.
+
+
 
 Line with default label
 -----------------------
@@ -540,7 +553,7 @@ Code
 Details
 ~~~~~~~
 
-As the :ref:`sld_cookbook_lines_defaultlabel` example showed, the default label behavior isn't very optimal.  The label
+As the :ref:`sld_cookbook_lines_defaultlabel` example showed, the default label behavior isn't optimal.  The label
 is displayed at a tangent to the line itself, leading to uncertainty as to which label corresponds to which line.
 
 This example is similar to the :ref:`sld_cookbook_lines_defaultlabel` example with the exception of **lines 12-18**. 

@@ -655,7 +655,7 @@ are returned. It can take one of the three values "configured", "available", "av
      - 200
      - XML,JSON
      -
-     - 
+     - :ref:`recalculate <featuretype_recalculate>`
    * - DELETE
      - Delete feature type ``ft``
      - 200
@@ -680,6 +680,18 @@ are returned. It can take one of the three values "configured", "available", "av
 The ``recurse`` parameter is used to recursively delete all layers that reference
 by the specified feature type. Allowable values for this parameter are "true" or  
 "false".  The default value is "false".
+
+.. _featuretype_recalculate:
+
+Some properties of feature types are automatically recalculated when necessary.
+In particular, the native bounding box is recalculated when the projection or projection policy are changed, and the lat/lon bounding box is recalculated when the native bounding box is recalculated, or when a new native bounding box is explicitly provided in the request.
+*The native and lat/lon bounding boxes are never automatically recalculated when they are explicitly included in the request.*
+In addition, the client may explicitly request a fixed set of fields to calculate by including a comma-separated list of their names as a parameter named ``recalculate``.  For example:
+
+   * ``recalculate=`` (empty parameter): Do not calculate any fields, regardless of the projection, projection policy, etc.
+     This might be useful to avoid slow recalculation when operating against large datasets.
+   * ``recalculate=nativebbox``: Recalculate the native boundingbox, do not recalculate the lat/lon bounding box.
+   * ``recalculate=nativebbox,latlonbbox``: Recalculate both the native boundingbox and the lat/lon bounding box.
 
 
 Coverage stores
@@ -820,7 +832,7 @@ following extensions are supported:
      - 405
      - 
      - 
-     -
+     - :ref:`recalculate <coverage_recalculate>`
    * - PUT
      - Creates or overwrites the files for coverage store ``cs``.
      - 200
@@ -862,6 +874,19 @@ receive the same name as its containing coverage store.
    Currently the relationship between a coverage store and a coverage is one to
    one. However there is currently work underway to support multi-dimensional
    coverages, so in the future this parameter is likely to change.
+
+.. _coverage_recalculate:
+
+Some properties of Coverages are automatically recalculated when necessary.
+In particular, the native bounding box is recalculated when the projection or projection policy are changed, and the lat/lon bounding box is recalculated when the native bounding box is recalculated, or when a new native bounding box is explicitly provided in the request.
+*The native and lat/lon bounding boxes are never automatically recalculated when they are explicitly included in the request.*
+In addition, the client may explicitly request a fixed set of fields to calculate by including a comma-separated list of their names as a parameter named ``recalculate``.  For example:
+
+   * ``recalculate=`` (empty parameter): Do not calculate any fields, regardless of the projection, projection policy, etc.
+     This might be useful to avoid slow recalculation when operating against large datasets.
+   * ``recalculate=nativebbox``: Recalculate the native boundingbox, do not recalculate the lat/lon bounding box.
+   * ``recalculate=nativebbox,latlonbbox``: Recalculate both the native boundingbox and the lat/lon bounding box.
+
 
 Coverages
 ---------
@@ -1076,6 +1101,87 @@ The ``purge`` parameter specifies whether the underlying SLD file for the style 
 - PUT that changes name of style -> 403
 - DELETE against style which is referenced by existing layers -> 403
 
+``/workspaces/<ws>/styles[.<format>]``
+
+.. list-table::
+   :header-rows: 1
+
+   * - Method
+     - Action
+     - Return Code
+     - Formats
+     - Default Format
+     - Parameters
+   * - GET
+     - Return all styles within workspace ``ws``
+     - 200
+     - HTML, XML, JSON
+     - HTML
+     -
+   * - POST
+     - Create a new style within workspace ``ws``
+     - 201 with ``Location`` header
+     - SLD, XML, JSON
+       See :ref:`notes <sld_post_put>` below
+     -
+     - :ref:`name <name_parameter>`
+   * - PUT
+     - 
+     - 405
+     - 
+     - 
+     -
+   * - DELETE
+     - 
+     - 405
+     -
+     -
+     - :ref:`purge <purge_parameter>`
+
+*Representations*:
+
+- :download:`HTML <representations/styles_html.txt>`
+- :download:`XML <representations/styles_xml.txt>`
+- :download:`JSON <representations/styles_json.txt>`
+
+``/workspaces/<ws>/styles/<s>[.<format>]``
+
+.. list-table::
+   :header-rows: 1
+
+   * - Method
+     - Action
+     - Return Code
+     - Formats
+     - Default Format
+   * - GET
+     - Return style ``s`` within workspace ``ws``
+     - 200
+     - SLD, HTML, XML, JSON
+     - HTML
+   * - POST
+     - 
+     - 405
+     -
+     -
+   * - PUT
+     - Modify style ``s`` within workspace ``ws``
+     - 200
+     - SLD, XML, JSON
+       See :ref:`notes <sld_post_put>` above
+     - 
+   * - DELETE
+     - Delete style ``s`` within workspace ``ws``
+     - 200
+     -
+     -
+
+*Representations*:
+
+ - :download:`SLD <representations/style_sld.txt>`
+ - :download:`HTML <representations/style_html.txt>`
+ - :download:`XML <representations/style_xml.txt>`
+ - :download:`JSON <representations/style_json.txt>`
 
 Layers
 ------
@@ -1303,6 +1409,79 @@ Operations
 - POST that specifies layer group with no layers -> 400
 - PUT that changes name of layer group -> 403 
 
+``/workspaces/<ws>/layergroups[.<format>]``
+
+.. list-table::
+   :header-rows: 1
+
+   * - Method
+     - Action
+     - Return Code
+     - Formats
+     - Default Format
+   * - GET
+     - Return all layer groups within workspace ``ws``
+     - 200
+     - HTML, XML, JSON
+     - HTML
+   * - POST
+     - Add a new layer group within workspace ``ws``
+     - 201, with ``Location`` header
+     - XML,JSON
+     -
+   * - PUT
+     - 
+     - 405
+     - 
+     - 
+   * - DELETE
+     -
+     - 405
+     -
+     -
+
+*Representations*:
+
+- :download:`HTML <representations/layergroups_html.txt>`
+- :download:`XML <representations/layergroups_xml.txt>`
+- :download:`JSON <representations/layergroups_json.txt>`
+
+``/workspaces/<ws>/layergroups/<lg>[.<format>]``
+
+.. list-table::
+   :header-rows: 1
+
+   * - Method
+     - Action
+     - Return Code
+     - Formats
+     - Default Format
+   * - GET
+     - Return layer group ``lg`` within workspace ``ws``
+     - 200
+     - HTML, XML, JSON
+     - HTML
+   * - POST
+     - 
+     - 405
+     -
+     -
+   * - PUT
+     - Modify layer group ``lg`` within workspace ``ws``
+     - 200
+     - XML,JSON
+     - 
+   * - DELETE
+     - Delete layer group ``lg`` within workspace ``ws``
+     - 200
+     -
+     -
+
+*Representations*:
+
+- :download:`HTML <representations/layergroup_html.txt>`
+- :download:`XML <representations/layergroup_xml.txt>`
+- :download:`JSON <representations/layergroup_json.txt>`
 
 Configuration reloading 
 ----------------------- 

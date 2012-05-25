@@ -50,6 +50,7 @@ import org.geoserver.config.ServiceInfo;
 import org.geoserver.config.SettingsInfo;
 import org.geoserver.config.impl.ServiceInfoImpl;
 import org.geoserver.ows.util.OwsUtils;
+import org.geoserver.web.ComponentAuthorizer;
 import org.geoserver.web.GeoServerApplication;
 import org.geoserver.web.GeoServerBasePage;
 import org.geoserver.web.GeoServerSecuredPage;
@@ -59,6 +60,7 @@ import org.geoserver.web.data.namespace.NamespaceDetachableModel;
 import org.geoserver.web.services.BaseServiceAdminPage;
 import org.geoserver.web.services.ServiceMenuPageInfo;
 import org.geoserver.web.wicket.GeoServerDialog;
+import org.geoserver.web.wicket.HelpLink;
 import org.geoserver.web.wicket.ParamResourceModel;
 import org.geoserver.web.wicket.URIValidator;
 import org.geoserver.web.wicket.XMLNameValidator;
@@ -119,8 +121,14 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
             }
         };
         add(form);
+
+        //check for full admin, we don't allow workspace admins to change all settings
+        boolean isFullAdmin = isAuthenticatedAsAdmin();
+        
         TextField name = new TextField("name", new PropertyModel(wsModel, "name"));
         name.setRequired(true);
+        name.setEnabled(isFullAdmin);
+
         name.add(new XMLNameValidator());
         form.add(name);
         TextField uri = new TextField("uri", new PropertyModel(nsModel, "uRI"), String.class);
@@ -129,41 +137,26 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
         form.add(uri);
         CheckBox defaultChk = new CheckBox("default", new PropertyModel(this, "defaultWs"));
         form.add(defaultChk);
-        
+        defaultChk.setEnabled(isFullAdmin);
+
         //stores
 //        StorePanel storePanel = new StorePanel("storeTable", new StoreProvider(ws), false);
 //        form.add(storePanel);
         
+        add(dialog = new GeoServerDialog("dialog"));
+
         //local settings
         form.add(settingsPanel = new SettingsPanel("settings", wsModel));
-        form.add(new AjaxLink("settingsHelp") {
-            @Override
-            public void onClick(AjaxRequestTarget target) {
-                dialog.showInfo(target, 
-                    new StringResourceModel("settingsHelp.title",WorkspaceEditPage.this, null), 
-                    new StringResourceModel("settingsHelp.message.1",WorkspaceEditPage.this, null),
-                    new StringResourceModel("settingsHelp.message.2",WorkspaceEditPage.this, null));
-            }
-        });
+        form.add(new HelpLink("settingsHelp").setDialog(dialog));
 
         //local services
         form.add(servicesPanel = new ServicesPanel("services", wsModel));
-        form.add(new AjaxLink("servicesHelp") {
-            @Override
-            public void onClick(AjaxRequestTarget target) {
-                dialog.showInfo(target, 
-                    new StringResourceModel("servicesHelp.title",WorkspaceEditPage.this, null), 
-                    new StringResourceModel("servicesHelp.message.1",WorkspaceEditPage.this, null),
-                    new StringResourceModel("servicesHelp.message.2",WorkspaceEditPage.this, null));
-            }
-        });
+        form.add(new HelpLink("servicesHelp").setDialog(dialog));
 
         SubmitLink submit = new SubmitLink("save");
         form.add(submit);
         form.setDefaultButton(submit);
         form.add(new BookmarkablePageLink("cancel", WorkspacePage.class));
-
-        add(dialog = new GeoServerDialog("dialog"));
     }
 
     private void saveWorkspace() {
@@ -219,6 +212,11 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
             }
         }
         setResponsePage(WorkspacePage.class);
+    }
+
+    @Override
+    protected ComponentAuthorizer getPageAuthorizer() {
+        return ComponentAuthorizer.WORKSPACE_ADMIN;
     }
 
     /*

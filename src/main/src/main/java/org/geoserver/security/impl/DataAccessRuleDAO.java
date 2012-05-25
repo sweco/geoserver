@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.geoserver.catalog.Catalog;
@@ -183,6 +184,14 @@ public class DataAccessRuleDAO extends AbstractAccessRuleDAO<DataAccessRule> {
             }
         }
 
+        // check admin access only applied globally to workspace
+        if (mode == AccessMode.ADMIN && !ANY.equals(layerName)) {
+            //TODO: should this throw an exception instead of ignore rule?
+            LOGGER.warning("Invalid rule " + rule + ", admin (a) privileges may only be applied " +
+                "globally to a workspace, layer must be *, skipping rule"); 
+            return null;
+        }
+
         // build the rule
         return new DataAccessRule(workspace, layerName, mode, roles);
     }
@@ -240,5 +249,18 @@ public class DataAccessRuleDAO extends AbstractAccessRuleDAO<DataAccessRule> {
 		}
 		return null;
 	}
-
+	
+	/**
+	 * Returns a sorted set of rules associated to the role
+	 * 
+	 * @param role
+	 * @return
+	 */
+	public SortedSet<DataAccessRule> getRulesAssociatedWithRole(String role) {
+	    SortedSet<DataAccessRule> result = new TreeSet<DataAccessRule>();
+	    for (DataAccessRule rule: getRules())
+	        if (rule.getRoles().contains(role))
+	            result.add(rule);
+	    return result;
+	}		
 }

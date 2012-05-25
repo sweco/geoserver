@@ -15,6 +15,7 @@ import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.model.ResourceModel;
 import org.geoserver.catalog.CoverageStoreInfo;
+import org.geoserver.web.ComponentAuthorizer;
 import org.geoserver.web.GeoServerApplication;
 import org.geoserver.web.GeoServerSecuredPage;
 import org.geoserver.web.data.store.panel.CheckBoxParamPanel;
@@ -44,7 +45,7 @@ abstract class AbstractCoverageStorePage extends GeoServerSecuredPage {
             throw new IllegalArgumentException(msg);
         }
 
-        IModel model = new Model(store);
+        IModel<CoverageStoreInfo> model = new Model<CoverageStoreInfo>(store);
 
         // build the form
         paramsForm = new Form("rasterStoreForm", model);
@@ -86,7 +87,7 @@ abstract class AbstractCoverageStorePage extends GeoServerSecuredPage {
         paramsForm.add(storeEditPanel);
 
         // cancel/submit buttons
-        paramsForm.add(new BookmarkablePageLink("cancel", StorePage.class));
+        paramsForm.add(new BookmarkablePageLink<StorePage>("cancel", StorePage.class));
         paramsForm.add(saveLink());
         paramsForm.setDefaultButton(saveLink());
 
@@ -142,4 +143,8 @@ abstract class AbstractCoverageStorePage extends GeoServerSecuredPage {
         target.setWorkspace(source.getWorkspace());
     }
 
+    @Override
+    protected ComponentAuthorizer getPageAuthorizer() {
+        return ComponentAuthorizer.WORKSPACE_ADMIN;
+    }
 }

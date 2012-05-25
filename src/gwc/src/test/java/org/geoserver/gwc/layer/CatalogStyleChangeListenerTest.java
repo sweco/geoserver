@@ -66,7 +66,7 @@ public class CatalogStyleChangeListenerTest extends TestCase {
         when(mockStyle.getName()).thenReturn(STYLE_NAME);
 
         mockResourceInfo = mock(FeatureTypeInfo.class);
-        when(mockResourceInfo.getPrefixedName()).thenReturn(PREFIXED_RESOURCE_NAME);
+        when(mockResourceInfo.prefixedName()).thenReturn(PREFIXED_RESOURCE_NAME);
 
         mockLayerInfo = mock(LayerInfo.class);
         when(mockLayerInfo.getResource()).thenReturn(mockResourceInfo);
@@ -171,7 +171,7 @@ public class CatalogStyleChangeListenerTest extends TestCase {
     @SuppressWarnings("unchecked")
     public void testLayerGroupInfoImplicitOrExplicitStyleChanged() throws Exception {
         LayerGroupInfo mockGroup = mock(LayerGroupInfo.class);
-        when(mockGroup.getName()).thenReturn("mockGroup");
+        when(GWC.tileLayerName(mockGroup)).thenReturn("mockGroup");
 
         when(mockMediator.getLayerInfosFor(same(mockStyle))).thenReturn(Collections.EMPTY_LIST);
         when(mockMediator.getLayerGroupsFor(same(mockStyle))).thenReturn(

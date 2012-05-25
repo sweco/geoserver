@@ -47,6 +47,7 @@ import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.WMSLayerInfo;
 import org.geoserver.config.ContactInfo;
 import org.geoserver.config.GeoServer;
+import org.geoserver.config.ResourceErrorHandling;
 import org.geoserver.ows.URLMangler.URLType;
 import org.geoserver.platform.ServiceException;
 import org.geoserver.sld.GetStylesResponse;
@@ -187,7 +188,7 @@ public class GetCapabilitiesTransformer extends TransformerBase {
      * @author Gabriel Roldan
      * @version $Id
      */
-    private static class CapabilitiesTranslator extends TranslatorSupport {
+    private static class CapabilitiesTranslator extends  TranslatorSupport {
 
         private static final Logger LOGGER = org.geotools.util.logging.Logging
                 .getLogger(CapabilitiesTranslator.class.getPackage().getName());
@@ -217,6 +218,8 @@ public class GetCapabilitiesTransformer extends TransformerBase {
         private WMS wmsConfig;
 
         private Collection<ExtendedCapabilitiesProvider> extCapsProviders;
+        
+        private final boolean skipping;
 
         /**
          * Creates a new CapabilitiesTranslator object.
@@ -247,6 +250,8 @@ public class GetCapabilitiesTransformer extends TransformerBase {
                     CapabilitiesTranslator.this.element(element, content);
                 }
             };
+            this.skipping = ResourceErrorHandling.SKIP_MISCONFIGURED_LAYERS.equals(
+                wmsConfig.getGeoServer().getGlobal().getResourceErrorHandling());
         }
 
         /**
@@ -713,7 +718,8 @@ public class GetCapabilitiesTransformer extends TransformerBase {
             for (LayerInfo layer : layers) {
                 ResourceInfo resource = layer.getResource();
                 layerBbox = resource.getLatLonBoundingBox();
-                latlonBbox.expandToInclude(layerBbox);
+                if (layerBbox != null)
+                    latlonBbox.expandToInclude(layerBbox);
             }
 
             if (LOGGER.isLoggable(Level.FINE)) {
@@ -752,16 +758,26 @@ public class GetCapabilitiesTransformer extends TransformerBase {
                                 + " the layer is geometryless", e);
                     }
                 }
-
+                
                 // ask for enabled() instead of isEnabled() to account for disabled resource/store
                 if (layer.enabled() && wmsExposable) {
                     try {
+                        mark();
                         handleLayer(layer);
+                        commit();
                     } catch (Exception e) {
-                        // report what layer we failed on to help the admin locate and fix it
-                        throw new ServiceException(
-                                "Error occurred trying to write out metadata for layer: "
-                                        + layer.getName(), e);
+                        if (skipping) {
+                            reset();
+                            LOGGER.log(
+                                Level.WARNING, 
+                                "Error writing metadata; skipping layer: " + layer.getName(),
+                                e);
+                        } else {
+                            // report what layer we failed on to help the admin locate and fix it
+                            throw new ServiceException(
+                                    "Error occurred trying to write out metadata for layer: "
+                                            + layer.getName(), e);
+                        }
                     }
                 }
             }
@@ -797,7 +813,7 @@ public class GetCapabilitiesTransformer extends TransformerBase {
             }
             
             start("Layer", qatts);
-            element("Name", layer.getResource().getNamespace().getPrefix() + ":" + layer.getName());
+            element("Name", layer.prefixedName());
             // REVISIT: this is bad, layer should have title and anbstract by itself
             element("Title", layer.getResource().getTitle());
             element("Abstract", layer.getResource().getAbstract());
@@ -927,7 +943,8 @@ public class GetCapabilitiesTransformer extends TransformerBase {
             });
 
             for (LayerGroupInfo layerGroup : layerGroups) {
-                String layerName = layerGroup.getName();
+                //String layerName = layerGroup.getName();
+                String layerName = layerGroup.prefixedName();
 
                 AttributesImpl qatts = new AttributesImpl();
                 boolean queryable = wmsConfig.isQueryable(layerGroup);
@@ -1198,8 +1215,8 @@ public class GetCapabilitiesTransformer extends TransformerBase {
                         handleBBox(tbbox, crs);
                     } 
                     catch(Exception e) {
-                        LOGGER.warning(String.format("Unable to transform bounding box for layer" +
-                            " '%s' to %s", layer.getName(), crs));
+                        LOGGER.warning(String.format("Unable to transform bounding box for '%s' layer" +
+                                " to %s", layer != null ? layer.getName() : "root", srs));
                         if (LOGGER.isLoggable(Level.FINE)) {
                             LOGGER.log(Level.FINE, e.getLocalizedMessage(), e);
                         }

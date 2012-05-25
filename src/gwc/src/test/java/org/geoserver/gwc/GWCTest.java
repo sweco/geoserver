@@ -4,6 +4,7 @@
  */
 package org.geoserver.gwc;
 
+import static org.geoserver.gwc.GWC.tileLayerName;
 import static org.geoserver.gwc.GWCTestHelpers.mockGroup;
 import static org.geoserver.gwc.GWCTestHelpers.mockLayer;
 import static org.geoserver.gwc.layer.TileLayerInfoUtil.updateAcceptAllFloatParameterFilter;
@@ -12,6 +13,8 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.same;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -74,6 +77,8 @@ import org.geowebcache.service.Service;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.StorageException;
 import org.mockito.ArgumentCaptor;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -81,10 +86,15 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.vividsolutions.jts.geom.Envelope;
 
 /**
  * Unit test suite for the {@link GWC} mediator.
+ * 
+ */
+/**
+ * @author groldan
  * 
  */
 public class GWCTest extends TestCase {
@@ -171,8 +181,8 @@ public class GWCTest extends TestCase {
         when(catalog.getLayerGroups()).thenReturn(Arrays.asList(layerGroup));
         when(catalog.getLayer(eq(layer.getId()))).thenReturn(layer);
         when(catalog.getLayerGroup(layerGroup.getId())).thenReturn(layerGroup);
-        when(catalog.getLayerByName(eq(layer.getResource().getPrefixedName()))).thenReturn(layer);
-        when(catalog.getLayerGroupByName(layerGroup.getName())).thenReturn(layerGroup);
+        when(catalog.getLayerByName(eq(layer.getResource().prefixedName()))).thenReturn(layer);
+        when(catalog.getLayerGroupByName(tileLayerName(layerGroup))).thenReturn(layerGroup);
     }
 
     private void mockTileLayerDispatcher() throws Exception {
@@ -468,11 +478,10 @@ public class GWCTest extends TestCase {
         LayerInfo layer2 = mockLayer("layer2");
         LayerGroupInfo group2 = mockGroup("group2", layer, layer2);
 
-        when(catalog.getLayerByName(eq(layer2.getResource().getPrefixedName()))).thenReturn(layer2);
-        when(catalog.getLayerGroupByName(eq(group2.getName()))).thenReturn(group2);
+        when(catalog.getLayerByName(eq(tileLayerName(layer2)))).thenReturn(layer2);
+        when(catalog.getLayerGroupByName(eq(tileLayerName(group2)))).thenReturn(group2);
 
-        List<String> layerNames = Arrays.asList(layer2.getResource().getPrefixedName(),
-                group2.getName());
+        List<String> layerNames = Arrays.asList(tileLayerName(layer2), tileLayerName(group2));
 
         when(tld.addLayer(any(GeoServerTileLayer.class))).thenReturn(config);
         mediator.autoConfigureLayers(layerNames, defaults);
@@ -665,6 +674,35 @@ public class GWCTest extends TestCase {
         }
     }
 
+    public void testReloadAndLayerRemovedExternally() throws Exception {
+
+        final String removedLayer = tileLayer.getName();
+        final String remainingLayer = tileLayerGroup.getName();
+
+        final Set<String> layerNames = Sets.newHashSet(removedLayer, remainingLayer);
+
+        when(tld.getLayerNames()).thenReturn(layerNames);
+        doAnswer(new Answer<Void>() {
+
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                layerNames.remove(removedLayer);
+                return null;
+            }
+        }).when(tld).reInit();
+
+        ArgumentCaptor<String> argCaptor = ArgumentCaptor.forClass(String.class);
+
+        mediator = spy(mediator);
+        doReturn(true).when(mediator).layerRemoved(argCaptor.capture());
+
+        mediator.reload();
+
+        verify(tld, times(1)).reInit();
+        assertEquals(1, argCaptor.getAllValues().size());
+        assertEquals(removedLayer, argCaptor.getValue());
+    }
+
     public void testIsServiceEnabled() {
         Service service = mock(Service.class);
 
@@ -822,6 +860,35 @@ public class GWCTest extends TestCase {
         request.setFeatureVersion("@version");
         assertDispatchMismatch(request, "no parameter filter exists for FEATUREVERSION");
         request.setFeatureVersion(null);
+    }
+
+    /**
+     * See GEOS-5003
+     */
+    public void testNullsInDimensionAndTimeParameters() throws Exception {
+        TileLayerInfoUtil.updateAcceptAllFloatParameterFilter(tileLayerInfo, "ELEVATION", true);
+        TileLayerInfoUtil.updateAcceptAllRegExParameterFilter(tileLayerInfo, "TIME", true);
+        tileLayer = new GeoServerTileLayer(layer, gridSetBroker, tileLayerInfo);
+        
+        GetMapRequest request = new GetMapRequest();
+        @SuppressWarnings("unchecked")
+        Map<String, String> rawKvp = new CaseInsensitiveMap(new HashMap<String, String>());
+        request.setRawKvp(rawKvp);
+
+        StringBuilder target = new StringBuilder();
+
+        boolean cachingPossible;
+
+        request.setElevation(Arrays.asList((Object) null));
+        cachingPossible = mediator.isCachingPossible(tileLayer, request, target);
+        assertTrue(cachingPossible);
+        assertEquals(0, target.length());
+        request.setElevation(Collections.emptyList());
+        
+        request.setTime(Arrays.asList((Object)null));
+        cachingPossible = mediator.isCachingPossible(tileLayer, request, target);
+        assertTrue(cachingPossible);
+        assertEquals(0, target.length());
     }
 
     private void assertDispatchMismatch(GetMapRequest request, String expectedReason) {

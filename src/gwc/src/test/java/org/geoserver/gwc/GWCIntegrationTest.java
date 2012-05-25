@@ -5,11 +5,14 @@
 package org.geoserver.gwc;
 
 import static org.geoserver.data.test.MockData.BASIC_POLYGONS;
+import static org.geoserver.gwc.GWC.tileLayerName;
 import junit.framework.Test;
 
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.data.test.MockData;
+import org.geoserver.gwc.layer.CatalogConfiguration;
+import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.test.GeoServerTestSupport;
 import org.geowebcache.GeoWebCacheException;
 import org.geowebcache.GeoWebCacheExtensions;
@@ -121,7 +124,7 @@ public class GWCIntegrationTest extends GeoServerTestSupport {
 
         // 3) Basic get
         LayerInfo li = cat.getLayers().get(1);
-        String layerName = li.getResource().getPrefixedName();
+        String layerName = tileLayerName(li);
 
         TileLayer tl = tld.getTileLayer(layerName);
 
@@ -167,4 +170,39 @@ public class GWCIntegrationTest extends GeoServerTestSupport {
         return sb.toString();
     }
 
+    /**
+     * See GEOS-5092, check server startup is not hurt by a tile layer out of sync (say someone
+     * manually removed the GeoServer layer)
+     */
+    public void testMissingGeoServerLayerAtStartUp() throws Exception {
+
+        Catalog catalog = getCatalog();
+        GWC mediator = GWC.get();
+
+        final String layerName = getLayerId(BASIC_POLYGONS);
+        LayerInfo layerInfo = catalog.getLayerByName(layerName);
+        assertNotNull(layerInfo);
+
+        
+        TileLayer tileLayer = mediator.getTileLayerByName(layerName);
+        assertNotNull(tileLayer);
+        assertTrue(tileLayer.isEnabled());
+
+        MockData testData = getTestData();
+        testData.removeFeatureType(BASIC_POLYGONS);
+
+        getGeoServer().reload();
+
+        assertNull(catalog.getLayerByName(layerName));
+
+        CatalogConfiguration config = GeoServerExtensions.bean(CatalogConfiguration.class);
+
+        assertNull(config.getTileLayer(layerName));
+        try {
+            mediator.getTileLayerByName(layerName);
+            fail("Expected IAE");
+        } catch (IllegalArgumentException e) {
+            assertTrue(true);
+        }
+    }
 }

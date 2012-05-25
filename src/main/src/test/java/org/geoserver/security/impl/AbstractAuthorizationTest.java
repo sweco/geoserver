@@ -12,9 +12,11 @@ import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.catalog.CoverageStoreInfo;
 import org.geoserver.catalog.DataStoreInfo;
 import org.geoserver.catalog.FeatureTypeInfo;
+import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.catalog.StoreInfo;
+import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.security.DataAccessManager;
 import org.geoserver.security.DataAccessManagerAdapter;
@@ -25,7 +27,6 @@ import org.geotools.factory.Hints;
 import org.opengis.util.ProgressListener;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.GrantedAuthorityImpl;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 
 
@@ -73,6 +74,14 @@ public abstract class AbstractAuthorizationTest extends SecureObjectsTest {
 
     protected CoverageStoreInfo arcGridStore;
 
+    protected StyleInfo pointStyle;
+    
+    protected StyleInfo lineStyle;
+
+    protected LayerGroupInfo layerGroupGlobal;
+
+    protected LayerGroupInfo layerGroupTopp;
+    
     protected List<LayerInfo> layers;
 
     protected List<FeatureTypeInfo> featureTypes;
@@ -81,18 +90,19 @@ public abstract class AbstractAuthorizationTest extends SecureObjectsTest {
 
     protected List<WorkspaceInfo> workspaces;
 
+    
     @Override
     protected void setUp() throws Exception {
         super.setUp();
         
-        rwUser = new TestingAuthenticationToken("rw", "supersecret", new GrantedAuthority[] {
-                new GrantedAuthorityImpl("READER"), new GrantedAuthorityImpl("WRITER") });
+        rwUser = new TestingAuthenticationToken("rw", "supersecret", Arrays.asList(new GrantedAuthority[] {
+                new GeoServerRole("READER"), new GeoServerRole("WRITER") }));
         roUser = new TestingAuthenticationToken("ro", "supersecret",
-                new GrantedAuthority[] { new GrantedAuthorityImpl("READER") });
+                Arrays.asList( new GrantedAuthority[] { new GeoServerRole("READER") }));
         anonymous = new TestingAuthenticationToken("anonymous", null);
         milUser = new TestingAuthenticationToken("military", "supersecret",
-                new GrantedAuthority[] { new GrantedAuthorityImpl("MILITARY") });
-        root = new TestingAuthenticationToken("admin", "geoserver", new GrantedAuthority[] { new GrantedAuthorityImpl(SecureTreeNode.ROOT_ROLE) });
+                Arrays.asList(new GrantedAuthority[] { new GeoServerRole("MILITARY") }));
+        root = new TestingAuthenticationToken("admin", "geoserver", Arrays.asList(new GrantedAuthority[] { new GeoServerRole(SecureTreeNode.ROOT_ROLE) }));
 
         catalog = createNiceMock(Catalog.class);
         expect(catalog.getWorkspace((String) anyObject())).andReturn(
@@ -123,6 +133,14 @@ public abstract class AbstractAuthorizationTest extends SecureObjectsTest {
         roadsStore = roads.getStore();
         landmarks = (FeatureTypeInfo) landmarksLayer.getResource();
         bases = (FeatureTypeInfo) basesLayer.getResource();
+
+        // styles
+        pointStyle = buildStyle("point", null);
+        lineStyle = buildStyle("line", toppWs);
+        
+        // layer groups
+        layerGroupGlobal = buildLayerGroup("layerGroup", arcGridLayer, pointStyle, null);
+        layerGroupTopp = buildLayerGroup("layerGroupTopp", statesLayer, lineStyle, toppWs);
     }
 
     protected LayerInfo buildLayer(String name, WorkspaceInfo ws,
@@ -162,6 +180,25 @@ public abstract class AbstractAuthorizationTest extends SecureObjectsTest {
         return layer;
     }
 
+    protected StyleInfo buildStyle(String name, WorkspaceInfo ws) {
+        StyleInfo style = createNiceMock(StyleInfo.class);
+        expect(style.getName()).andReturn(name).anyTimes();
+        expect(style.getFilename()).andReturn(name+".sld").anyTimes();
+        expect(style.getWorkspace()).andReturn(ws).anyTimes();
+        replay(style);
+        return style;
+    }
+
+    protected LayerGroupInfo buildLayerGroup(String name, LayerInfo layer, StyleInfo style, WorkspaceInfo ws) {
+        LayerGroupInfo layerGroup = createNiceMock(LayerGroupInfo.class);
+        expect(layerGroup.getName()).andReturn(name).anyTimes();
+        expect(layerGroup.getLayers()).andReturn(Arrays.asList(layer)).anyTimes();
+        expect(layerGroup.getStyles()).andReturn(Arrays.asList(style)).anyTimes();
+        expect(layerGroup.getWorkspace()).andReturn(ws).anyTimes();
+        replay(layerGroup);
+        return layerGroup;
+    }
+    
     protected ResourceAccessManager buildManager(String propertyFile) throws Exception {
         return new DataAccessManagerAdapter(buildLegacyAccessManager(propertyFile));
     }
@@ -217,6 +254,12 @@ public abstract class AbstractAuthorizationTest extends SecureObjectsTest {
         expect(catalog.getWorkspaces()).andReturn(workspaces).anyTimes();
         expect(catalog.getWorkspaceByName("topp")).andReturn(toppWs).anyTimes();
         expect(catalog.getWorkspaceByName("nurc")).andReturn(nurcWs).anyTimes();
+        expect(catalog.getStyles()).andReturn(Arrays.asList(pointStyle, lineStyle)).anyTimes();
+        expect(catalog.getStylesByWorkspace(toppWs)).andReturn(Arrays.asList(pointStyle, lineStyle)).anyTimes();
+        expect(catalog.getStylesByWorkspace(nurcWs)).andReturn(Arrays.asList(pointStyle)).anyTimes();
+        expect(catalog.getLayerGroups()).andReturn(Arrays.asList(layerGroupGlobal, layerGroupTopp)).anyTimes();
+        expect(catalog.getLayerGroupsByWorkspace("topp")).andReturn(Arrays.asList(layerGroupTopp)).anyTimes();
+        expect(catalog.getLayerGroupsByWorkspace("nurc")).andReturn(Arrays.asList(layerGroupGlobal)).anyTimes();
         replay(catalog);
     }
 }

@@ -34,6 +34,7 @@ import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.MetadataLinkInfo;
 import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.catalog.util.ReaderDimensionsAccessor;
+import org.geoserver.config.ResourceErrorHandling;
 import org.geoserver.ows.URLMangler.URLType;
 import org.geoserver.wcs.WCSInfo;
 import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
@@ -74,6 +75,8 @@ public class Wcs10DescribeCoverageTransformer extends TransformerBase {
     private static final String XSI_URI = "http://www.w3.org/2001/XMLSchema-instance";
 
     private static final Map<String, String> METHOD_NAME_MAP = new HashMap<String, String>();
+    
+    private final boolean skipMisconfigured;
 
     static {
         METHOD_NAME_MAP.put("nearest neighbor", "nearest");
@@ -92,6 +95,8 @@ public class Wcs10DescribeCoverageTransformer extends TransformerBase {
         super();
         this.wcs = wcs;
         this.catalog = catalog;
+        this.skipMisconfigured = ResourceErrorHandling.SKIP_MISCONFIGURED_LAYERS.equals( 
+                wcs.getGeoServer().getGlobal().getResourceErrorHandling());
         setNamespaceDeclarationEnabled(false);
     }
 
@@ -163,22 +168,39 @@ public class Wcs10DescribeCoverageTransformer extends TransformerBase {
             attributes.addAttribute("", "version", "version", "", "1.0.0");
 
             start("wcs:CoverageDescription", attributes);
-            for (Iterator it = request.getCoverage().iterator(); it.hasNext();) {
-                String coverageId = (String) it.next();
-
-                // check the coverage is known
-                LayerInfo layer = catalog.getLayerByName(coverageId);
-                if (layer == null || layer.getType() != LayerInfo.Type.RASTER) {
-                    throw new WcsException("Could not find the specified coverage: " + coverageId,
-                            WcsExceptionCode.InvalidParameterValue, "coverage");
+            
+            List<CoverageInfo> coverages;
+            final boolean skipMisconfiguredThisTime;
+            if(request.getCoverage() == null || request.getCoverage().size() == 0) {
+                skipMisconfiguredThisTime = skipMisconfigured;
+                coverages = catalog.getCoverages();
+            } else {
+                skipMisconfiguredThisTime = false; // NEVER skip layers when the user requested specific ones
+                coverages = new ArrayList<CoverageInfo>();
+                for(Iterator it = request.getCoverage().iterator(); it.hasNext();) {
+                    String coverageId = (String) it.next();
+                    // check the coverage is known
+                    LayerInfo layer = catalog.getLayerByName(coverageId);
+                    if (layer == null || layer.getType() != LayerInfo.Type.RASTER) {
+                        throw new WcsException("Could not find the specified coverage: " + coverageId,
+                                WcsExceptionCode.InvalidParameterValue, "coverage");
+                    }
+                    coverages.add(catalog.getCoverageByName(coverageId));
                 }
-
-                CoverageInfo ci = catalog.getCoverageByName(coverageId);
+            }
+            for (Iterator it = coverages.iterator(); it.hasNext();) {
+                CoverageInfo coverage = (CoverageInfo) it.next();
                 try {
-                    handleCoverageOffering(ci);
+                    mark();
+                    handleCoverageOffering(coverage);
+                    commit();
                 } catch (Exception e) {
-                    throw new RuntimeException(
+                    if (skipMisconfiguredThisTime) {
+                        reset();
+                    } else {
+                        throw new RuntimeException(
                             "Unexpected error occurred during describe coverage xml encoding", e);
+                    }
                 }
 
             }
@@ -420,6 +442,7 @@ public class Wcs10DescribeCoverageTransformer extends TransformerBase {
 
             AttributesImpl attributes = new AttributesImpl();
             attributes.addAttribute("", "dimension", "dimension", "", String.valueOf(gridDimension));
+            attributes.addAttribute("", "srsName", "srsName", "", ci.getSRS());
 
             // RectifiedGrid
             start("gml:RectifiedGrid", attributes);

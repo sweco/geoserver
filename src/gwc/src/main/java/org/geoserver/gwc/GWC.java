@@ -102,6 +102,7 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Sets.SetView;
 import com.vividsolutions.jts.densify.Densifier;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
@@ -485,12 +486,22 @@ public class GWC implements DisposableBean, InitializingBean {
         }
     }
 
+    /**
+     * Reloads the configuration and notifies GWC of any externally removed layer.
+     */
     public void reload() {
+        final Set<String> currLayerNames = new HashSet<String>(getTileLayerNames());
         try {
             tld.reInit();
         } catch (RuntimeException e) {
             log.log(Level.WARNING, "Unable to reinit TileLayerDispatcher", e);
             throw e;
+        }
+        Set<String> newLayerNames = getTileLayerNames();
+        SetView<String> removedExternally = Sets.difference(currLayerNames, newLayerNames);
+        for (String removedLayerName : removedExternally) {
+            log.info("Notifying of TileLayer '" + removedLayerName + "' removed externally");
+            layerRemoved(removedLayerName);
         }
     }
 
@@ -648,7 +659,7 @@ public class GWC implements DisposableBean, InitializingBean {
      *            the GetMap request to check whether it might match a tile
      * @param requestMistmatchTarget
      */
-    private boolean isCachingPossible(TileLayer layer, GetMapRequest request,
+    boolean isCachingPossible(TileLayer layer, GetMapRequest request,
             StringBuilder requestMistmatchTarget) {
 
         if (null != request.getRemoteOwsType() || null != request.getRemoteOwsURL()) {
@@ -707,7 +718,8 @@ public class GWC implements DisposableBean, InitializingBean {
             }
         }
         if (request.getElevation() != null && !request.getElevation().isEmpty()) {
-            if (!filterApplies(filters, request, "ELEVATION", requestMistmatchTarget)) {
+            if (null != request.getElevation().get(0) &&
+                    !filterApplies(filters, request, "ELEVATION", requestMistmatchTarget)) {
                 return false;
             }
         }
@@ -750,7 +762,8 @@ public class GWC implements DisposableBean, InitializingBean {
             }
         }
         if (null != request.getTime() && !request.getTime().isEmpty()) {
-            if (!filterApplies(filters, request, "TIME", requestMistmatchTarget)) {
+            if (null != request.getTime().get(0) && 
+                    !filterApplies(filters, request, "TIME", requestMistmatchTarget)) {
                 return false;
             }
         }
@@ -1138,20 +1151,21 @@ public class GWC implements DisposableBean, InitializingBean {
         Set<String> affectedLayers = new HashSet<String>();
 
         for (LayerInfo layer : layers) {
-            // this is redundant now but I'm still hoping for the infamous resource/publish split
-            if (tileLayerExists(layer.getResource().getPrefixedName())) {
-                affectedLayers.add(layer.getResource().getPrefixedName());
+            final String tileLayerName = tileLayerName(layer);
+            if (tileLayerExists(tileLayerName)) {
+                affectedLayers.add(tileLayerName);
             }
         }
 
         for (LayerGroupInfo lgi : getLayerGroups()) {
-            if (!tileLayerExists(lgi.getName())) {
+            final String tileLayerName = tileLayerName(lgi);
+            if (!tileLayerExists(tileLayerName)) {
                 continue;
             }
             for (LayerInfo li : lgi.getLayers()) {
                 ResourceInfo resource = li.getResource();
                 if (typeInfo.equals(resource)) {
-                    affectedLayers.add(lgi.getName());
+                    affectedLayers.add(tileLayerName);
                 }
             }
         }
@@ -1265,6 +1279,7 @@ public class GWC implements DisposableBean, InitializingBean {
         return mainConfig;
     }
 
+    @SuppressWarnings("unchecked")
     public Response getResponseEncoder(MimeType responseFormat, RenderedImageMap metaTileMap) {
         final String format = responseFormat.getFormat();
         final String mimeType = responseFormat.getMimeType();
@@ -1654,7 +1669,7 @@ public class GWC implements DisposableBean, InitializingBean {
         final String tileLayerId;
         if (source instanceof ResourceInfo) {
             LayerInfo layerInfo = getCatalog().getLayerByName(
-                    ((ResourceInfo) source).getPrefixedName());
+                    ((ResourceInfo) source).prefixedName());
             if (layerInfo == null) {
                 return false;
             }
@@ -1685,11 +1700,11 @@ public class GWC implements DisposableBean, InitializingBean {
     public GeoServerTileLayer getTileLayer(CatalogInfo source) {
         final String name;
         if (source instanceof ResourceInfo) {
-            name = ((ResourceInfo) source).getPrefixedName();
+            name = ((ResourceInfo) source).prefixedName();
         } else if (source instanceof LayerInfo) {
-            name = ((LayerInfo) source).getResource().getPrefixedName();
+            name = tileLayerName(((LayerInfo) source));
         } else if (source instanceof LayerGroupInfo) {
-            name = ((LayerGroupInfo) source).getName();
+            name = tileLayerName(((LayerGroupInfo) source));
         } else {
             return null;
         }
@@ -1716,4 +1731,22 @@ public class GWC implements DisposableBean, InitializingBean {
         return bounds.getCoordinateReferenceSystem();
     }
 
+    public static String tileLayerName(LayerInfo li) {
+        // REVISIT when/if layerinfo.getName gets decoupled from LayerInfo.resource.name
+        return li.getResource().prefixedName();
+    }
+
+    public static String tileLayerName(LayerGroupInfo lgi) {
+        return lgi.prefixedName();
+    }
+
+    /**
+     * Flush caches
+     */
+    public void reset() {
+        CatalogConfiguration c = GeoServerExtensions.bean(CatalogConfiguration.class);
+        if (c != null) {
+            c.reset();
+        }
+    }
 }

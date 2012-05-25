@@ -9,8 +9,10 @@ import java.util.logging.Logger;
 
 import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.catalog.FeatureTypeInfo;
+import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.ResourceInfo;
+import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.WMSLayerInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geotools.util.logging.Logging;
@@ -23,7 +25,7 @@ import org.springframework.security.core.Authentication;
  * @author Andrea Aime - GeoSolutions
  * 
  */
-public class DataAccessManagerAdapter implements ResourceAccessManager {
+public class DataAccessManagerAdapter extends AbstractResourceAccessManager {
     static final Logger LOGGER = Logging.getLogger(DataAccessManagerAdapter.class);
 
     DataAccessManager delegate;
@@ -81,13 +83,16 @@ public class DataAccessManagerAdapter implements ResourceAccessManager {
     public WorkspaceAccessLimits getAccessLimits(Authentication user, WorkspaceInfo workspace) {
         boolean readable = delegate.canAccess(user, workspace, AccessMode.READ);
         boolean writable = delegate.canAccess(user, workspace, AccessMode.WRITE);
+        boolean adminable = delegate.canAccess(user, workspace, AccessMode.ADMIN);
+        
         CatalogMode mode = delegate.getMode();
 
         if (readable && writable) {
-            return null;
-        } else {
-            return new WorkspaceAccessLimits(mode, readable, writable);
+            if (AdminRequest.get() == null) {
+                //not admin request, read+write means full acesss
+                return null;
+            }
         }
+        return new WorkspaceAccessLimits(mode, readable, writable, adminable);
     }
-
 }

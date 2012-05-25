@@ -13,6 +13,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.IndexColorModel;
 import java.awt.image.RenderedImage;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,7 @@ import org.geotools.data.DataUtilities;
 import org.geotools.feature.SchemaException;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.geometry.jts.LiteShape2;
+import org.geotools.renderer.lite.RendererUtilities;
 import org.geotools.renderer.lite.StyledShapePainter;
 import org.geotools.renderer.style.SLDStyleFactory;
 import org.geotools.renderer.style.Style2D;
@@ -37,6 +39,8 @@ import org.geotools.styling.Rule;
 import org.geotools.styling.Style;
 import org.geotools.styling.Symbolizer;
 import org.geotools.styling.TextSymbolizer;
+import org.geotools.styling.visitor.RescaleStyleVisitor;
+import org.geotools.styling.visitor.UomRescaleStyleVisitor;
 import org.geotools.util.NumberRange;
 import org.opengis.feature.Feature;
 import org.opengis.feature.IllegalAttributeException;
@@ -50,12 +54,6 @@ import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.LinearRing;
 import com.vividsolutions.jts.geom.Polygon;
-import java.util.Collections;
-import org.geotools.renderer.lite.RendererUtilities;
-import org.geotools.styling.AnchorPoint;
-import org.geotools.styling.visitor.DuplicatingStyleVisitor;
-import org.geotools.styling.visitor.RescaleStyleVisitor;
-import org.geotools.styling.visitor.UomRescaleStyleVisitor;
 
 /**
  * Template {@linkPlain org.vfny.geoserver.responses.wms.GetLegendGraphicProducer} based on
@@ -185,23 +183,25 @@ public class BufferedImageLegendGraphicBuilder {
             return image;
         }
 
-        final SimpleFeature sampleFeature;
+       // final SimpleFeature sampleFeature;
+        final Feature sampleFeature;
         if (layer == null) {
             sampleFeature = createSampleFeature();
         } else {
-            final Feature temp = createSampleFeature(layer);
-            if (!(temp instanceof SimpleFeature)) {
-                throw new UnsupportedOperationException("not a SimpleFeature");
-            }
-            sampleFeature = (SimpleFeature) temp;
+        	sampleFeature = createSampleFeature(layer);
         }
         final FeatureTypeStyle[] ftStyles = gt2Style.featureTypeStyles().toArray(
                 new FeatureTypeStyle[0]);
         final double scaleDenominator = request.getScale();
 
         final Rule[] applicableRules;
-        if (request.getRule() != null) {
-            applicableRules = new Rule[] { request.getRule() };
+        String ruleName = request.getRule();
+        if (ruleName != null) {
+            Rule rule = LegendUtils.getRule(ftStyles, ruleName);
+            if (rule == null) {
+                throw new ServiceException("Specified style does not contains a rule named " + ruleName);
+            }
+            applicableRules = new Rule[] {rule};
         } else {
             applicableRules = LegendUtils.getApplicableRules(ftStyles, scaleDenominator);
         }
@@ -257,7 +257,7 @@ public class BufferedImageLegendGraphicBuilder {
         BufferedImage image = mergeLegends(legendsStack, applicableRules, request);
         return image;
     }
-
+    
     /**
      * Recieves a list of <code>BufferedImages</code> and produces a new one which holds all the
      * images in <code>imageStack</code> one above the other.
@@ -528,19 +528,18 @@ public class BufferedImageLegendGraphicBuilder {
      * @throws ServiceException
      */
     private Feature createSampleFeature(FeatureType schema) throws ServiceException {
-        SimpleFeature sampleFeature;
+        Feature sampleFeature;
         try {
             if (schema instanceof SimpleFeatureType) {
-                sampleFeature = SimpleFeatureBuilder.template((SimpleFeatureType) schema, null);
-            } else {
-                // TODO: implement support for GSIP 31 (DataAccess API)
-                throw new UnsupportedOperationException(
-                        "Sample non-simple feature not yet supported.");
+                sampleFeature = SimpleFeatureBuilder.template((SimpleFeatureType) schema, null);            
+            } else {            	
+            	sampleFeature = DataUtilities.templateFeature(schema);
             }
         } catch (IllegalAttributeException e) {
             throw new ServiceException(e);
         }
         return sampleFeature;
     }
+    
 
 }

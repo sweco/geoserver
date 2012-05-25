@@ -14,6 +14,8 @@ import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.LayerInfo.Type;
+import org.geoserver.ows.URLMangler.URLType;
+import org.geoserver.ows.util.ResponseUtils;
 import org.geoserver.web.CatalogIconFactory;
 import org.geoserver.web.GeoServerApplication;
 import org.geoserver.wms.DefaultWebMapService;
@@ -52,7 +54,7 @@ public class PreviewLayer {
 
     public String getName() {
         if (layerInfo != null) {
-            return layerInfo.getResource().getPrefixedName();
+            return layerInfo.getResource().prefixedName();
         } else {
             return groupInfo.getName();
         }
@@ -61,9 +63,10 @@ public class PreviewLayer {
     public String getWorkspace() {
         if (layerInfo != null) {
             return layerInfo.getResource().getStore().getWorkspace().getName();
-        } else {
-            return null;
+        } else if (groupInfo != null && groupInfo.getWorkspace() != null){
+            return groupInfo.getWorkspace().getName();
         }
+        return null;
     }
     
     public ResourceReference getIcon() {
@@ -172,12 +175,12 @@ public class PreviewLayer {
         String ws = getWorkspace();
         if(ws == null) {
             // global reference
-            return "../" + service;
+            return ResponseUtils.buildURL("../", service, null, URLType.SERVICE);
         } else {
-            return "../" + ws + "/" + service;
+            return ResponseUtils.buildURL("../", ws + "/" + service, null, URLType.SERVICE);
         }
     }
-
+    
     /**
      * Given a request and a target format, builds the WMS request
      * 

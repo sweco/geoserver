@@ -6,6 +6,10 @@
 
 package org.geoserver.test;
 
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.awt.image.ColorModel;
+import java.awt.image.Raster;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +32,7 @@ import org.geotools.data.complex.AppSchemaDataAccess;
 import org.geotools.data.complex.AppSchemaDataAccessRegistry;
 import org.geotools.data.complex.DataAccessRegistry;
 import org.geotools.xml.AppSchemaCache;
+import org.geotools.xml.AppSchemaCatalog;
 import org.geotools.xml.AppSchemaResolver;
 import org.geotools.xml.AppSchemaValidator;
 import org.geotools.xml.AppSchemaXSDRegistry;
@@ -35,7 +40,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
 /**
- * Abstract base class for WFS test cases that test integration of {@link AppSchemaDataAccess} with
+ * Abstract base class for WFS (and WMS) test cases that test integration of {@link AppSchemaDataAccess} with
  * GeoServer.
  * 
  * <p>
@@ -81,6 +86,11 @@ public abstract class AbstractAppSchemaWfsTestSupport extends GeoServerAbstractT
      * The XpathEngine to be used for this namespace context.
      */
     private XpathEngine xpathEngine;
+    
+    /**
+     * AppSchemaCatalog to work with AppSchemaValidator for test requests validation. 
+     */
+    private AppSchemaCatalog catalog;
 
     /**
      * Subclasses override this to construct the test data.
@@ -157,6 +167,7 @@ public abstract class AbstractAppSchemaWfsTestSupport extends GeoServerAbstractT
         DataAccessRegistry.unregisterAndDisposeAll();
         AppSchemaDataAccessRegistry.clearAppSchemaProperties();
         AppSchemaXSDRegistry.getInstance().dispose();
+        catalog = null;
     }
 
     /**
@@ -261,6 +272,19 @@ public abstract class AbstractAppSchemaWfsTestSupport extends GeoServerAbstractT
             xpathEngine.setNamespaceContext(new SimpleNamespaceContext(namespaces));
         }
         return xpathEngine;
+    }
+    
+    /**
+     * Return the AppSchemaCatalog to resolve local schemas.
+     * @return AppSchemaCatalog
+     */    
+    private AppSchemaCatalog getAppSchemaCatalog() {
+        if (catalog == null) {
+            if (testData instanceof AbstractAppSchemaMockData) {
+                catalog = ((AbstractAppSchemaMockData) testData).getAppSchemaCatalog();
+            }
+        }
+        return catalog;
     }
 
     /**
@@ -439,7 +463,7 @@ public abstract class AbstractAppSchemaWfsTestSupport extends GeoServerAbstractT
      */
     protected void validateGet(String path) {
         try {
-            AppSchemaValidator.validate(get(path));
+            AppSchemaValidator.validate(get(path), getAppSchemaCatalog());
         } catch (RuntimeException e) {
             LOGGER.severe(e.getMessage());
             throw e;
@@ -466,7 +490,7 @@ public abstract class AbstractAppSchemaWfsTestSupport extends GeoServerAbstractT
      */
     protected void validatePost(String path, String xml) {
         try {
-            AppSchemaValidator.validate(post(path, xml));
+            AppSchemaValidator.validate(post(path, xml), getAppSchemaCatalog());
         } catch (RuntimeException e) {
             LOGGER.severe(e.getMessage());
             throw e;
@@ -492,11 +516,95 @@ public abstract class AbstractAppSchemaWfsTestSupport extends GeoServerAbstractT
      */
     protected void validate(String xml) {
         try {
-            AppSchemaValidator.validate(xml);
+            AppSchemaValidator.validate(xml, getAppSchemaCatalog());
         } catch (RuntimeException e) {
             LOGGER.severe(e.getMessage());
             throw e;
         }
+    }
+    
+    
+    /**
+     * For WMS tests.
+     * 
+     * Asserts that the image is not blank, in the sense that there must be pixels different from
+     * the passed background color.
+     * 
+     * @param testName
+     *            the name of the test to throw meaningfull messages if something goes wrong
+     * @param image
+     *            the imgage to check it is not "blank"
+     * @param bgColor
+     *            the background color for which differing pixels are looked for
+     */
+    protected void assertNotBlank(String testName, BufferedImage image, Color bgColor) {
+        int pixelsDiffer = countNonBlankPixels(testName, image, bgColor);
+        assertTrue(testName + " image is completely blank", 0 < pixelsDiffer);
+    }
+    
+    
+    /**
+     * 
+     *  For WMS tests.
+     *  
+     *  
+     * Counts the number of non black pixels
+     * 
+     * @param testName
+     * @param image
+     * @param bgColor
+     * @return
+     */
+    protected int countNonBlankPixels(String testName, BufferedImage image, Color bgColor) {
+        int pixelsDiffer = 0;
+
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                if (image.getRGB(x, y) != bgColor.getRGB()) {
+                    ++pixelsDiffer;
+                }
+            }
+        }
+
+        LOGGER.fine(testName + ": pixel count=" + (image.getWidth() * image.getHeight())
+                + " non bg pixels: " + pixelsDiffer);
+        return pixelsDiffer;
+    }
+    
+    /**
+     * Checks the pixel i/j has the specified color
+     * @param image
+     * @param i
+     * @param j
+     * @param color
+     */
+    protected void assertPixel(BufferedImage image, int i, int j, Color color) {
+        Color actual = getPixelColor(image, i, j);
+        
+
+        assertEquals(color, actual);
+    }
+
+    /**
+     * Gets a specific pixel color from the specified buffered image
+     * @param image
+     * @param i
+     * @param j
+     * @param color
+     * @return
+     */
+    protected Color getPixelColor(BufferedImage image, int i, int j) {
+        ColorModel cm = image.getColorModel();
+        Raster raster = image.getRaster();
+        Object pixel = raster.getDataElements(i, j, null);
+        
+        Color actual;
+        if(cm.hasAlpha()) {
+            actual = new Color(cm.getRed(pixel), cm.getGreen(pixel), cm.getBlue(pixel), cm.getAlpha(pixel));
+        } else {
+            actual = new Color(cm.getRed(pixel), cm.getGreen(pixel), cm.getBlue(pixel), 255);
+        }
+        return actual;
     }
 
 }

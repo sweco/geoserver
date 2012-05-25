@@ -99,6 +99,21 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.geoserver.security</groupId>
+      <artifactId>sec-jdbc</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.geoserver.security</groupId>
+      <artifactId>sec-ldap</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.geoserver.security</groupId>
+      <artifactId>sec-cas</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.geotools.jdbc</groupId>
       <artifactId>gt-jdbc-postgis</artifactId>
     </dependency>
@@ -228,7 +243,7 @@
           <contextPath>geoserver</contextPath>
           <connectors>
             <connector implementation="org.mortbay.jetty.nio.SelectChannelConnector">
-              <port>8080</port>
+              <port>${jetty.port}</port>
               <maxIdleTime>10000</maxIdleTime>
             </connector>
           </connectors>
@@ -265,6 +280,7 @@
     <configDirectory>${basedir}</configDirectory>
     <webappSourceDirectory>${basedir}/src/main/webapp</webappSourceDirectory>
     <sde.version>9.3</sde.version>
+    <jetty.port>8080</jetty.port>
   </properties>
 
   <profiles>
@@ -366,16 +382,6 @@
       <dependency>
        <groupId>org.geoserver.extension</groupId>
        <artifactId>h2</artifactId>
-       <version>${project.version}</version>
-      </dependency>
-     </dependencies>
-    </profile>
-    <profile>
-     <id>security</id>
-     <dependencies>
-      <dependency>
-       <groupId>org.geoserver.extension</groupId>
-       <artifactId>web-security</artifactId>
        <version>${project.version}</version>
       </dependency>
      </dependencies>

@@ -6,10 +6,12 @@ import java.util.Locale;
 
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
+import org.apache.wicket.RequestCycle;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.FormComponent;
 import org.apache.wicket.util.tester.FormTester;
 import org.apache.wicket.util.tester.WicketTester;
+import org.geoserver.security.impl.GeoServerRole;
 import org.geoserver.test.GeoServerTestSupport;
 import org.geoserver.web.wicket.WicketHierarchyPrinter;
 import org.springframework.security.core.GrantedAuthority;
@@ -36,25 +38,40 @@ public abstract class GeoServerWicketTestSupport extends GeoServerTestSupport {
         
     }
 
+    @Override
+    protected void oneTimeTearDown() throws Exception {
+        super.oneTimeTearDown();
+        tester.destroy();
+    }
+
     public GeoServerApplication getGeoServerApplication(){
         return GeoServerApplication.get();
     }
 
+    /**
+     * Logs in as administrator.
+     */
     public void login(){
+        login("admin", "geoserver", "ROLE_ADMINISTRATOR");
+    }
+
+    /**
+     * Logs in with the specified credentials and associates the specified roles with the resulting
+     * authentication. 
+     */
+    public void login(String user, String passwd, String... roles) {
         SecurityContextHolder.setContext(new SecurityContextImpl());
         List<GrantedAuthority> l= new ArrayList<GrantedAuthority>();
-        l.add(new GrantedAuthorityImpl("ROLE_ADMINISTRATOR"));
+        for (String role : roles) {
+            l.add(new GrantedAuthorityImpl(role));
+        }
         
         SecurityContextHolder.getContext().setAuthentication(
-            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("admin","geoserver",l));                                  
+            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(user,passwd,l));
     }
 
     public void logout(){
-        SecurityContextHolder.setContext(new SecurityContextImpl());
-        List<GrantedAuthority> l= new ArrayList<GrantedAuthority>();
-        l.add(new GrantedAuthorityImpl("ROLE_ANONYMOUS"));
-        SecurityContextHolder.getContext().setAuthentication(
-                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("anonymousUser","",l));                                  
+        login("anonymousUser","", "ROLE_ANONYMOUS");
     }
     
     /**

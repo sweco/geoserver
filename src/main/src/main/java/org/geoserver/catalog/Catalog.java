@@ -1234,16 +1234,59 @@ public interface Catalog extends CatalogInfo {
     List<LayerGroupInfo> getLayerGroups();
 
     /**
+     * All layer groups in the specified workspace.
+     * 
+     * @param workspaceName The name of the workspace containing layer groups.
+     */
+    List<LayerGroupInfo> getLayerGroupsByWorkspace(String workspaceName);
+
+    /**
+     * All layer groups in the specified workspace.
+     * 
+     * @param workspace The workspace containing layer groups.
+     */
+    List<LayerGroupInfo> getLayerGroupsByWorkspace(WorkspaceInfo workspace);
+
+    /**
      * Returns the layer group matching a particular id, or <code>null</code> if no
      * such group could be found.
      */
     LayerGroupInfo getLayerGroup(String id);
     
     /**
-     * Returns the layer group matching a particular name, or <code>null</code> if no
-     * such group could be found.
+     * Returns the global layer group matching a particular name, or <code>null</code> if no such
+     * style could be found.
+     * <p>
+     * If {@code prefixedName} contains a workspace name prefix (like in {@code topp:tasmania}, the
+     * layer group will be looked up on that specific workspace ({@code topp}), otherwise it is
+     * assumed a global (with no workspace) layer group.
+     * </p>
+     * 
+     * @param name the name of the layer group, may include a workspace name prefix or not.
+     * @return the global layer group matching a particular name, or <code>null</code> if no such
+     *         group could be found.
      */
     LayerGroupInfo getLayerGroupByName(String name);
+    
+    /**
+     * Returns the layer group matching a particular name in the specified workspace, or
+     * <code>null</code> if no such layer group could be found.
+     * 
+     * @param workspaceName The name of the workspace containing the layer group, {@code null} is
+     *        allowed, meaning to look up for a global layer group
+     * @param name The name of the layer group to return.
+     */
+    LayerGroupInfo getLayerGroupByName(String workspaceName, String name);
+
+    /**
+     * Returns the layer group matching a particular name in the specified workspace, or
+     * <code>null</code> if no such layer group could be found.
+     * 
+     * @param workspace The workspace containing the layer group, {@code null} is allowed, meaning
+     *        to look up for a global layer group.
+     * @param name The name of the layer group to return.
+     */
+    LayerGroupInfo getLayerGroupByName(WorkspaceInfo workspace, String name);
     
     /**
      * Adds a new style.
@@ -1292,11 +1335,32 @@ public interface Catalog extends CatalogInfo {
     StyleInfo getStyle(String id);
 
     /**
-     * Returns the style matching a particular name, or <code>null</code> if
-     * no such style could be found.
+     * Returns the style matching a particular name in the specified workspace, or <code>null</code> 
+     * if no such style could be found.
      * 
-     * @param name
-     *                The name of the style to return.
+     * @param workspaceName The name of the workspace containing the style, {@code null} stands for a global style.
+     * @param name The name of the style to return.
+     */
+    StyleInfo getStyleByName(String workspaceName, String name);
+
+    /**
+     * Returns the style matching a particular name in the specified workspace, or <code>null</code> 
+     * if no such style could be found.
+     * 
+     * @param workspace The workspace containing the style, {@code null} stands for a global style.
+     * @param name The name of the style to return.
+     */
+    StyleInfo getStyleByName(WorkspaceInfo workspace, String name);
+    
+    /**
+     * Returns the global style matching a particular name, or <code>null</code> if no such style
+     * could be found.
+     * <p>
+     * Note this is a convenient method for {@link #getStyleByName(WorkspaceInfo, String)} with a
+     * {@code null} workspace argument.
+     * </p>
+     * 
+     * @param name The name of the style to return.
      */
     StyleInfo getStyleByName(String name);
 
@@ -1309,6 +1373,20 @@ public interface Catalog extends CatalogInfo {
      *  </p>
      */
     List<StyleInfo> getStyles();
+
+    /**
+     * All styles in the specified workspace.
+     * 
+     * @param workspaceName The name of the workspace containing styles.
+     */
+    List<StyleInfo> getStylesByWorkspace(String workspaceName);
+
+    /**
+     * All styles in the specified workspace.
+     * 
+     * @param workspace The workspace containing styles.
+     */
+    List<StyleInfo> getStylesByWorkspace(WorkspaceInfo workspace);
 
     /**
      * Adds a new namespace.

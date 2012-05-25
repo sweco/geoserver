@@ -49,10 +49,12 @@ public class StyleResource extends AbstractCatalogResource {
     
     @Override
     protected Object handleObjectGet() {
+        String workspace = getAttribute("workspace");
         String style = getAttribute("style");
         
         LOGGER.fine( "GET style " + style );
-        StyleInfo sinfo = catalog.getStyleByName( style );
+        StyleInfo sinfo = workspace == null ? catalog.getStyleByName( style ) : 
+            catalog.getStyleByName(workspace,style);
         
         //check the format, if specified as sld, return the sld itself
         DataFormat format = getFormatGet();
@@ -70,11 +72,15 @@ public class StyleResource extends AbstractCatalogResource {
 
     @Override
     public boolean allowPost() {
+        if (getAttribute("workspace") == null && !isAuthenticatedAsAdmin()) {
+            return false;
+        }
         return getAttribute("style") == null;
     }
     
     @Override
     protected String handleObjectPost(Object object) throws Exception {
+        String workspace = getAttribute("workspace");
         String layer = getAttribute( "layer" );
         
         if ( object instanceof StyleInfo ) {
@@ -99,6 +105,11 @@ public class StyleResource extends AbstractCatalogResource {
                 LOGGER.info( "POST style " + style.getName() + " to layer " + layer);
             }
             else {
+
+                if (workspace != null) {
+                    style.setWorkspace(catalog.getWorkspaceByName(workspace));
+                }
+
                 catalog.add( style  );
                 LOGGER.info( "POST style " + style.getName() );
             }
@@ -161,6 +172,11 @@ public class StyleResource extends AbstractCatalogResource {
             StyleInfo sinfo = catalog.getFactory().createStyle();
             sinfo.setName( name );
             sinfo.setFilename( f.getName() );
+
+            if (workspace != null) {
+                sinfo.setWorkspace(catalog.getWorkspaceByName(workspace));
+            }
+            
             catalog.add( sinfo );
             
             LOGGER.info( "POST SLD " + name);
@@ -172,17 +188,29 @@ public class StyleResource extends AbstractCatalogResource {
 
     @Override
     public boolean allowPut() {
+        if (getAttribute("workspace") == null && !isAuthenticatedAsAdmin()) {
+            return false;
+        }
         return getAttribute("style") != null;
     }
     
     @Override
     protected void handleObjectPut(Object object) throws Exception {
         String style = getAttribute("style");
-        
+        String workspace = getAttribute("workspace");
+
         if ( object instanceof StyleInfo ) {
             StyleInfo s = (StyleInfo) object;
-            StyleInfo original = catalog.getStyleByName( style );
+            StyleInfo original = catalog.getStyleByName( workspace, style );
      
+            //ensure no workspace change
+            if (s.getWorkspace() != null) {
+                if (!s.getWorkspace().equals(original.getWorkspace())) {
+                    throw new RestletException( "Can't change the workspace of a style, instead " +
+                        "DELETE from existing workspace and POST to new workspace", Status.CLIENT_ERROR_FORBIDDEN );
+                }
+            }
+            
             new CatalogBuilder( catalog ).updateStyle( original, s );
             catalog.save( original );
         }
@@ -191,7 +219,7 @@ public class StyleResource extends AbstractCatalogResource {
              * Force the .sld file to be overriden and it's Style object cleared from the
              * ResourcePool cache
              */
-            StyleInfo s = catalog.getStyleByName( style );
+            StyleInfo s = catalog.getStyleByName( workspace, style );
             catalog.getResourcePool().writeStyle( s, (Style) object, true );
             /*
              * make sure to save the StyleInfo so that the Catalog issues the notification events
@@ -209,8 +237,10 @@ public class StyleResource extends AbstractCatalogResource {
     
     @Override
     protected void handleObjectDelete() throws Exception {
+        String workspace = getAttribute("workspace");
         String style = getAttribute("style");
-        StyleInfo s = catalog.getStyleByName(style);
+        StyleInfo s = workspace != null ? catalog.getStyleByName(workspace, style) :
+            catalog.getStyleByName(style);
         
         //ensure that no layers reference the style
         List<LayerInfo> layers = catalog.getLayers(s);
