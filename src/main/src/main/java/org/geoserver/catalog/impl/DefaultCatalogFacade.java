@@ -112,12 +112,12 @@ public class DefaultCatalogFacade implements CatalogFacade {
     /**
      * layer groups
      */
-    protected List<LayerGroupInfo> layerGroups = new ArrayList<LayerGroupInfo>();
+    protected List<LayerGroupInfo> layerGroups = new CopyOnWriteArrayList<LayerGroupInfo>();
     
     /**
      * styles
      */
-    protected List<StyleInfo> styles = new ArrayList();
+    protected List<StyleInfo> styles = new CopyOnWriteArrayList<StyleInfo>();
 
     /**
      * the catalog
@@ -577,43 +577,37 @@ public class DefaultCatalogFacade implements CatalogFacade {
         return null;
     }
     
+    @Override
     public LayerGroupInfo getLayerGroupByName(String name) {
-        for (LayerGroupInfo layerGroup : layerGroups ) {
-            if ( name.equals( layerGroup.getName() ) ) {
-                return ModificationProxy.create(layerGroup,LayerGroupInfo.class);
-            }
-        }
-        
-        return null;
+        return getLayerGroupByName(NO_WORKSPACE, name);
     }
 
     @Override
-    public LayerGroupInfo getLayerGroupByName(WorkspaceInfo workspace,
-            String name) {
-        if (workspace == ANY_WORKSPACE) {
-            //do an exhaustive search through all workspaces
-            ArrayList<LayerGroupInfo> matches = new ArrayList();
-            for (Iterator i = layerGroups.iterator(); i.hasNext();) {
-                LayerGroupInfo layerGroup = (LayerGroupInfo) i.next();
-                if ( name.equals( layerGroup.getName() ) ) {
-                    matches.add( layerGroup );
-                }
+    public LayerGroupInfo getLayerGroupByName(WorkspaceInfo workspace, String name) {
+
+        ArrayList<LayerGroupInfo> matches = new ArrayList<LayerGroupInfo>(2);
+
+        for (LayerGroupInfo layerGroup : layerGroups) {
+            if (!name.equals(layerGroup.getName())) {
+                continue;
             }
-            
-            if ( matches.size() == 1 ) {
-                return ModificationProxy.create( matches.get( 0 ), LayerGroupInfo.class);
+            WorkspaceInfo lgWorkspace = layerGroup.getWorkspace();
+            if (NO_WORKSPACE == workspace) {
+                if (lgWorkspace == null) {
+                    matches.add(layerGroup);
+                }
+            } else if (ANY_WORKSPACE == workspace) {
+                matches.add(layerGroup);
+            } else if (lgWorkspace != null && workspace.equals(lgWorkspace)) {
+                matches.add(layerGroup);
+            }
+            if (matches.size() > 1) {
+                break;
             }
         }
-        else {
-            for (Iterator i = layerGroups.iterator(); i.hasNext();) {
-                LayerGroupInfo layerGroup = (LayerGroupInfo) i.next();
-                if (name.equals(layerGroup.getName())) {
-                    if (layerGroup.getWorkspace() != null && layerGroup.getWorkspace().equals(workspace) || 
-                        layerGroup.getWorkspace() == null && workspace == null) {
-                        return ModificationProxy.create( layerGroup, LayerGroupInfo.class );
-                    }
-                }
-            }
+
+        if (matches.size() == 1) {
+            return ModificationProxy.create(matches.get(0), LayerGroupInfo.class);
         }
         return null;
     }
@@ -851,8 +845,8 @@ public class DefaultCatalogFacade implements CatalogFacade {
     public StyleInfo getStyleByName(String name) {
         for (Iterator s = styles.iterator(); s.hasNext();) {
             StyleInfo style = (StyleInfo) s.next();
-            if (name.equals(style.getName())) {
-                return ModificationProxy.create(style,StyleInfo.class);
+            if (null == style.getWorkspace() && name.equals(style.getName())) {
+                return ModificationProxy.create(style, StyleInfo.class);
             }
         }
 
@@ -861,6 +855,12 @@ public class DefaultCatalogFacade implements CatalogFacade {
 
     @Override
     public StyleInfo getStyleByName(WorkspaceInfo workspace, String name) {
+        if (null == workspace) {
+            throw new NullPointerException("workspace");
+        }
+        if (null == name) {
+            throw new NullPointerException("name");
+        }
         if (workspace == ANY_WORKSPACE) {
             //do an exhaustive search through all workspaces
             ArrayList<StyleInfo> matches = new ArrayList();
@@ -880,7 +880,7 @@ public class DefaultCatalogFacade implements CatalogFacade {
                 StyleInfo style = (StyleInfo) i.next();
                 if (name.equals(style.getName())) {
                     if (style.getWorkspace() != null && style.getWorkspace().equals(workspace) || 
-                        style.getWorkspace() == null && workspace == null) {
+                        style.getWorkspace() == null && workspace == NO_WORKSPACE) {
                         return ModificationProxy.create( style, StyleInfo.class );
                     }
                 }
@@ -888,9 +888,9 @@ public class DefaultCatalogFacade implements CatalogFacade {
         }
         return null;
     }
-
-    public List getStyles() {
-        return ModificationProxy.createList(styles,StyleInfo.class);
+    
+    public List<StyleInfo> getStyles() {
+        return ModificationProxy.createList(new ArrayList<StyleInfo>(styles), StyleInfo.class);
     }
 
     public List<StyleInfo> getStylesByWorkspace(WorkspaceInfo workspace) {

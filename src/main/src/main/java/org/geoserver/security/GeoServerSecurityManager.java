@@ -20,7 +20,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.Set;
 import java.util.SortedMap;
@@ -49,6 +51,7 @@ import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.security.auth.AuthenticationCache;
 import org.geoserver.security.auth.AuthenticationCacheImpl;
 import org.geoserver.security.auth.GeoServerRootAuthenticationProvider;
+import org.geoserver.security.auth.LRUAuthenticationCacheImpl;
 import org.geoserver.security.auth.UsernamePasswordAuthenticationProvider;
 import org.geoserver.security.concurrent.LockingKeyStoreProvider;
 import org.geoserver.security.concurrent.LockingRoleService;
@@ -237,6 +240,7 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
     
     public GeoServerSecurityManager(GeoServerDataDirectory dataDir) throws Exception {
         this.dataDir = dataDir;
+        setEraseCredentialsAfterAuthentication(true);
 
         /*
          * JD we have to ensure that the master password is initialized first thing, before the 
@@ -487,7 +491,7 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
 
     AuthenticationCache lookupAuthenticationCache() {
         AuthenticationCache authCache = GeoServerExtensions.bean(AuthenticationCache.class);
-        return authCache != null ? authCache : new AuthenticationCacheImpl();
+        return authCache != null ? authCache : new LRUAuthenticationCacheImpl(1000);
     }
 
     public RememberMeServices getRememberMeService() {
@@ -1239,10 +1243,9 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
                     filterHelper.loadConfig(config.getName()));
             // remove all cached authentications for this filter
             getAuthenticationCache().removeAll(config.getName());
-            if (securityConfig.getFilterChain().
-                    patternsContainingFilter(config.getName()).isEmpty()==false)
+            if (!securityConfig.getFilterChain().patternsForFilter(config.getName()).isEmpty()) {
                 fireChanged=true;
-            
+            }
         }
 
         filterHelper.saveConfig(config);
@@ -1288,6 +1291,10 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
         return new SecurityManagerConfig(this.securityConfig);
     }
 
+    public boolean isEncryptingUrlParams() {
+        if (this.securityConfig==null) return false;
+        return this.securityConfig.isEncryptingUrlParams();
+    }
     /*
      * saves the global security config
      * TODO: use read/write lock rather than full synchronied
@@ -1939,11 +1946,10 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
             }
         } else  {
             // no user.properties, populate with default user and roles
-            if (userGroupService.getUserByUsername(GeoServerUser.AdminName) == null) {
+            if (userGroupService.getUserByUsername(GeoServerUser.ADMIN_USERNAME) == null) {
                 userGroupStore.addUser(GeoServerUser.createDefaultAdmin());
                 roleStore.addRole(GeoServerRole.ADMIN_ROLE);
-                roleStore.associateRoleToUser(GeoServerRole.ADMIN_ROLE,
-                        GeoServerUser.AdminName);
+                roleStore.associateRoleToUser(GeoServerRole.ADMIN_ROLE, GeoServerUser.ADMIN_USERNAME);
             }
         }
 
@@ -2004,13 +2010,17 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
     /*
      * looks up security plugins
      */
-    List<GeoServerSecurityProvider> lookupSecurityProviders() {
-        List<GeoServerSecurityProvider> list = new ArrayList<GeoServerSecurityProvider>( 
-            GeoServerExtensions.extensions(GeoServerSecurityProvider.class, appContext));
+    public List<GeoServerSecurityProvider> lookupSecurityProviders() {
+        List<GeoServerSecurityProvider> list = new ArrayList<GeoServerSecurityProvider>();
 
-        //add the defaults
-        // list.add(new XMLSecurityProvider());
-        // list.add(new UsernamePasswordAuthenticationProvider.SecurityProvider());
+        for (GeoServerSecurityProvider provider : 
+            GeoServerExtensions.extensions(GeoServerSecurityProvider.class, appContext)) {
+            if (!provider.isAvailable()) {
+                continue;
+            }
+            list.add(provider);
+        }
+
         return list;
     }
 
@@ -2596,7 +2606,7 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
     /**
      * custom converter for filter chain
      */
-    static class FilterChainConverter extends AbstractCollectionConverter {
+    class FilterChainConverter extends AbstractCollectionConverter {
 
         public FilterChainConverter(Mapper mapper) {
             super(mapper);
@@ -2610,28 +2620,37 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
         @Override
         public void marshal(Object source, HierarchicalStreamWriter writer,
                 MarshallingContext context) {
+
             GeoServerSecurityFilterChain filterChain = (GeoServerSecurityFilterChain) source;
-            int index=0;
-            for (String pattern : filterChain.getAntPatterns()) {
-            
-            
+            for (RequestFilterChain requestChain : filterChain.getRequestChains()) {
                 //<filterChain>
                 //  <filters path="..." index="...">
                 //    <filter>name1</filter>
                 //    <filter>name2</filter>
                 //    ...
                 writer.startNode("filters");
-                writer.addAttribute("path", pattern);
-                writer.addAttribute("index", Integer.toString(index));
-                
-                for (String filterName : filterChain.getFilterMap().get(pattern)) {
+
+                StringBuilder sb = new StringBuilder();
+                for (String s : requestChain.getPatterns()) {
+                    sb.append(s).append(",");
+                }
+                if (sb.length() > 0) {
+                    sb.setLength(sb.length()-1);
+                }
+
+                if (requestChain.getName() != null) {
+                    writer.addAttribute("name", requestChain.getName());
+                }
+
+                writer.addAttribute("path", sb.toString());
+
+                for (String filterName : requestChain.getFilterNames()) {
                     writer.startNode("filter");
-                    writer.setValue(filterName);                    
+                    writer.setValue(filterName);
                     writer.endNode();
                 }
 
                 writer.endNode();
-                index++;
             }
         }
 
@@ -2639,36 +2658,45 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
         public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
 
             GeoServerSecurityFilterChain filterChain = new GeoServerSecurityFilterChain();
-            SortedMap<Integer, String> temp = new TreeMap<Integer,String>(); 
 
             while(reader.hasMoreChildren()) {
-                
-                //<filters path="..."
+
+                //<filters name="..." path="..."
                 reader.moveDown();
+
                 String path = reader.getAttribute("path");
-                String indexString = reader.getAttribute("index");
-                Integer index = new Integer(indexString);
-                temp.put(index,path);
+                String name = reader.getAttribute("name");
+                if (name == null) {
+                    //first version of the serialization did not contain name attribute, if not 
+                    // available try to look up well known chain, if not found just use the path
+                    // as the name
+                    RequestFilterChain requestChain = GeoServerSecurityFilterChain
+                        .lookupRequestChainByPattern(path, GeoServerSecurityManager.this);
+                    if (requestChain != null) {
+                        name = requestChain.getName();
+                    }
+                    else {
+                        name = path;
+                    }
+                }
 
                 //<filter
-                ArrayList<String> filterEntries = new ArrayList<String>();
+                ArrayList<String> filterNames = new ArrayList<String>();
                 while(reader.hasMoreChildren()) {
                     reader.moveDown();
-                    String name = reader.getValue();                    
-                    filterEntries.add(name);
+                    filterNames.add(reader.getValue());
                     reader.moveUp();
                 }
-                filterChain.getFilterMap().put(path, filterEntries);
+
+                RequestFilterChain requestChain = new RequestFilterChain(path.split(","));
+                requestChain.setName(name);
+                requestChain.setFilterNames(filterNames);
+                filterChain.getRequestChains().add(requestChain);
+
                 reader.moveUp();
             }
 
-            ArrayList<String> antPatterns = new ArrayList<String>();
-            // iterate sorted by index
-            for (Entry<Integer,String> e : temp.entrySet()) {
-                antPatterns.add(e.getValue());
-            }
-                        
-            filterChain.setAntPatterns(antPatterns);
+            filterChain.simplify();
             return filterChain;
         }
 

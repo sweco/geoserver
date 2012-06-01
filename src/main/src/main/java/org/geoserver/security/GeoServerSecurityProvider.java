@@ -18,7 +18,6 @@ import org.geoserver.security.filter.GeoServerSecurityFilter;
 import org.geoserver.security.password.MasterPasswordProviderConfig;
 import org.geoserver.security.password.PasswordValidator;
 import org.geoserver.security.validation.SecurityConfigValidator;
-import org.springframework.security.authentication.AuthenticationProvider;
 
 import com.thoughtworks.xstream.converters.SingleValueConverter;
 
@@ -124,7 +123,7 @@ public abstract class GeoServerSecurityProvider {
      * </p>
      */
             
-    public boolean isAvaialble() {
+    public boolean isAvailable() {
         return true;
     }
 
@@ -320,5 +319,11 @@ public abstract class GeoServerSecurityProvider {
      */
     public SecurityConfigValidator createConfigurationValidator(GeoServerSecurityManager securityManager) {
        return new SecurityConfigValidator(securityManager); 
+    }
+
+    /**
+     * Configures the security filter chain.
+     */
+    public void configureFilterChain(GeoServerSecurityFilterChain filterChain) {
     }
 }

@@ -557,6 +557,8 @@ public class GeoServerPersisterTest extends GeoServerTestSupport {
         assertTrue( f.exists() );
 
         s = catalog.getStyleByName("foostyle");
+        assertNull(s);
+        s = catalog.getStyleByName(catalog.getDefaultWorkspace(), "foostyle");
         catalog.remove(s);
         assertFalse( f.exists() );
     }
@@ -628,7 +630,9 @@ public class GeoServerPersisterTest extends GeoServerTestSupport {
         assertTrue(f.exists());
 
         LayerGroupInfo lg = catalog.getLayerGroupByName("lg");
-        lg.setWorkspace(catalog.getWorkspaceByName("acme"));
+        WorkspaceInfo workspace = catalog.getWorkspaceByName("acme");
+        assertNotNull(workspace);
+        lg.setWorkspace(workspace);
         catalog.save(lg);
         
         assertFalse(f.exists());
@@ -656,6 +660,8 @@ public class GeoServerPersisterTest extends GeoServerTestSupport {
         assertTrue(f.exists());
 
         LayerGroupInfo lg = catalog.getLayerGroupByName("lg");
+        assertNull(lg);
+        lg = catalog.getLayerGroupByName("acme:lg");
         assertNotNull(lg);
         catalog.remove(lg);
         assertFalse(f.exists());

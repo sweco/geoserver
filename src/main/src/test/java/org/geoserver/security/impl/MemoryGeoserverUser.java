@@ -29,4 +29,9 @@ public class MemoryGeoserverUser extends GeoServerUser {
     public GeoServerUser copy() {
         return new MemoryGeoserverUser(this);
     }
+    
+    @Override
+    public void eraseCredentials() {
+        // do nothing
+    }
 }

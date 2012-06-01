@@ -27,6 +27,13 @@ public class WMSStoreEditPage extends AbstractWMSStorePage {
         initUI(store);
     }
 
+    /**
+     * Creates a new edit page directly from a store object.
+     */
+    public WMSStoreEditPage(WMSStoreInfo store) {
+        initUI(store);
+    }
+
     @Override
     protected void onSave(WMSStoreInfo info, AjaxRequestTarget target)
             throws IllegalArgumentException {
@@ -48,10 +55,16 @@ public class WMSStoreEditPage extends AbstractWMSStorePage {
         }
 
     }
-    
-    private void doSaveStore(WMSStoreInfo info) {
+
+    /**
+     * Performs the save of the store.
+     * <p>
+     * This method may be subclasses to provide custom save functionality.
+     * </p>
+     */
+    protected void doSaveStore(WMSStoreInfo info) {
         getCatalog().save(info);
-        setResponsePage(StorePage.class);
+        doReturn(StorePage.class);
     }
 
     @SuppressWarnings("serial")
@@ -94,7 +107,7 @@ public class WMSStoreEditPage extends AbstractWMSStorePage {
             @Override
             public void onClose(AjaxRequestTarget target) {
                 if (accepted) {
-                    setResponsePage(StorePage.class);
+                    doReturn(StorePage.class);
                 }
             }
         });

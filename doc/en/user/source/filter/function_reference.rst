@@ -3,12 +3,16 @@
 Filter Function Reference
 ==========================
 
-This page contains a reference to filter functions that can be used in WFS filtering or in SLD expressions.
-If a function reported by the WFS capabilities is not available in this list it might either mean that the
-function cannot actually be used for the above purposes, or that it's new and has not been documented still.
-Ask for details on the user mailing list.
+This reference describes all filter functions that can be used in WFS/WMS filtering or in SLD expressions.
 
-Unless otherwise specified none of the filter functions in this references is understood natively by the data stores, and as a result all expressions using them will be evaluated in memory.
+The list of functions available on a Geoserver instance can be determined by 
+browsing to http://localhost:8080/geoserver/wfs?request=GetCapabilities 
+and searching for ``ogc:FunctionNames`` in the returned XML.  
+If a function is described in the Capabilities document but is not in this reference, 
+then it might mean that the function cannot be used for filtering, 
+or that it is new and has not been documented.  Ask for details on the user mailing list.
+
+Unless otherwise specified, none of the filter functions in this reference are understood natively by the data stores, and thus expressions using them will be evaluated in-memory.
 
 Function argument type reference
 ---------------------------------
@@ -33,7 +37,7 @@ Function argument type reference
    * - Timestamp
      - Date and time information
      
-Comparison and control Functions
+Comparison Functions
 --------------------------------
 
 .. list-table::
@@ -55,10 +59,7 @@ Comparison and control Functions
    * - greaterThan
      - ``x``:Object, ``y``:Object
      - Returns true if ``x`` > ``y``. Parameters can be either numbers or strings (in the second case lexicographic ordering is used)
-   * - if_the_else
-     - ``condition``:Boolean, ``x``:Object, ``y``: Object
-     - Returns ``x`` if the condition is true, ``y`` otherwise
-   * - in10, in9, in8, in7, in6, in5, in4, in3, in2
+   * - in2, in3, in4, in5, in6, in7, in8, in9, in10
      - ``candidate``:Object, ``v1``:Object, ..., ``v9``:Object
      - Returns true if ``candidate`` is equal to one of the ``v1``, ..., ``v9`` values. Use the appropriate function name depending on how many arguments you need to pass.
    * - isLike
@@ -70,7 +71,7 @@ Comparison and control Functions
    * - lessThan
      - ``x``:Object, ``y``:Object
      - Returns true if ``x`` < ``y``. Parameters can be either numbers or strings (in the second case lexicographic ordering is used
-   * - lessThanEqual
+   * - lessEqualThan
      - ``x``:Object, ``y``:Object
      - Returns true if ``x`` <= ``y``. Parameters can be either numbers or strings (in the second case lexicographic ordering is used
    * - not
@@ -80,6 +81,22 @@ Comparison and control Functions
      - ``x``:Object, ``y``:Object
      - Returns true if ``x`` and ``y`` are equal, false otherwise
      
+     
+Control Functions
+--------------------------------
+
+.. list-table::
+   :widths: 20 25 55
+   
+   
+   * - **Name**
+     - **Arguments**
+     - **Description**
+   * - if_then_else
+     - ``condition``:Boolean, ``x``:Object, ``y``: Object
+     - Returns ``x`` if the condition is true, ``y`` otherwise
+
+
 Feature functions
 ------------------
 
@@ -97,11 +114,10 @@ Feature functions
      - ``f``:Feature, ``propertyName``:String
      - Returns ``true`` if ``f`` has a property named ``propertyName``
      
-     
-Geometric Functions
---------------------
+Spatial Relationship Functions
+------------------------------
 
-Most of the geometric function listed below refer to geometry relationship, to get more information about the meaning of each spatial relationship consult the `OGC Simple Feature Specification for SQL <http://www.opengeospatial.org/standards/sfs>`_
+For more information about the precise meaning of the spatial relationships consult the `OGC Simple Feature Specification for SQL <http://www.opengeospatial.org/standards/sfs>`_
 
 .. list-table::
    :widths: 20 25 55
@@ -110,7 +126,55 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - **Name**
      - **Arguments**
      - **Description**
-   * - Area
+   * - contains
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if the geometry ``a`` contains ``b``
+   * - crosses
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if ``a`` crosses ``b``
+   * - disjoint
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if the two geometries are disjoint, false otherwise   
+   * - equalsExact
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if the two geometries are exactly equal, same coordinates in the same order
+   * - equalsExactTolerance
+     - ``a``:Geometry, ``b``:Geometry, ``tol``:Double
+     - Returns true if the two geometries are exactly equal, same coordinates in the same order, allowing for a ``tol`` distance in the corresponding points
+   * - intersects
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if ``a`` intersects ``b``
+   * - isWithinDistance
+     - ``a``: Geometry, ``b``:Geometry, ``distance``: Double
+     - Returns true if the distance between ``a`` and ``b`` is less than ``distance`` (measured as an euclidean distance)
+   * - overlaps
+     - ``a``: Geometry, ``b``:Geometry
+     - Returns true ``a`` overlaps with ``b``
+   * - relate
+     - ``a``: Geometry, ``b``:Geometry
+     - Returns the DE-9IM intersection matrix for ``a`` and ``b``
+   * - relatePattern
+     - ``a``: Geometry, ``b``:Geometry, ``pattern``:String
+     - Returns true if the DE-9IM intersection matrix for ``a`` and ``b`` matches the specified pattern
+   * - touches
+     - ``a``: Geometry, ``b``: Geometry
+     - Returns true if ``a`` touches ``b`` according to the SQL simple feature specification rules
+   * - within
+     - ``a``: Geometry, ``b``:Geometry
+     - Returns true is fully contained inside ``b``
+
+     
+Geometric Functions
+--------------------
+
+.. list-table::
+   :widths: 20 25 55
+   
+   
+   * - **Name**
+     - **Arguments**
+     - **Description**
+   * - area
      - ``geometry``:Geometry
      - The area of the specified geometry. Works in a Cartesian plane, the result will be in the same unit of measure as the geometry coordinates (which also means the results won't make any sense for geographic data)
    * - boundary
@@ -131,24 +195,15 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - centroid
      - ``geometry``:Geometry
      - Returns the centroid of the geometry. Can be often used as a label point for polygons, though there is no guarantee it will actually lie inside the geometry 
-   * - contains
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if the geometry ``a`` contains ``b``
    * - convexHull
      - ``geometry``:Geometry
      - Returns the convex hull of the specified geometry
-   * - crosses
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if ``a`` crosses ``b``
    * - difference
      - ``a``:Geometry, ``b``:Geometry
      - Returns all the points that sit in ``a`` but not in ``b``
    * - dimension
      - ``a``:Geometry
      - Returns the dimension of the specified geometry
-   * - disjoint
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if the two geometries are disjoint, false otherwise   
    * - distance
      - ``a``:Geometry, ``b``:Geometry
      - Returns the euclidean distance between the two geometries
@@ -158,12 +213,6 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - envelope
      - ``geometry``:geometry
      - Returns the polygon representing the envelope of the geometry, that is, the minimum rectangle with sides parallels to the axis containing it
-   * - equalsExact
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if the two geometries are exactly equal, same coordinates in the same order
-   * - equalsExactTolerance
-     - ``a``:Geometry, ``b``:Geometry, ``tol``:Double
-     - Returns true if the two geometries are exactly equal, same coordinates in the same order, allowing for a ``tol`` distance in the corresponding points
    * - exteriorRing
      - ``poly``:Polygon
      - Returns the exterior ring of the specified polygon
@@ -197,9 +246,6 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - intersection
      - ``a``:Geometry, ``b``:Geometry
      - Returns the intersection between ``a`` and ``b``. The intersection result can be anything including a geometry collection of heterogeneous, if the result is empty, it will be represented by an empty collection.
-   * - intersects
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if ``a`` intersects ``b``
    * - isClosed
      - ``line``: LineString
      - Returns true if ``line`` forms a closed ring, that is, if the first and last coordinates are equal
@@ -218,9 +264,6 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - isValid
      - ``geometry``: Geometry
      - Returns true if the geometry is topologically valid (rings are closed, holes are inside the hull, and so on)
-   * - isWithinDistance
-     - ``a``: Geometry, ``b``:Geometry, ``distance``: Double
-     - Returns true if the distance between ``a`` and ``b`` is less than ``distance`` (measured as an euclidean distance)
    * - numGeometries
      - ``collection``: GeometryCollection
      - Returns the number of geometries contained in the geometry collection
@@ -233,27 +276,15 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - offset
      - ``geometry``: Geometry, ``offsetX``:Double, ``offsetY``:Double
      - Offsets all points in a geometry by the specified X and Y offsets. Offsets are working in the same coordinate system as the geometry own coordinates.
-   * - overlaps
-     - ``a``: Geometry, ``b``:Geometry
-     - Returns true ``a`` overlaps with ``b``
    * - pointN
      - ``geometry``: Geometry, ``n``:Integer
      - Returns the n-th point inside the specified geometry
-   * - relate
-     - ``a``: Geometry, ``b``:Geometry
-     - Returns the DE-9IM intersection matrix for ``a`` and ``b``
-   * - relatePattern
-     - ``a``: Geometry, ``b``:Geometry, ``pattern``:String
-     - Returns true if the DE-9IM intersection matrix for ``a`` and ``b`` matches the specified pattern
    * - startPoint
      - ``line``: LineString
      - Returns the starting point of the specified geometry
    * - symDifference
      - ``a``: Geometry, ``b``:Geometry
      - Returns the symmetrical difference between ``a`` and ``b`` (all points that are inside ``a`` or ``b``, but not both)
-   * - touches
-     - ``a``: Geometry, ``b``: Geometry
-     - Returns true if ``a`` touches ``b`` according to the SQL simple feature specification rules
    * - toWKT
      - ``geometry``: Geometry
      - Returns the WKT representation of ``geometry``
@@ -263,9 +294,6 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - vertices
      - ``geom``: Geometry
      - Returns a multi-point made with all the vertices of ``geom``
-   * - within
-     - ``a``: Geometry, ``b``:Geometry
-     - Returns true is fully contained inside ``b``
    
    
 	 

@@ -13,8 +13,6 @@ import org.apache.wicket.util.tester.FormTester;
 import org.geoserver.web.ComponentBuilder;
 import org.geoserver.web.wicket.GeoServerDataProvider.Property;
 
-import com.sun.java.swing.plaf.gtk.resources.gtk_zh_TW;
-
 public abstract class AbstractTabbedListPageTest<T> extends AbstractSecurityWicketTestSupport {
     
      public static final String FIRST_COLUM_PATH="itemProperties:0:component:link";
@@ -27,8 +25,7 @@ public abstract class AbstractTabbedListPageTest<T> extends AbstractSecurityWick
 
     public void testRenders() throws Exception {
         initializeForXML();
-        AbstractSecurityPage listPage =listPage(getServiceName());
-        tester.assertRenderedPage(listPage.getClass());
+        tester.assertRenderedPage(listPage(getServiceName()).getClass());
     }
     
     
@@ -39,9 +36,9 @@ public abstract class AbstractTabbedListPageTest<T> extends AbstractSecurityWick
 
     protected abstract String getTabbedPanelPath();
     protected abstract String getServiceName();
-    abstract protected AbstractSecurityPage listPage(String serviceName);
-    abstract protected AbstractSecurityPage newPage(AbstractSecurityPage responsePage,Object...params);
-    abstract protected AbstractSecurityPage editPage(AbstractSecurityPage responsePage,Object...params);
+    abstract protected Page listPage(String serviceName);
+    abstract protected Page newPage(AbstractSecurityPage responsePage,Object...params);
+    abstract protected Page editPage(AbstractSecurityPage responsePage,Object...params);
  
     abstract protected String getSearchString() throws Exception;
     abstract protected Property<T> getEditProperty();
@@ -52,7 +49,7 @@ public abstract class AbstractTabbedListPageTest<T> extends AbstractSecurityWick
         // the name link for the first user
         initializeForXML();
         insertValues();
-        AbstractSecurityPage listPage = listPage(getServiceName());
+        AbstractSecurityPage listPage = (AbstractSecurityPage) listPage(getServiceName());
         //tester.startPage(listPage);
                    
         String search = getSearchString();

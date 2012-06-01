@@ -134,7 +134,7 @@ public class LocalWorkspaceCatalog extends AbstractCatalogDecorator implements C
             if (layerGroup != null) {
                 return wrap(layerGroup);
             }
-            //else fall back on unqualified lookup
+            // else fall back on unqualified lookup
         }
 
         return wrap(super.getLayerGroupByName(name));

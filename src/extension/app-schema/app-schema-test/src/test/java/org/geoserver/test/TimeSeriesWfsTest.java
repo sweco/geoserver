@@ -6,11 +6,8 @@
 
 package org.geoserver.test;
 
-import java.util.Arrays;
-
 import junit.framework.Test;
 
-import org.springframework.util.StringUtils;
 import org.w3c.dom.Document;
 
 /**
@@ -112,7 +109,7 @@ public class TimeSeriesWfsTest extends AbstractAppSchemaWfsTestSupport {
                 doc);
 
         assertXpathEvaluatesTo(
-                "7.9 8.5 8.8 8.9 10.4 10.8 14.2 14.9 15.4 18.1 19.1 19.6 20.8 21.7 missing missing",
+                "missing missing 8.9 7.9 14.2 15.4 18.1 19.1 21.7 20.8 19.6 14.9 10.8 8.8 8.5 10.4",
                 "//csml:PointSeriesFeature[@gml:id='"
                         + id
                         + "']/csml:value/csml:PointSeriesCoverage/gml:rangeSet/gml:ValueArray/gml:valueComponent/gml:QuantityList",
@@ -131,10 +128,27 @@ public class TimeSeriesWfsTest extends AbstractAppSchemaWfsTestSupport {
                 "//csml:PointSeriesFeature[@gml:id='" + id + "']/csml:parameter/@xlink:href", doc);
         id = "ID2";
         assertXpathEvaluatesTo(id, "(//csml:PointSeriesFeature)[2]/@gml:id", doc);
-        checkPointFeatureTwo(doc, id);
+        checkPointFeatureTwo(doc);
+        // check full timePositionList value
+        assertXpathEvaluatesTo(
+                "1949-05-01 1949-06-01 1949-07-01 1949-08-01 1949-09-01 1949-10-01 1949-11-01 1949-12-01 1950-01-01 1950-02-01"
+                        + " 1950-03-01 1950-04-01 1950-05-01 1950-06-01 1950-07-01 1950-08-01 1950-09-01 1950-10-01 1950-11-01 1950-12-01",
+                "//csml:PointSeriesFeature[@gml:id='"
+                        + id
+                        + "']/csml:value/csml:PointSeriesCoverage/csml:pointSeriesDomain/csml:TimeSeries/csml:timePositionList",
+                doc);
+        // check full QuantityList value
+        assertXpathEvaluatesTo(
+                "16.2 17.1 22.0 25.1 23.9 22.8 17.0 10.2 9.2 7.1 12.3 12.9 17.2 23.6 21.6 21.9 17.6 14.0 9.3 3.8",
+                "//csml:PointSeriesFeature[@gml:id='"
+                        + id
+                        + "']/csml:value/csml:PointSeriesCoverage/gml:rangeSet/gml:ValueArray/gml:valueComponent/gml:QuantityList",
+                doc);
+
     }
 
-    private void checkPointFeatureTwo(Document doc, String id) {
+    protected void checkPointFeatureTwo(Document doc) {
+        String id = "ID2";
         // location
         assertXpathEvaluatesTo("42.58 31.29", "//csml:PointSeriesFeature[@gml:id='" + id
                 + "']/csml:location", doc);
@@ -171,13 +185,6 @@ public class TimeSeriesWfsTest extends AbstractAppSchemaWfsTestSupport {
                         + "']/csml:value/csml:PointSeriesCoverage/csml:pointSeriesDomain/csml:TimeSeries/csml:timePositionList",
                 doc);
 
-        assertXpathEvaluatesTo(
-                "1949-05-01 1949-06-01 1949-07-01 1949-08-01 1949-09-01 1949-10-01 1949-11-01 1949-12-01 1950-01-01 1950-02-01"
-                + " 1950-03-01 1950-04-01 1950-05-01 1950-06-01 1950-07-01 1950-08-01 1950-09-01 1950-10-01 1950-11-01 1950-12-01",
-                "//csml:PointSeriesFeature[@gml:id='"
-                        + id
-                        + "']/csml:value/csml:PointSeriesCoverage/csml:pointSeriesDomain/csml:TimeSeries/csml:timePositionList",
-                doc);
         // quantityList
         assertXpathCount(1, "//csml:PointSeriesFeature[@gml:id='" + id
                 + "']/csml:value/csml:PointSeriesCoverage/gml:rangeSet", doc);
@@ -198,13 +205,6 @@ public class TimeSeriesWfsTest extends AbstractAppSchemaWfsTestSupport {
                         + "']/csml:value/csml:PointSeriesCoverage/gml:rangeSet/gml:ValueArray/gml:valueComponent/gml:QuantityList",
                 doc);
         
-        assertXpathEvaluatesTo(
-                "3.8 7.1 9.2 9.3 10.2 12.3 12.9 14.0 16.2 17.0 17.1 17.2 17.6 21.6 21.9 22.0 22.8 23.6 23.9 25.1",
-                "//csml:PointSeriesFeature[@gml:id='"
-                        + id
-                        + "']/csml:value/csml:PointSeriesCoverage/gml:rangeSet/gml:ValueArray/gml:valueComponent/gml:QuantityList",
-                doc);
-
         // parameter xlink:href
         assertXpathEvaluatesTo(
                 "http://cf-pcmdi.llnl.gov/documents/cf-standard-names/standard-name-table/current/cf-standard-name-table.html#surface_temperature",
@@ -212,45 +212,9 @@ public class TimeSeriesWfsTest extends AbstractAppSchemaWfsTestSupport {
     }
 
     /**
-     * Test filtering list value.
-     */
-    public void testFilterPositionList() {
-        String xml = "<wfs:GetFeature "
-                + "service=\"WFS\" " //
-                + "version=\"1.1.0\" " //
-                + "outputFormat=\"gml32\" " //
-                + "xmlns:cdf=\"http://www.opengis.net/cite/data\" " //
-                + "xmlns:ogc=\"http://www.opengis.net/ogc\" " //
-                + "xmlns:wfs=\"http://www.opengis.net/wfs\" " //
-                + "xmlns:gml=\"http://www.opengis.net/gml/3.2\" " //
-                + "xmlns:csml=\""
-                + TimeSeriesMockData.CSML_URI
-                + "\" " //
-                + "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" " //
-                + "xsi:schemaLocation=\"" //
-                + "http://www.opengis.net/wfs http://schemas.opengis.net/wfs/1.1.0/wfs.xsd" //
-                + "\"" //
-                + ">" //
-                + "<wfs:Query typeName=\"csml:PointSeriesFeature\">"
-                + "    <ogc:Filter>"
-                + "        <ogc:PropertyIsLike wildCard=\"*\" singleChar=\"#\" escapeChar=\"\\\">"
-                + "            <ogc:PropertyName>csml:PointSeriesFeature/csml:value/csml:PointSeriesCoverage/csml:pointSeriesDomain/csml:TimeSeries/csml:timePositionList</ogc:PropertyName>"
-                + "            <ogc:Literal>*1949-05*</ogc:Literal>"
-                + "        </ogc:PropertyIsLike>" + "    </ogc:Filter>" + "</wfs:Query> "
-                + "</wfs:GetFeature>";
-        validate(xml);
-        Document doc = postAsDOM("wfs", xml);
-        LOGGER.info("WFS filter GetFeature response:\n" + prettyString(doc));
-        assertEquals("wfs:FeatureCollection", doc.getDocumentElement().getNodeName());
-        assertXpathEvaluatesTo("1", "/wfs:FeatureCollection/@numberReturned", doc);
-        assertXpathCount(1, "//csml:PointSeriesFeature", doc);
-        checkPointFeatureTwo(doc, "ID2");
-    }
-
-    /**
      * Test filtering quantity list that is feature chained.
      */
-    public void testFilterQuantityList() {
+    public void testQuantityListSubset() {
         String xml = "<wfs:GetFeature "
                 + "service=\"WFS\" " //
                 + "version=\"1.1.0\" " //
@@ -278,7 +242,21 @@ public class TimeSeriesWfsTest extends AbstractAppSchemaWfsTestSupport {
         assertEquals("wfs:FeatureCollection", doc.getDocumentElement().getNodeName());
         assertXpathEvaluatesTo("1", "/wfs:FeatureCollection/@numberReturned", doc);
         assertXpathCount(1, "//csml:PointSeriesFeature", doc);
-        checkPointFeatureTwo(doc, "ID2");
+        checkPointFeatureTwo(doc);
+        // subsetting doesn't work with feature chaining, therefore full lists are returned
+        assertXpathEvaluatesTo(
+                "1949-05-01 1949-06-01 1949-07-01 1949-08-01 1949-09-01 1949-10-01 1949-11-01 1949-12-01 1950-01-01 1950-02-01"
+                        + " 1950-03-01 1950-04-01 1950-05-01 1950-06-01 1950-07-01 1950-08-01 1950-09-01 1950-10-01 1950-11-01 1950-12-01",
+                "//csml:PointSeriesFeature[@gml:id='"
+                        + "ID2"
+                        + "']/csml:value/csml:PointSeriesCoverage/csml:pointSeriesDomain/csml:TimeSeries/csml:timePositionList",
+                doc);
+        assertXpathEvaluatesTo(
+                "16.2 17.1 22.0 25.1 23.9 22.8 17.0 10.2 9.2 7.1 12.3 12.9 17.2 23.6 21.6 21.9 17.6 14.0 9.3 3.8",
+                "//csml:PointSeriesFeature[@gml:id='"
+                        + "ID2"
+                        + "']/csml:value/csml:PointSeriesCoverage/gml:rangeSet/gml:ValueArray/gml:valueComponent/gml:QuantityList",
+                doc);
     }
     
 }

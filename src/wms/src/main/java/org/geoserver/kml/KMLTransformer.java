@@ -109,7 +109,8 @@ public class KMLTransformer extends TransformerBase {
                 sb.setLength(sb.length() - 1);
 
                 start("Document");
-                element("name", sb.toString());
+                String kmltitle = (String) mapContent.getRequest().getFormatOptions().get("kmltitle");
+                element("name", (kmltitle != null ? kmltitle : sb.toString()));
             }
 
             // for every layer specified in the request
@@ -249,6 +250,7 @@ public class KMLTransformer extends TransformerBase {
 
         /**
          * Encodes a layer as a super overlay.
+         * @param group 
          */
         protected void encodeSuperOverlayLayer(WMSMapContent mapContent, Layer layer) {
             KMLSuperOverlayTransformer tx = new KMLSuperOverlayTransformer(wms, mapContent);

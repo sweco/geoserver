@@ -2,6 +2,7 @@ package org.geoserver.security;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,11 +16,11 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 
+import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.security.config.SecurityManagerConfig;
 import org.geoserver.security.filter.GeoServerAnonymousAuthenticationFilter;
 import org.geotools.util.logging.Logging;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.DisposableBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.security.web.FilterChainProxy;
@@ -117,13 +118,22 @@ public class GeoServerSecurityFilterChainProxy extends FilterChainProxy
         }
 
         SecurityManagerConfig config = securityManager.getSecurityConfig(); 
-        GeoServerSecurityFilterChain filterChain = config.getFilterChain();
-        
-        Map<RequestMatcher,List<Filter>> filterChainMap = new LinkedHashMap<RequestMatcher,List<Filter>>();
-                
-        for (String pattern : filterChain.getAntPatterns()) {
+        GeoServerSecurityFilterChain filterChain = 
+                new GeoServerSecurityFilterChain(config.getFilterChain());
+
+        // similar to the list of authentication providers
+        // adding required providers like GeoServerRootAuthenticationProvider
+        filterChain.postConfigure(securityManager);
+
+        //build up the actual filter chain
+        Map<String,List<String>> rawFilterChainMap = filterChain.compileFilterMap();
+
+        Map<RequestMatcher,List<Filter>> filterChainMap = 
+                new LinkedHashMap<RequestMatcher,List<Filter>>();
+
+        for (String pattern : rawFilterChainMap.keySet()) {
             List<Filter> filters = new ArrayList<Filter>();
-            for (String filterName : filterChain.getFilterMap().get(pattern)) {
+            for (String filterName : rawFilterChainMap.get(pattern)) {
                 try {
                     Filter filter = lookupFilter(filterName);
                     if (filter == null) {
@@ -172,9 +182,12 @@ public class GeoServerSecurityFilterChainProxy extends FilterChainProxy
      */
     Filter lookupFilter(String filterName) throws IOException {
         Filter filter = securityManager.loadFilter(filterName);
-//        if (filter == null) {
-//            filter = (Filter) GeoServerExtensions.bean(filterName, appContext);
-//        }
+        if (filter == null) {
+            Object obj = GeoServerExtensions.bean(filterName, appContext);
+            if (obj != null && obj instanceof Filter) {
+                filter = (Filter) obj;
+            }
+        }
         return filter;
     }
 
@@ -184,5 +197,13 @@ public class GeoServerSecurityFilterChainProxy extends FilterChainProxy
 
         //do some cleanup
         securityManager.removeListener(this);
+    }
+    
+    /**
+     * Add constant filter chains
+     * 
+     * @param filterChainMap
+     */
+    protected final void addConstantFilterChains(GeoServerSecurityFilterChain chain) {
     }
 }

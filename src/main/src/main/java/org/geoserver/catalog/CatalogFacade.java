@@ -459,7 +459,7 @@ public interface CatalogFacade {
     LayerGroupInfo getLayerGroup(String id);
 
     /**
-     * Loads a layer group from persistent storage by specifying its name.
+     * Loads a global layer group from persistent storage by specifying its name.
      * 
      * @param name The name of the layer group.
      * 
@@ -468,10 +468,13 @@ public interface CatalogFacade {
     LayerGroupInfo getLayerGroupByName(String name);
 
     /**
-     * Returns the layer group matching a particular name in the specified workspace, or 
+     * Returns the layer group matching a particular name in the specified workspace, or
      * <code>null</code> if no such layer group could be found.
      * 
-     * @param workspace The workspace containing the layer group.
+     * @param workspace The workspace containing the layer group. Not {@code null}, use
+     *        {@link DefaultCatalogFacade#NO_WORKSPACE} or
+     *        {@link DefaultCatalogFacade#ANY_WORKSPACE} to be explicit about what you're looking
+     *        for.
      * @param name The name of the layer group to return.
      */
     LayerGroupInfo getLayerGroupByName(WorkspaceInfo workspace, String name);
@@ -709,10 +712,11 @@ public interface CatalogFacade {
     StyleInfo getStyleByName(String name);
 
     /**
-     * Returns the style matching a particular name in the specified workspace, or <code>null</code> 
+     * Returns the style matching a particular name in the specified workspace, or <code>null</code>
      * if no such style could be found.
      * 
-     * @param workspace The workspace containing the style.
+     * @param workspace The workspace containing the style; non {@code null}, use
+     *        {@value #ANY_WORKSPACE} or {@link #NO_WORKSPACE} as appropriate.
      * @param name The name of the style to return.
      */
     StyleInfo getStyleByName(WorkspaceInfo workspace, String name);

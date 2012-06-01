@@ -17,6 +17,7 @@ import net.opengis.ows11.BoundingBoxType;
 
 import org.custommonkey.xmlunit.XMLUnit;
 import org.custommonkey.xmlunit.XpathEngine;
+import org.custommonkey.xmlunit.exceptions.XpathException;
 import org.geoserver.test.RemoteOWSTestSupport;
 import org.geotools.data.collection.ListFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
@@ -40,6 +41,23 @@ import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.io.WKTReader;
 
 public class ExecuteTest extends WPSTestSupport {
+
+    @Override
+    protected void oneTimeSetUp() throws Exception {
+        super.oneTimeSetUp();
+        WPSInfo wps = getGeoServer().getService(WPSInfo.class);
+        // want at least two asynchronous processes to test concurrency
+        wps.setMaxAsynchronousProcesses(Math.max(2, wps.getMaxAsynchronousProcesses()));
+        getGeoServer().save(wps);
+    }
+
+    @Override
+    protected void setUpInternal() throws Exception {
+        super.setUpInternal();
+        
+        // make extra sure we don't have anything else going
+        MonkeyProcess.clearCommands();
+    }
     
     /* TODO GET requests A.4.4.1 */
 
@@ -751,8 +769,8 @@ public class ExecuteTest extends WPSTestSupport {
     
     public void testProcessFailure() throws Exception {
         // have the monkey throw an exception 
-        MonkeyProcess.exception(new ProcessException("Sorry dude, things went pear shaped..."), false);
-        String request = "wps?service=WPS&version=1.0.0&request=Execute&Identifier=gs:Monkey";
+        MonkeyProcess.exception("x1", new ProcessException("Sorry dude, things went pear shaped..."), false);
+        String request = "wps?service=WPS&version=1.0.0&request=Execute&Identifier=gs:Monkey&DataInputs=" + urlEncode("id=x1");
         Document dom = getAsDOM(request);
         checkValidationErrors(dom);
         assertXpathExists("//wps:ProcessFailed", dom);
@@ -762,7 +780,7 @@ public class ExecuteTest extends WPSTestSupport {
     
     public void testStoredNoStatus() throws Exception {
         // submit asynch request with no updates
-        String request = "wps?service=WPS&version=1.0.0&request=Execute&Identifier=gs:Monkey&storeExecuteResponse=true";
+        String request = "wps?service=WPS&version=1.0.0&request=Execute&Identifier=gs:Monkey&storeExecuteResponse=true&DataInputs=" + urlEncode("id=x2");
         Document dom = getAsDOM(request);
         assertXpathExists("//wps:ProcessAccepted", dom);
         XpathEngine xpath = XMLUnit.newXpathEngine();
@@ -770,14 +788,14 @@ public class ExecuteTest extends WPSTestSupport {
         String statusLocation = fullStatusLocation.substring(fullStatusLocation.indexOf('?') - 3);
         
         // we move the clock forward, but we asked no status, nothing should change
-        MonkeyProcess.progress(0.5f, true);
+        MonkeyProcess.progress("x2", 50f, true);
         dom = getAsDOM(statusLocation);
         // print(dom);
         assertXpathExists("//wps:ProcessAccepted", dom);
         
         // now schedule the exit and wait for it to exit
         ListFeatureCollection fc = collectionOfThings();
-        MonkeyProcess.exit(fc, true);
+        MonkeyProcess.exit("x2", fc, true);
         dom = waitForProcessEnd(statusLocation, 60);
         assertXpathExists("//wps:ProcessSucceeded", dom);
     }
@@ -794,29 +812,24 @@ public class ExecuteTest extends WPSTestSupport {
     
     public void testStoredWithStatus() throws Exception {
         // submit asynch request with no updates
-        String request = "wps?service=WPS&version=1.0.0&request=Execute&Identifier=gs:Monkey&storeExecuteResponse=true&status=true";
-        Document dom = getAsDOM(request);
-        assertXpathExists("//wps:ProcessAccepted", dom);
-        XpathEngine xpath = XMLUnit.newXpathEngine();
-        String fullStatusLocation = xpath.evaluate("//wps:ExecuteResponse/@statusLocation", dom);
-        String statusLocation = fullStatusLocation.substring(fullStatusLocation.indexOf('?') - 3);
+        String statusLocation = submitMonkey("x3");
         
         // we move the clock forward, but we asked no status, nothing should change
-        MonkeyProcess.progress(0.1f, true);
-        dom = getAsDOM(statusLocation);
-        // print(dom);
+        MonkeyProcess.progress("x3", 0.1f, true);
+        Document dom = getAsDOM(statusLocation);
+        print(dom);
         assertXpathExists("//wps:ProcessStarted", dom);
         assertXpathEvaluatesTo("" + Math.round(0.66 * 10), "//wps:ProcessStarted/@percentCompleted", dom);
         
         // we move the clock forward, but we asked no status, nothing should change
-        MonkeyProcess.progress(0.5f, true);
+        MonkeyProcess.progress("x3", 0.5f, true);
         dom = getAsDOM(statusLocation);
         // print(dom);
         assertXpathExists("//wps:ProcessStarted", dom);
         assertXpathEvaluatesTo("" + Math.round(0.66 * 50), "//wps:ProcessStarted/@percentCompleted", dom);
         
         // now schedule the exit and wait for it to exit
-        MonkeyProcess.exit(collectionOfThings(), true);
+        MonkeyProcess.exit("x3", collectionOfThings(), true);
         dom = waitForProcessEnd(statusLocation, 60);
         // print(dom);
         assertXpathExists("//wps:ProcessSucceeded", dom);
@@ -824,19 +837,56 @@ public class ExecuteTest extends WPSTestSupport {
     
     public void testAsynchFailEncode() throws Exception {
         // submit asynch request with no updates
-        String request = "wps?service=WPS&version=1.0.0&request=Execute&Identifier=gs:Monkey&storeExecuteResponse=true&status=true";
+        String statusLocation = submitMonkey("x5");
+        
+        // now schedule the exit and wait for it to exit
+        MonkeyProcess.exit("x5", bombOutCollection(), true);
+        Document dom = waitForProcessEnd(statusLocation, 60);
+        // print(dom);
+        assertXpathExists("//wps:ProcessFailed", dom);
+    }
+    
+    public void testConcurrentRequests() throws Exception {
+        // submit first
+        String statusLocation1 = submitMonkey("one");
+        String statusLocation2 = submitMonkey("two");
+        
+        // make the report progress
+        MonkeyProcess.progress("one", 0.1f, true);
+        MonkeyProcess.progress("two", 0.1f, true);
+        
+        // make sure both were started and are running (the 
+        assertProgress(statusLocation1, "7");
+        assertProgress(statusLocation2, "7");
+        
+        // now schedule the exit and wait for it to exit
+        MonkeyProcess.exit("one", collectionOfThings(), true);
+        MonkeyProcess.exit("two", collectionOfThings(), true);
+        
+        Document dom = waitForProcessEnd(statusLocation1, 60);
+        // print(dom);
+        assertXpathExists("//wps:ProcessSucceeded", dom);
+        dom = waitForProcessEnd(statusLocation2, 60);
+        assertXpathExists("//wps:ProcessSucceeded", dom);
+    }
+    
+    private void assertProgress(String statusLocation, String progress) throws Exception {
+        Document dom = getAsDOM(statusLocation);
+        // print(dom);
+        assertXpathExists("//wps:ProcessStarted", dom);
+        assertXpathEvaluatesTo(progress, "//wps:ProcessStarted/@percentCompleted", dom);
+    }
+    
+    private String submitMonkey(String id) throws Exception, XpathException {
+        String request = "wps?service=WPS&version=1.0.0&request=Execute&Identifier=gs:Monkey&storeExecuteResponse=true&status=true&DataInputs=" + urlEncode("id=" + id);
         Document dom = getAsDOM(request);
         assertXpathExists("//wps:ProcessAccepted", dom);
         XpathEngine xpath = XMLUnit.newXpathEngine();
         String fullStatusLocation = xpath.evaluate("//wps:ExecuteResponse/@statusLocation", dom);
         String statusLocation = fullStatusLocation.substring(fullStatusLocation.indexOf('?') - 3);
-        
-        // now schedule the exit and wait for it to exit
-        MonkeyProcess.exit(bombOutCollection(), true);
-        dom = waitForProcessEnd(statusLocation, 60);
-        // print(dom);
-        assertXpathExists("//wps:ProcessFailed", dom);
+        return statusLocation;
     }
+    
     
     private ListFeatureCollection bombOutCollection() {
         SimpleFeatureTypeBuilder tb = new SimpleFeatureTypeBuilder();
