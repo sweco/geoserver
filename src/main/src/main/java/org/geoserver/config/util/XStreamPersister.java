@@ -103,6 +103,7 @@ import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.geotools.referencing.crs.DefaultProjectedCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
+import org.geotools.referencing.wkt.Formattable;
 import org.geotools.util.Converters;
 import org.geotools.util.NumberRange;
 import org.geotools.util.logging.Logging;
@@ -173,7 +174,17 @@ public class XStreamPersister {
         protected void postEncodeLayerGroup( LayerGroupInfo ls, HierarchicalStreamWriter writer, MarshallingContext context ) {
         }
         
+        /**
+         * @deprecated use {@link #postEncodeReference(Object, String, String, HierarchicalStreamWriter, MarshallingContext)}
+         */
         protected void postEncodeReference( Object obj, String ref, HierarchicalStreamWriter writer, MarshallingContext context ) {
+        }
+
+        protected void postEncodeReference( Object obj, String ref, String prefix, HierarchicalStreamWriter writer, MarshallingContext context ) {
+            if (prefix == null) {
+                //call other method for backward compatability
+                postEncodeReference(obj, ref, writer, context);
+            }
         }
 
         protected void postEncodeWMSStore(WMSStoreInfo store, HierarchicalStreamWriter writer,  MarshallingContext context) {
@@ -364,7 +375,7 @@ public class XStreamPersister {
         // LayerInfo
         //xs.omitField( LayerInfo.class), "resource");
         xs.registerLocalConverter( impl(LayerInfo.class), "resource", new ReferenceConverter( ResourceInfo.class ) );
-        xs.registerLocalConverter( impl(LayerInfo.class), "defaultStyle", new ReferenceConverter( StyleInfo.class ) );
+        xs.registerLocalConverter( impl(LayerInfo.class), "defaultStyle", new ReferenceConverter( StyleInfo.class) );
         xs.registerLocalConverter( impl(LayerInfo.class), "styles", new ReferenceCollectionConverter( StyleInfo.class ) );
         xs.registerLocalConverter( impl(LayerInfo.class), "metadata", new MetadataMapConverter() );
         
@@ -855,7 +866,7 @@ public class XStreamPersister {
     //class ReferenceConverter extends AbstractSingleValueConverter {
     class ReferenceConverter implements Converter {
         Class clazz;
-        
+
         public ReferenceConverter( Class clazz ) {
             this.clazz = clazz;
         }
@@ -875,16 +886,27 @@ public class XStreamPersister {
                 writer.startNode("id");
                 writer.setValue( id );
                 writer.endNode();
-                callback.postEncodeReference( source, id, writer, context );
+                callback.postEncodeReference( source, id, null, writer, context );
             }
             else {
                 //use name if no id set
                 String name = (String) OwsUtils.get( source, "name" );
+
+                //use workspace name as a prefix if available
+                String wsName = null;
+                if (OwsUtils.has(source, "workspace")) {
+                    WorkspaceInfo workspace = (WorkspaceInfo) OwsUtils.get(source, "workspace");
+                    if (workspace != null) {
+                        wsName = workspace.getName();
+                    }
+                }
+                
                 if ( name != null ) {
                     writer.startNode("name");
                     writer.setValue( name );
                     writer.endNode();
-                    callback.postEncodeReference( source, name, writer, context );
+
+                    callback.postEncodeReference( source, name, wsName, writer, context );
                 }
                 else {
                     throw new IllegalArgumentException( "Unable to marshal reference with no id or name.");
@@ -897,15 +919,34 @@ public class XStreamPersister {
                 UnmarshallingContext context) {
             
             String ref = null;
+            String pre = null;
             if ( reader.hasMoreChildren() ) {
-                reader.moveDown();
-                ref = reader.getValue();
-                reader.moveUp();
+                while(reader.hasMoreChildren()) {
+                    reader.moveDown();
+                    if ("workspace".equals(reader.getNodeName())) {
+                        if (reader.hasMoreChildren()) {
+                            //specified as <workspace><name>[name]</name></workspace>
+                            reader.moveDown();
+                            pre = reader.getValue();
+                            reader.moveUp();
+                        }
+                        else {
+                            //specified as <workspace>[name]</workspace>
+                            pre = reader.getValue();
+                        }
+                    }
+                    else {
+                        ref = reader.getValue();
+                    }
+
+                    reader.moveUp();
+                }
             }
             else {
                 ref = reader.getValue();
             }
-            Object proxy = ResolvingProxy.create( ref, clazz );
+
+            Object proxy = ResolvingProxy.create( ref, pre, clazz );
             Object resolved = proxy;
             if ( catalog != null ) {
                 resolved = ResolvingProxy.resolve( catalog, proxy );
@@ -916,6 +957,7 @@ public class XStreamPersister {
     }
     class ReferenceCollectionConverter extends LaxCollectionConverter {
         Class clazz;
+
         public ReferenceCollectionConverter(Class clazz) {
             super( getXStream().getMapper() );
             this.clazz = clazz;
@@ -963,7 +1005,7 @@ public class XStreamPersister {
     /**
      * Converter for coordinate reference system objects that converts by SRS code.
      */
-    static class SRSConverter extends AbstractSingleValueConverter {
+    public static class SRSConverter extends AbstractSingleValueConverter {
         
         public boolean canConvert(Class type) {
             return CoordinateReferenceSystem.class.isAssignableFrom(type);
@@ -973,7 +1015,7 @@ public class XStreamPersister {
         public String toString(Object obj) {
             CoordinateReferenceSystem crs = (CoordinateReferenceSystem) obj;
             try {
-                Integer epsg = CRS.lookupEpsgCode(crs, true);
+                Integer epsg = CRS.lookupEpsgCode(crs, false);
                 if (epsg != null) {
                     return "EPSG:" + epsg;
                 }
@@ -982,7 +1024,7 @@ public class XStreamPersister {
                 XStreamPersister.LOGGER.warning( "Could not determine epsg code of crs, encoding as WKT");
             }
             
-            return crs.toWKT();
+            return new CRSConverter().toString(crs);
         }
         
         @Override
@@ -1011,7 +1053,7 @@ public class XStreamPersister {
      * Converter for coordinate reference system objects that converts by WKT. 
      *
      */
-    static class CRSConverter extends AbstractSingleValueConverter {
+    public static class CRSConverter extends AbstractSingleValueConverter {
 
         @Override
         public boolean canConvert(Class type) {
@@ -1020,7 +1062,7 @@ public class XStreamPersister {
 
         @Override
         public String toString(Object obj) {
-            return ((CoordinateReferenceSystem)obj).toWKT();
+            return ((Formattable)obj).toWKT(2, false);
         }
         
         @Override

@@ -23,15 +23,17 @@ Function argument type reference
    * - **Type**
      - **Description**
    * - Double
-     - Floating point number, 8 bytes, IEEE 754. ranging from 4.94065645841246544e-324d to 1.79769313486231570e+308d
+     - Floating point number, 8 bytes, IEEE 754. Ranges from 4.94065645841246544e-324d to 1.79769313486231570e+308d
    * - Float
-     - Floating point number, 4 bytes, IEEE 754. ranging from 1.40129846432481707e-45 to 3.40282346638528860e+38. Smaller range and less accurate than Double.
+     - Floating point number, 4 bytes, IEEE 754. Ranges from 1.40129846432481707e-45 to 3.40282346638528860e+38. Smaller range and less accurate than Double.
    * - Integer
      - Integer number, ranging from -2,147,483,648 to 2,147,483,647
    * - Long
      - Integer number, ranging from -9,223,372,036,854,775,808 to +9,223,372,036,854,775,807
    * - Number
-     - Can be any type of number
+     - A numeric value of any type
+   * - Object
+     - A value of any type
    * - String
      - A sequence of characters
    * - Timestamp
@@ -399,13 +401,19 @@ Math Functions
 String functions
 -----------------   
 
+String functions generally will accept any type of value for ``String`` arguments.  
+Non-string values will be converted into a string representation automatically.
+
 .. list-table::
    :widths: 20 25 55
    
    * - **Name**
      - **Arguments**
      - **Description**
-   * - strCapitalize (since 2.0.2)
+   * - Concatenate
+     - ``s1``:String, ``s2``:String, ...
+     - Concatenates any number of strings.  Non-string arguments are allowed.
+   * - strCapitalize
      - ``sentence``:String
      - Fully capitalizes the sentence. For example, "HoW aRe YOU?" will be turned into "How Are You?"
    * - strConcat
@@ -484,3 +492,56 @@ Parsing and formatting functions
    * - parseLong
      - ``number``:String
      - Parses a string into a long integer
+     
+Transformation functions
+--------------------------------
+
+Transformation functions transform values from one data space into another.
+These functions provide a concise way to compute styling parameters from feature attribute values.
+See also :ref:`transformation_func`.
+
+.. list-table::
+   :widths: 20 25 55
+   
+   * - **Name**
+     - **Arguments**
+     - **Description**
+   * - Recode
+     - ``lookupValue``:Object, 
+     
+       ``data``:Object,
+       ``value``:Object, ...
+     - Transforms a ``lookupValue`` from a set of discrete attribute values into another set of values.
+       Any number of ``data``/``value`` pairs may be specified.
+       ``belongsTo`` is optional, and has the value ``succeeding`` or ``preceding``.
+   * - Categorize
+     - ``lookupValue``:Object, 
+       ``thresholdLow``:Object,
+       
+       ``value``:Object,
+       ``threshold``:Object, ...
+       
+       ``belongsTo`` : String
+     - Transforms a continuous-valued attribute value into a set of discrete values.
+       ``lookupValue`` and ``value`` must be an orderable type (typically numeric).
+       The initial ``thresholdLow`` value is required.
+       Any number of additional ``value``/``threshold`` pairs may be specified.
+       ``belongsTo`` is optional, and defines which interval contains lookup values equal to a threshold value
+       with the value ``succeeding`` or ``preceding``.
+   * - Interpolate
+     - ``lookupValue``:Numeric, 
+       
+       ``data``:Numeric,
+       ``value``:Numeric *or* String, 
+       ...
+       
+       ``mode``:String,
+       ``method``:String
+     - Transforms a continuous-valued attribute value into another continuous range of values.
+       Any number of ``data``/``value`` pairs may be specified.
+       ``mode`` is optional, and defines the interpolation algorithm used
+       with the value ``linear``, ``cosine`` or ``cubic``.
+       ``method`` is optional, and defines whether the target values are numeric or colors
+       with the value ``numeric`` or ``color``.
+
+

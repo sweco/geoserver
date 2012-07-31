@@ -10,7 +10,7 @@
     <metadataLink>
       <type>application/xml</type>
       <metadataType>FGDC</metadataType>
-      <content>http://localhost/www/LakesWithElevation.xml</content>
+      <content>/www/LakesWithElevation.xml</content>
     </metadataLink>
   </metadataLinks>
   <nativeCRS>GEOGCS[&quot;GCS_WGS_1984&quot;, 
@@ -35,7 +35,7 @@
     <maxy>-1.0E-4</maxy>
     <crs>EPSG:4326</crs>
   </latLonBoundingBox>
-  <projectionPolicy>NONE</projectionPolicy>
+  <projectionPolicy>FORCE_DECLARED</projectionPolicy>
   <enabled>true</enabled>
   <store class="dataStore">
     <id>DataStoreInfoImpl--2e539c29:12c805e6d8b:-8000</id>

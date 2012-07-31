@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
+import javax.servlet.ServletResponse;
+
 import junit.framework.Test;
 
 import org.custommonkey.xmlunit.XMLAssert;
@@ -111,6 +113,29 @@ public class GetCapabilitiesTest extends WFS20TestSupport {
         
         assertEquals( s1, s2 );
     }
+
+    public void testSupportedSpatialOperators() throws Exception {
+        Document doc = getAsDOM("wfs?service=WFS&request=getCapabilities&version=2.0.0");
+
+        // let's look for the spatial capabilities, extract all the spatial operators
+        XpathEngine engine = XMLUnit.newXpathEngine();
+        NodeList spatialOperators = engine
+                .getMatchingNodes(
+                        "//fes:Spatial_Capabilities/fes:SpatialOperators/fes:SpatialOperator/@name",
+                        doc);
+
+        Set<String> ops = new TreeSet<String>();
+        for (int i = 0; i < spatialOperators.getLength(); i++) {
+            String format = spatialOperators.item(i).getFirstChild()
+                    .getNodeValue();
+            ops.add(format);
+        }
+
+        List<String> expectedSpatialOperators = getSupportedSpatialOperatorsList(false);
+        assertEquals(expectedSpatialOperators.size(), ops.size());
+        assertTrue(ops.containsAll(expectedSpatialOperators));
+    }
+
     public void testFunctionArgCount() throws Exception {
         Document doc = getAsDOM("wfs?service=WFS&request=getCapabilities&version=2.0.0");
         
@@ -227,5 +252,25 @@ public class GetCapabilitiesTest extends WFS20TestSupport {
         
         assertEquals("soap:Envelope", dom.getDocumentElement().getNodeName());
         assertEquals(1, dom.getElementsByTagName("wfs:WFS_Capabilities").getLength());
+    }
+
+    public void testAcceptVersions11() throws Exception {
+        Document dom = getAsDOM("wfs?request=GetCapabilities&acceptversions=1.1.0,1.0.0");
+        assertEquals("wfs:WFS_Capabilities", dom.getDocumentElement().getNodeName());
+        assertEquals("1.1.0", dom.getDocumentElement().getAttribute("version"));
+    }
+
+    public void testAcceptVersions11WithVersion() throws Exception {
+        Document dom = getAsDOM("wfs?request=GetCapabilities&version=2.0.0&acceptversions=1.1.0,1.0.0");
+        assertEquals("wfs:WFS_Capabilities", dom.getDocumentElement().getNodeName());
+        assertEquals("1.1.0", dom.getDocumentElement().getAttribute("version"));   
+    }
+
+    public void testAcceptFormats() throws Exception {
+        ServletResponse response = getAsServletResponse("wfs?request=GetCapabilities&version=2.0.0");
+        assertEquals("application/xml", response.getContentType());
+
+        response = getAsServletResponse("wfs?request=GetCapabilities&version=2.0.0&acceptformats=text/xml");
+        assertEquals("text/xml", response.getContentType());
     }
 }

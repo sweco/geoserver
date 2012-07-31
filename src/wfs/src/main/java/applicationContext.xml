@@ -79,9 +79,10 @@
 	<!-- service descriptors -->
 	<bean id="wfsService-1.0.0" class="org.geoserver.platform.Service">
 		<constructor-arg index="0" value="wfs"/>
-		<constructor-arg index="1" ref="wfsService"/>
-		<constructor-arg index="2" value="1.0.0"/>
-		<constructor-arg index="3">
+		<constructor-arg index="1" value="http://www.opengis.net/wfs"/>
+		<constructor-arg index="2" ref="wfsService"/>
+		<constructor-arg index="3" value="1.0.0"/>
+		<constructor-arg index="4">
 		  <list>
 		    <value>GetCapabilities</value>
 		    <value>DescribeFeatureType</value>
@@ -95,9 +96,10 @@
 	
 	<bean id="wfsService-1.1.0" class="org.geoserver.platform.Service">
 		<constructor-arg index="0" value="wfs"/>
-		<constructor-arg index="1" ref="wfsService"/>
-		<constructor-arg index="2" value="1.1.0"/>
-		<constructor-arg index="3">
+		<constructor-arg index="1" value="http://www.opengis.net/wfs"/>
+		<constructor-arg index="2" ref="wfsService"/>
+		<constructor-arg index="3" value="1.1.0"/>
+		<constructor-arg index="4">
           <list>
             <value>GetCapabilities</value>
             <value>DescribeFeatureType</value>
@@ -112,9 +114,10 @@
 	
     <bean id="wfsService-2.0" class="org.geoserver.platform.Service">
         <constructor-arg index="0" value="wfs"/>
-        <constructor-arg index="1" ref="wfsService20"/>
-        <constructor-arg index="2" value="2.0.0"/>
-        <constructor-arg index="3">
+        <constructor-arg index="1" value="http://www.opengis.net/wfs/2.0"/>
+        <constructor-arg index="2" ref="wfsService20"/>
+        <constructor-arg index="3" value="2.0.0"/>
+        <constructor-arg index="4">
           <list>
             <value>GetCapabilities</value>
             <value>DescribeFeatureType</value>
@@ -371,8 +374,10 @@
 		<constructor-arg value="java.math.BigInteger"/>
 	</bean>
 	<bean id="resultTypeKvpParser" class="org.geoserver.wfs.kvp.ResultTypeKvpParser"/>
-	<bean id="acceptVersionsKvpParser" class="org.geoserver.wfs.kvp.AcceptVersionsKvpParser"/>
-	<bean id="acceptFormatsKvpParser" class="org.geoserver.wfs.kvp.AcceptFormatsKvpParser"/>
+	<bean id="acceptVersions11KvpParser" class="org.geoserver.wfs.kvp.AcceptVersionsKvpParser"/>
+	<bean id="acceptVersionsKvpParser" class="org.geoserver.wfs.kvp.v2_0.AcceptVersionsKvpParser"/>
+	<bean id="acceptFormats11KvpParser" class="org.geoserver.wfs.kvp.AcceptFormatsKvpParser"/>
+	<bean id="acceptFormatsKvpParser" class="org.geoserver.wfs.kvp.v2_0.AcceptFormatsKvpParser"/>
     <bean id="strictKvpParser" class="org.geoserver.ows.kvp.BooleanKvpParser">
         <constructor-arg value="strict"/>
     </bean>

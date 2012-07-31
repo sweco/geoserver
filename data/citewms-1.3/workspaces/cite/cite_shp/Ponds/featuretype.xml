@@ -10,7 +10,7 @@
     <metadataLink>
       <type>application/xml</type>
       <metadataType>FGDC</metadataType>
-      <content>http://localhost/www/Ponds.xml</content>
+      <content>/www/Ponds.xml</content>
     </metadataLink>
   </metadataLinks>
   <nativeCRS>GEOGCS[&quot;GCS_WGS_1984&quot;, 
@@ -35,7 +35,7 @@
     <maxy>0.0020</maxy>
     <crs>EPSG:4326</crs>
   </latLonBoundingBox>
-  <projectionPolicy>NONE</projectionPolicy>
+  <projectionPolicy>FORCE_DECLARED</projectionPolicy>
   <enabled>true</enabled>
   <metadata>
     <entry key="cachingEnabled">false</entry>

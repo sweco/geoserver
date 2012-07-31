@@ -1,7 +1,7 @@
 /* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
  * This code is licensed under the GPL 2.0 license, availible at the root
  * application directory.
- */
+*/
 package org.geoserver.wfs;
 
 import static org.geoserver.ows.util.ResponseUtils.appendQueryString;
@@ -14,7 +14,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -57,7 +56,6 @@ import org.opengis.parameter.Parameter;
 import org.vfny.geoserver.global.FeatureTypeInfoTitleComparator;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.helpers.AttributesImpl;
-import org.xml.sax.helpers.NamespaceSupport;
 
 import com.vividsolutions.jts.geom.Envelope;
 
@@ -95,17 +93,21 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
     /** wfs service */
     protected WFSInfo wfs;
 
+    /** wfs version */
+    protected WFSInfo.Version version;
+
     /** catalog */
     protected Catalog catalog;
-    
+
     /**
      * Creates a new CapabilitiesTransformer object.
      */
-    public CapabilitiesTransformer(WFSInfo wfs, Catalog catalog) {
+    public CapabilitiesTransformer(WFSInfo wfs, WFSInfo.Version version, Catalog catalog) {
         super();
         setNamespaceDeclarationEnabled(false);
 
         this.wfs = wfs;
+        this.version = version;
         this.catalog = catalog;
     }
     
@@ -233,7 +235,7 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
         private final boolean skipMisconfigured;
 
         public WFS1_0(WFSInfo wfs, Catalog catalog) {
-            super(wfs, catalog);
+            super(wfs, WFSInfo.Version.V_10, catalog);
             this.skipMisconfigured = ResourceErrorHandling.SKIP_MISCONFIGURED_LAYERS.equals(
                     wfs.getGeoServer().getGlobal().getResourceErrorHandling());
         }
@@ -856,7 +858,11 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
         private final boolean skipMisconfigured;
         
         public WFS1_1(WFSInfo wfs, Catalog catalog) {
-            super(wfs, catalog);
+            this(wfs, WFSInfo.Version.V_11, catalog);
+        }
+        
+        public WFS1_1(WFSInfo wfs, WFSInfo.Version version, Catalog catalog) {
+            super(wfs, version, catalog);
             skipMisconfigured = ResourceErrorHandling.SKIP_MISCONFIGURED_LAYERS.equals(
                     wfs.getGeoServer().getGlobal().getResourceErrorHandling());
         }
@@ -1267,10 +1273,11 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
             }
 
             void featureTypes() {
-                featureTypes(true, "urn:x-ogc:def:crs:", request.getNamespace());
+                //featureTypes(false, "urn:x-ogc:def:crs:", request.getNamespace());
+                featureTypes(false, request.getNamespace());
             }
             
-            void featureTypes(boolean crs, String srsPrefix, String namespace) {
+            void featureTypes(boolean crs, String namespace) {
                 List featureTypes = new ArrayList(catalog.getFeatureTypes());
                 
                 // filter out disabled feature types
@@ -1295,7 +1302,7 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
                     if(featureType.enabled()) {
                         try {
                             mark();
-                            featureType(featureType, crs, srsPrefix);
+                            featureType(featureType, crs);
                             commit();
                         } catch (RuntimeException ex) {
                             if (skipMisconfigured) {
@@ -1402,7 +1409,9 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
                  * </p>
                  * @param featureType
                  */
-            void featureType(FeatureTypeInfo featureType, boolean crs, String srsPrefix) {
+            void featureType(FeatureTypeInfo featureType, boolean crs) {
+                GMLInfo gml = wfs.getGML().get(version);
+                
                 String prefix = featureType.getNamespace().getPrefix();
                 String uri = featureType.getNamespace().getURI();
 
@@ -1413,13 +1422,18 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
                 element("Abstract", featureType.getAbstract());
                 keywords(featureType.getKeywords());
 
+                String srs = featureType.getSRS();
+                if (srs != null && srs.matches("(?ui)EPSG:[0-9]+")) {
+                    srs = gml.getSrsNameStyle().getPrefix() + srs.substring(5); 
+                }
+
                 //default srs
                 if (crs) {
                     //wfs 2.0
-                    element("DefaultCRS", srsPrefix + featureType.getSRS());
+                    element("DefaultCRS", srs);
                 }
                 else {
-                    element("DefaultSRS", srsPrefix + featureType.getSRS());    
+                    element("DefaultSRS", srs);
                 }
                 
                 //TODO: other srs's
@@ -1501,6 +1515,7 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
                     attributes(new String[] { "name", "Intersects" }));
                 element("ogc:SpatialOperator", null, attributes(new String[] { "name", "Touches" }));
                 element("ogc:SpatialOperator", null, attributes(new String[] { "name", "Crosses" }));
+                element("ogc:SpatialOperator", null, attributes(new String[] { "name", "Within" }));
                 element("ogc:SpatialOperator", null, attributes(new String[] { "name", "Contains" }));
                 element("ogc:SpatialOperator", null, attributes(new String[] { "name", "Overlaps" }));
                 element("ogc:SpatialOperator", null, attributes(new String[] { "name", "BBOX" }));
@@ -1717,7 +1732,7 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
         protected static final String FES_URI = FES.NAMESPACE;
         
         public WFS2_0(WFSInfo wfs, Catalog catalog) {
-            super(wfs, catalog);
+            super(wfs, WFSInfo.Version.V_20, catalog);
         }
         
         @Override
@@ -1740,7 +1755,7 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
                 //wfs 1.1 already does a lot of the capabilities work, use that transformer 
                 // as a delegate
                 delegate = 
-                    (CapabilitiesTranslator1_1) new WFS1_1(wfs, catalog).createTranslator(handler);
+                    (CapabilitiesTranslator1_1) new WFS1_1(wfs, version, catalog).createTranslator(handler);
             }
 
             public void encode(Object o) throws IllegalArgumentException {
@@ -1753,9 +1768,9 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
                     "xmlns:fes", FES_URI, "xmlns:xlink", XLINK.NAMESPACE,
                     "xmlns:xs", XS.NAMESPACE,
                     "xsi:schemaLocation", WFS20_URI + " " +
-                        (wfs.isCanonicalSchemaLocation()?
-                                org.geoserver.wfs.xml.v1_1_0.WFS.CANONICAL_SCHEMA_LOCATION:
-                                    (buildSchemaURL(request.getBaseUrl(), "wfs/2.0/wfs.xsd")))
+                        (wfs.isCanonicalSchemaLocation()
+                                ? org.geotools.wfs.v2_0.WFS.CANONICAL_SCHEMA_LOCATION
+                                : (buildSchemaURL(request.getBaseUrl(), "wfs/2.0/wfs.xsd")))
                 });
 
                 registerNamespaces(attributes);
@@ -2011,7 +2026,7 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
                 start("FeatureTypeList");
                 
                 //TODO: namespace filtering
-                delegate.featureTypes(true, "urn:ogc:def:crs:", request.getNamespace());
+                delegate.featureTypes(true, request.getNamespace());
                 end("FeatureTypeList");
             }
             
@@ -2110,6 +2125,7 @@ public abstract class CapabilitiesTransformer extends TransformerBase {
                    element("fes:SpatialOperator", null, attributes(new String[] { "name", "Intersects" }));
                    element("fes:SpatialOperator", null, attributes(new String[] { "name", "Touches" }));
                    element("fes:SpatialOperator", null, attributes(new String[] { "name", "Crosses" }));
+                   element("fes:SpatialOperator", null, attributes(new String[] { "name", "Within" }));
                    element("fes:SpatialOperator", null, attributes(new String[] { "name", "Contains" }));
                    element("fes:SpatialOperator", null, attributes(new String[] { "name", "Overlaps" }));
                    element("fes:SpatialOperator", null, attributes(new String[] { "name", "BBOX" }));
