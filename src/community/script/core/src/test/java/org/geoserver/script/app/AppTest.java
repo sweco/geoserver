@@ -26,9 +26,9 @@ public class AppTest extends ScriptIntTestSupport {
 
     public void testSimple() throws Exception {
         FileUtils.copyURLToFile(
-            getClass().getResource("index-helloWorld."+ext), new File(app, "index."+ext));
+            getClass().getResource("main-helloWorld."+ext), new File(app, "main."+ext));
     
-        MockHttpServletResponse resp = getAsServletResponse("/script/apps/foo/index."+ext);
+        MockHttpServletResponse resp = getAsServletResponse("/script/apps/foo/main."+ext);
         assertEquals(200, resp.getStatusCode());
         assertEquals("Hello World!", resp.getOutputStreamContent());
     
