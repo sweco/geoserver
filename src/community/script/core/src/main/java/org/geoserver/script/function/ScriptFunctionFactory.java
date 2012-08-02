@@ -89,7 +89,8 @@ public class ScriptFunctionFactory extends ScriptFactory implements FunctionFact
 
     @Override
     public Function function(Name name, List<Expression> args, Literal fallback) {
-        return function(name).instance(name, args);
+        ScriptFunction f = function(name);
+        return f != null ? f.instance(name, args) : null;
     }
 
     ScriptFunction function(Name name) {
@@ -117,7 +118,7 @@ public class ScriptFunctionFactory extends ScriptFactory implements FunctionFact
                         }
 
                         if (f == null) {
-                            throw new RuntimeException("No such function: " + name);
+                            return null;
                         }
                         
                         if (!f.exists()) {
