@@ -60,7 +60,9 @@ public class ScriptProcessFactory extends ScriptFactory implements ProcessFactor
             File wpsRoot = scriptMgr.getWpsRoot();
             for (String file : wpsRoot.list()) {
                 File f = new File(wpsRoot, file);
-
+                if (f.isHidden()) {
+                    continue;
+                }
                 WpsHook hook = scriptMgr.lookupWpsHook(f);
                 if (hook == null) {
                     LOGGER.fine("Skipping " + f.getName() + ", no hook found");
