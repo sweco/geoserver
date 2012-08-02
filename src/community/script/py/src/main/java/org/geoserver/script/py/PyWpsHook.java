@@ -18,6 +18,7 @@ import javax.script.ScriptException;
 import org.geoserver.script.wps.WpsHook;
 import org.geotools.data.Parameter;
 import org.python.core.Py;
+import org.python.core.PyDictionary;
 import org.python.core.PyList;
 import org.python.core.PyObject;
 import org.python.core.PyType;
@@ -47,9 +48,10 @@ public class PyWpsHook extends WpsHook {
     public Map<String, Parameter<?>> getInputs(ScriptEngine engine)
             throws ScriptException {
 
+        //TODO: inspecting the function is uncessary, but is nice as it performs a bit of validation
         engine.eval("import inspect");
-        PyList args = (PyList) engine.eval("inspect.getargspec(run)[0]");
-        PyList inputs = (PyList) process(engine).__getattr__("inputs");
+        PyList args = (PyList) engine.eval("inspect.getargspec(run.func_closure[0].cell_contents)[0]");
+        PyDictionary inputs = (PyDictionary) process(engine).__getattr__("inputs");
 
         if (args.size() != inputs.size()) {
             throw new RuntimeException(String.format("process function specified %d arguments but"+
@@ -59,8 +61,11 @@ public class PyWpsHook extends WpsHook {
         Map<String,Parameter<?>> map = new TreeMap<String, Parameter<?>>();
         for (int i = 0; i < args.size(); i++) {
             String arg = args.get(i).toString();
-            PyObject input = (PyObject) inputs.get(i);
-            
+            PyObject input = (PyObject) inputs.get(arg);
+            if (input == null) {
+                throw new RuntimeException(String.format("process function specified argument %s" +
+                    " but does not specify it as an input", arg));
+            }
             map.put(arg, parameter(arg, input.__getitem__(0), input.__getitem__(1)));
         }
         return map;
@@ -70,15 +75,14 @@ public class PyWpsHook extends WpsHook {
     public Map<String, Parameter<?>> getOutputs(ScriptEngine engine)
             throws ScriptException {
     
-        PyList outputs = (PyList) process(engine).__getattr__("outputs");
+        PyDictionary outputs = (PyDictionary) process(engine).__getattr__("outputs");
         Map<String,Parameter<?>> map = new TreeMap<String, Parameter<?>>();
-       
-        for (int i = 0; i < outputs.size(); i++) {
-            PyObject output = (PyObject) outputs.get(i); 
 
-            String name = output.__getitem__(0).toString();
-            Object type = output.__getitem__(1);
-            Object desc = output.__getitem__(2);
+        for (String name : (List<String>)outputs.keys()) {
+            PyObject output = (PyObject) outputs.get(name); 
+
+            Object type = output.__getitem__(0);
+            Object desc = output.__getitem__(1);
 
             map.put(name, parameter(name, type, desc));
         }
