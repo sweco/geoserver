@@ -62,6 +62,6 @@ class Layer(object):
   @lazy
   def data(self):
     fs = self._info.getFeatureSource(None, None)
-    return GeoScriptLayer(workspace=self.store.data, fs=fs)
+    return GeoScriptLayer(workspace=self.store.data, source=fs)
 
 Layer = info(Layer)

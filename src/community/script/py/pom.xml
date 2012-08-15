@@ -38,6 +38,11 @@
    <version>2.5.2</version>
   </dependency>
   <dependency>
+   <groupId>org.geoscript</groupId>
+   <artifactId>geoscript-py</artifactId>
+   <version>1.2-SNAPSHOT</version>
+  </dependency>
+  <dependency>
    <groupId>org.geoserver.script</groupId>
    <artifactId>script-core</artifactId>
    <version>${project.version}</version>
@@ -63,6 +68,7 @@
    <scope>test</scope>
   </dependency>
  </dependencies>
+
  <build>
   <resources>
    <resource>
@@ -87,59 +93,8 @@
     </includes>
    </resource>
   </resources>
-  <plugins>
-      <!--plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <forkMode>always</forkMode>
-        </configuration>
-      </plugin-->
-   <plugin>
-    <artifactId>maven-antrun-plugin</artifactId>
-    <dependencies>
-     <dependency>
-      <groupId>ant</groupId>
-      <artifactId>ant</artifactId>
-      <version>1.6.5</version>
-     </dependency>
-     <dependency>
-      <groupId>ant-contrib</groupId>
-      <artifactId>ant-contrib</artifactId>
-      <version>1.0b3</version>
-     </dependency>
-    </dependencies>
-    <executions>
-     <execution>
-       <id>generate-sources</id>
-       <phase>generate-sources</phase>
-       <configuration>
-         <tasks>
-            <ant antfile="${basedir}/build.xml"/>
-         </tasks>
-       </configuration>
-       <goals>
-         <goal>run</goal>
-       </goals>
-     </execution>
-     <execution>
-      <id>generate-resources</id>
-      <phase>generate-resources</phase>
-      <configuration>
-       <tasks>
-         <copy todir="${basedir}/src/main/python">
-            <fileset dir="geoscript" includes="geoscript/**/*.py"/> 
-         </copy>
-       </tasks>
-      </configuration>
-      <goals>
-       <goal>run</goal>
-      </goals>
-     </execution>
-    </executions>
-   </plugin>
-  </plugins>
  </build>
+
  <properties>
    <test.maxPermSize>128m</test.maxPermSize>
  </properties>

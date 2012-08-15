@@ -1,4 +1,5 @@
 from geoscript import core
+from org.geotools.feature import FeatureCollection
 
 def process(inputs, outputs, title=None, description=None):
   def wrap(f):
@@ -9,16 +10,22 @@ def process(inputs, outputs, title=None, description=None):
         kwargs[k] = core.map(kwargs[k])
 
       # unmap on way out
-      return core.unmap(f(*args, **kwargs))
+      # JD: this is a hack but we specify FeatureCollection as a hint to 
+      # the mapping to deal with the FeatureCollection/FeatureSource to 
+      # Layer mapping issue. In cases where we are not dealing with a layer 
+      # like with raster data it should simply be ignored
+      return core.unmap(f(*args, **kwargs), FeatureCollection)
 
     wrapped.title = title
     wrapped.description = description
 
     # unmap the specified inputs and outputs 
-    wrapped.inputs = dict((k,_unmap(v)) for k,v in inputs.iteritems())
-    wrapped.outputs = dict((k,_unmap(v)) for k,v in outputs.iteritems())
+    wrapped.inputs = dict((k,_unmap(v, FeatureCollection)) 
+      for k,v in inputs.iteritems())
+    wrapped.outputs = dict((k,_unmap(v, FeatureCollection)) 
+      for k,v in outputs.iteritems())
     return wrapped
   return wrap
 
-def _unmap(v):
-  return tuple([core.unmap(x) for x in v])
+def _unmap(v, t):
+  return tuple([core.unmap(x, t) for x in v])
