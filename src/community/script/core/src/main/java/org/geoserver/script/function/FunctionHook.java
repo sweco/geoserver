@@ -40,6 +40,6 @@ public class FunctionHook extends ScriptHook {
     public Object run(Object value, List<Object> args, ScriptEngine engine) 
         throws ScriptException {
 
-        return invoke(engine, "run", args);
+        return invoke(engine, "run", value, args);
     }
 }
