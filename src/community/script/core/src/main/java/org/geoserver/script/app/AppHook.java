@@ -43,17 +43,7 @@ public class AppHook extends ScriptHook {
      */
     public void run(Request request, Response response, ScriptEngine engine) 
         throws ScriptException, IOException {
-        if (engine instanceof Invocable) {
-            try {
-                ((Invocable)engine).invokeFunction("run", request, response);
-            } catch (NoSuchMethodException e) {
-                throw new ScriptException(e);
-            }
-        }
-        else {
-            throw new ScriptException("Engine does not implement Invocable, plugin must implement"
-                + " custom app hook");
-        }
+        invoke(engine, "run", request, response);
     }
 
 }

@@ -6,7 +6,6 @@ package org.geoserver.script.function;
 
 import java.util.List;
 
-import javax.script.Invocable;
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
@@ -41,17 +40,6 @@ public class FunctionHook extends ScriptHook {
     public Object run(Object value, List<Object> args, ScriptEngine engine) 
         throws ScriptException {
 
-        if (engine instanceof Invocable) {
-            try {
-                return ((Invocable)engine).invokeFunction("run", value, args);
-            } catch (NoSuchMethodException e) {
-                throw new ScriptException(e);
-            }
-        }
-        else {
-            throw new ScriptException("Engine does not implement Invocable, plugin must implement"
-                + " custom function hook");
-        }
-
+        return invoke(engine, "run", args);
     }
 }

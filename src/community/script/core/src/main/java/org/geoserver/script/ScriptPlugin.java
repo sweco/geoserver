@@ -105,7 +105,7 @@ public abstract class ScriptPlugin implements Serializable {
      * </p>
      */
     public WpsHook createWpsHook() {
-        return null;
+        return new WpsHook(this);
     }
 
     /**
