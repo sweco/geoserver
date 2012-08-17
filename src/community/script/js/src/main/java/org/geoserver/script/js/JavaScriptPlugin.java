@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import javax.script.Bindings;
 import javax.script.ScriptContext;
@@ -21,6 +22,7 @@ import org.geoserver.script.function.FunctionHook;
 import org.geoserver.script.js.engine.RhinoScriptEngine;
 import org.geoserver.script.js.engine.RhinoScriptEngineFactory;
 import org.geoserver.script.wps.WpsHook;
+import org.geotools.util.logging.Logging;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.Scriptable;
@@ -34,7 +36,8 @@ import org.mozilla.javascript.tools.shell.Global;
 public class JavaScriptPlugin extends ScriptPlugin {
 
     private static final long serialVersionUID = 1L;
-    
+    private Logger LOGGER = Logging.getLogger("org.geoserver.script.js");
+
     private File libRoot;
     public Global global;
     private RequireBuilder requireBuilder;
@@ -73,6 +76,7 @@ public class JavaScriptPlugin extends ScriptPlugin {
         Require require = createRequire();
         Bindings scope = engine.getBindings(ScriptContext.ENGINE_SCOPE);
         scope.put("require", require);
+        scope.put("LOGGER", LOGGER);
         Context cx = RhinoScriptEngine.enterContext();
         try {
             scope.put("exports", cx.newObject(global));
