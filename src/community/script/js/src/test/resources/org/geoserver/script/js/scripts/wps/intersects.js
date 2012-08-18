@@ -1,6 +1,6 @@
 var Process = require("geoscript/process").Process;
 var where = require("geoscript/filter").where;
-var wkt = require("geoscript/geom/io/wkt");
+var wkt = require("geoscript/io/wkt");
 var catalog = require("geoserver/catalog");
 
 exports.process = new Process({
@@ -42,7 +42,7 @@ exports.process = new Process({
     },
     run: function(inputs) {
         var geometry = inputs.geometry;
-        var layer = catalog.getFeatureType(inputs.namespace, inputs.featureType);
+        var layer = catalog.getVectorLayer(inputs.namespace, inputs.featureType);
         var filter = where("INTERSECTS", layer.schema.geometry.name, wkt.write(geometry));
         if (inputs.filter) {
             filter = filter.and(inputs.filter);
