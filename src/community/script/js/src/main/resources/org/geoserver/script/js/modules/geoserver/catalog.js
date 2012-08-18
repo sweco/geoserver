@@ -40,8 +40,27 @@ exports.addNamespace = function(namespace, setDefault) {
     return namespace;
 };
 
-exports.getFeatureType = function(uri, name) {
-    var featureType = null;
+exports.getVectorLayer = function() {
+    var uri, name;
+    if (arguments.length == 1) {
+        // alias:name
+        var parts = arguments[0].split(":");
+        if (parts.length != 2) {
+            throw new Error("Expected a layer identifier in the form 'prefix:name'");
+        }
+        var alias = parts[0];
+        _namespace = _catalog.getNamespaceByPrefix(alias);
+        if (!_namespace) {
+            throw new Error("No namespace found for prefix: " + alias);
+        }
+        uri = _namespace.getURI();
+        name = parts[1];
+    } else if (arguments.length == 2) {
+        // uri, name
+        uri = arguments[0];
+        name = arguments[1];
+    }
+    var layer = null;
     var _featureTypeInfo = _catalog.getResourceByName(
         uri, name, geoserver.catalog.FeatureTypeInfo
     );
@@ -49,9 +68,9 @@ exports.getFeatureType = function(uri, name) {
         var _source = _featureTypeInfo.getFeatureSource(null, null);
         var _store = _source.getDataStore();
         var workspace = Workspace.from_(_store);
-        featureType = Layer.from_(_source, workspace);
+        layer = Layer.from_(_source, workspace);
     }
-    return featureType;
+    return layer;
 };
 
 

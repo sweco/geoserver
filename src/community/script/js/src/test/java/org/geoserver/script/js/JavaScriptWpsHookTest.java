@@ -82,6 +82,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         input.put("first", 2.0);
         input.put("second", 4.0);
         Map<String,Object> result = process.execute(input, null);
+        assertNotNull("add result", result);
         assertTrue("sum in results", result.containsKey("sum"));
         Object sum = result.get("sum");
         assertEquals("correct sum", 6.0, (Double) sum, 0.0);
@@ -112,6 +113,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         input.put("geom", point);
         input.put("distance", 4.0);
         Map<String,Object> result = process.execute(input, null);
+        assertNotNull("buffer result", result);
         assertTrue("result in results", result.containsKey("result"));
         Object obj = result.get("result");
         assertTrue("got back a geometry", obj instanceof Geometry);
@@ -131,6 +133,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         input.put("featureType", "Bridges");
 
         Map<String,Object> result = process.execute(input, null);
+        assertNotNull("intersects result", result);
         assertTrue("intersects in results", result.containsKey("intersects"));
         Object obj = result.get("intersects");
         assertTrue("got back a boolean", obj instanceof Boolean);
@@ -151,6 +154,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         input.put("featureType", "Bridges");
 
         Map<String,Object> result = process.execute(input, null);
+        assertNotNull("intersects result", result);
         assertTrue("intersects in results", result.containsKey("intersects"));
         Object obj = result.get("intersects");
         assertTrue("got back a boolean", obj instanceof Boolean);
@@ -167,6 +171,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         input.put("featureType", "Buildings");
 
         Map<String,Object> result = process.execute(input, null);
+        assertNotNull("intersects result", result);
         assertTrue("intersects in results", result.containsKey("intersects"));
         Object obj = result.get("intersects");
         assertTrue("got back a boolean", obj instanceof Boolean);
@@ -183,6 +188,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         input.put("featureType", "Buildings");
 
         Map<String,Object> result = process.execute(input, null);
+        assertNotNull("intersects result", result);
         assertTrue("intersects in results", result.containsKey("intersects"));
         Object obj = result.get("intersects");
         assertTrue("got back a boolean", obj instanceof Boolean);
@@ -203,6 +209,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         input.put("featureType", "Buildings");
 
         Map<String,Object> result = process.execute(input, null);
+        assertNotNull("intersects result", result);
         assertTrue("intersects in results", result.containsKey("intersects"));
         Object obj = result.get("intersects");
         assertTrue("got back a boolean", obj instanceof Boolean);
@@ -220,6 +227,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         input.put("filter", "ADDRESS LIKE '215 Main%'");
 
         Map<String,Object> result = process.execute(input, null);
+        assertNotNull("intersects result", result);
         assertTrue("intersects in results", result.containsKey("intersects"));
         Object obj = result.get("intersects");
         assertTrue("got back a boolean", obj instanceof Boolean);
@@ -240,6 +248,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         input.put("filter", "ADDRESS LIKE '123 Main%'");
 
         Map<String,Object> result = process.execute(input, null);
+        assertNotNull("intersects result", result);
         assertTrue("intersects in results", result.containsKey("intersects"));
         Object obj = result.get("intersects");
         assertTrue("got back a boolean", obj instanceof Boolean);

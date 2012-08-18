@@ -67,8 +67,6 @@ public class JavaScriptPluginTest extends ScriptIntTestSupport {
         Scriptable exports = plugin.require("geoserver");
         Object catalogObj = exports.get("catalog", exports);
         assertTrue("catalog in exports", catalogObj instanceof Scriptable);
-        Object processObj = exports.get("process", exports);
-        assertTrue("process in exports", processObj instanceof Scriptable);
     }
 
     /**
@@ -89,4 +87,25 @@ public class JavaScriptPluginTest extends ScriptIntTestSupport {
         assertEquals("first namespace uri", "http://www.opengis.net/cite", obj.get("uri", obj));
     }
 
+    /**
+     * Test for catalog access through the geoserver.js module.
+     * @throws ScriptException 
+     */
+    public void testGeoServerCatalogGetVectorLayer() throws ScriptException {
+        
+        ScriptEngine engine = getScriptManager().createNewEngine("js");
+        
+        String script = 
+            "var catalog = require('geoserver/catalog');" + 
+            "var Layer = require('geoscript/layer').Layer;" +
+            "var buildings = catalog.getVectorLayer('cite:Buildings');" +
+            "buildings instanceof Layer";
+
+        // get a layer from the catalog
+        Object result = engine.eval(script);
+        assertTrue(result instanceof Boolean);
+        assertEquals("got layer", result, true);
+    }
+
+    
 }

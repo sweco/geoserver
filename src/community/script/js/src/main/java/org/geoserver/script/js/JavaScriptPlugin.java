@@ -223,12 +223,10 @@ public class JavaScriptPlugin extends ScriptPlugin {
      */
     public List<String> getModulePaths() {
         // GeoScript modules
-        URL geoscriptModuleUrl = getClass().getClassLoader().getResource("geoscript.js");
+        URL geoscriptModuleUrl = getClass().getClassLoader().getResource("org/geoscript/js/lib");
         String geoscriptModulePath;
         try {
             geoscriptModulePath = geoscriptModuleUrl.toURI().toString();
-            geoscriptModulePath = geoscriptModulePath.substring(0, 
-                    geoscriptModulePath.lastIndexOf("geoscript.js"));
         } catch (URISyntaxException e) {
             throw new RuntimeException("Trouble evaluating GeoScript module path.", e);
         }
