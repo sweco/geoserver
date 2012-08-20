@@ -1,7 +1,4 @@
 var Process = require("geoscript/process").Process;
-var where = require("geoscript/filter").where;
-var wkt = require("geoscript/io/wkt");
-var catalog = require("geoserver/catalog");
 
 exports.process = new Process({
     title: "Intersection Test",
@@ -12,21 +9,11 @@ exports.process = new Process({
             title: "Input Geometry",
             description: "Input geometry that must intersect at least one target feature geometry."
         },
-        featureType: {
-            type: "String",
-            title: "Target Feature Type",
-            description: "The unqualified name of the target feature type."
-        },
-        namespace: {
-            type: "String",
-            title: "Target Namespace URI",
-            description: "The namespace URI for the target feature type."
-        },
-        filter: {
-            type: "String",
-            title: "Target Filter",
-            description: "CQL used to filter features from the target feature type (optional)."
-        },
+        features: {
+            type: "FeatureCollection",
+            title: "Target Features",
+            description: "The feature collection to test for intersections."
+        }
     },
     outputs: {
         intersects: {
@@ -42,15 +29,17 @@ exports.process = new Process({
     },
     run: function(inputs) {
         var geometry = inputs.geometry;
-        var layer = catalog.getVectorLayer(inputs.namespace, inputs.featureType);
-        var filter = where("INTERSECTS", layer.schema.geometry.name, wkt.write(geometry));
-        if (inputs.filter) {
-            filter = filter.and(inputs.filter);
+        var hits = 0;
+        var target;
+        for (var feature in inputs.features) {
+            target = feature.geometry;
+            if (target && geometry.intersects(target)) {
+                ++hits;
+            }
         }
-        var count = layer.getCount(filter);
         return {
-            intersects: count > 0,
-            count: count
+            intersects: hits > 0,
+            count: hits
         };
     }
 });

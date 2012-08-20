@@ -3,10 +3,13 @@ var {Feature, Collection, Schema} = require("geoscript/feature");
 
 exports.process = new Process({
 
+    // human readable title
     title: "Distance and Bearing",
 
+    // describe process
     description: "Generates features with (cartesian) distance and bearing metrics given an existing feature collection and an origin.",
 
+    // describe input parameters
     inputs: {
         origin: {
             type: "Point",
@@ -20,6 +23,7 @@ exports.process = new Process({
         }
     },
 
+    // describe output parameters
     outputs: {
         result: {
             type: "FeatureCollection",
@@ -28,14 +32,15 @@ exports.process = new Process({
         }
     },
 
+    // provide a function that accepts inputs and returns outputs
     run: function(inputs) {
         var origin = inputs.origin;
-        var inSchema = inputs.features.schema;
+        var geomField = inputs.features.schema.geometry;
 
         var schema = new Schema({
             name: "result",
             fields: [
-                {name: "geometry", type: inSchema.geometry.type},
+                {name: "geometry", type: geomField.type, projection: geomField.projection},
                 {name: "distance", type: "Double"},
                 {name: "bearing", type: "Double"}
             ]
@@ -43,21 +48,20 @@ exports.process = new Process({
 
         var collection = new Collection({
             features: function() {
-                for (var inFeature in inputs.features) {
+                for (var feature in inputs.features) {
 
-                    var point = inFeature.geometry.centroid;
+                    var point = feature.geometry.centroid;
                     var distance = origin.distance(point);
                     var bearing = (270 + Math.atan2(point.y - origin.y, point.x - origin.x) * 180 / Math.PI) % 360;
 
-                    var outFeature = new Feature({
+                    yield new Feature({
                         schema: schema,
                         properties: {
-                            geometry: inFeature.geometry,
+                            geometry: feature.geometry,
                             distance: distance,
                             bearing: bearing
                         }
                     });
-                    yield outFeature;
                 }
             }
         });
