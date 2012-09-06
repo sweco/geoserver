@@ -12,12 +12,12 @@ Applications
 ------------
 
 The "app" hook provides a way to contribute scripts that are intended to be run over http. 
-An app corresponds to a named directory under the ``scripts/app`` directory. For example::
+An app corresponds to a named directory under the ``scripts/apps`` directory. For example::
 
   GEOSERVER_DATA_DIR/
      ...
-     script/
-        app/
+     scripts/
+        apps/
           hello/
 
 An app directory must contain a *main* file that contains the "entry point" into the 
@@ -47,7 +47,22 @@ to that above is:
        start_response('200 OK', [('Content-Type', 'text/plain')])
        return ['Hello World!']
 
-Applications are http accessible at the path ``/script/apps/{app}`` where ``{app}`` 
+For the JavaScript app hook, scripts are expected to support ``app`` functions that
+conform to the `JSGI <http://wiki.commonjs.org/wiki/JSGI>`_ specification (v0.3).
+The equivalent 'Hello World' app in JavaScript would look like the following
+(in ``/scripts/apps/hello/main.js``):
+
+  .. code-block:: javascript
+
+      exports.app = function(request) {
+        return {
+          status: 200,
+          headers: {"Content-Type": "text/plain"},
+          body: ["Hello World"]
+        }
+      }; 
+
+Applications are http accessible at the path ``/scripts/apps/{app}`` where ``{app}`` 
 is the name of the application. For example assuming a local GeoServer the url for
 for the application would be::
 
@@ -66,7 +81,7 @@ located in a file named for the process. For example::
 
     GEOSERVER_DATA_DIR/
        ...
-       script/
+       scripts/
           wps/
             buffer.bsh
 
