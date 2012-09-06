@@ -47,8 +47,8 @@ to that above is:
        start_response('200 OK', [('Content-Type', 'text/plain')])
        return ['Hello World!']
 
-For the JavaScript app hook, scripts are expected to support ``app`` functions that
-conform to the `JSGI <http://wiki.commonjs.org/wiki/JSGI>`_ specification (v0.3).
+For the JavaScript app hook, scripts are expected to export an ``app`` function that
+conforms to the `JSGI <http://wiki.commonjs.org/wiki/JSGI>`_ specification (v0.3).
 The equivalent 'Hello World' app in JavaScript would look like the following
 (in ``/scripts/apps/hello/main.js``):
 
@@ -135,6 +135,43 @@ In Python the api is slightly different and makes use of Python decorators:
      def run(geom, distance):
        return geom.buffer(distance);
 
+In JavaScript, a script exports a ``process`` object (see the 
+`GeoScript JS API docs <http://geoscript.org/js/api/process.html>`_ for more detail)
+in order to be exposed as a WPS process.  The following is an example of a simple
+buffer process (saved in ``scripts/wps/buffer.js``):
+
+  .. code-block:: javascript
+
+    var Process = require("geoscript/process").Process;
+
+    exports.process = new Process({
+      title: "JavaScript Buffer Process",
+      description: "Process that buffers a geometry.",
+      inputs: {
+        geom: {
+          type: "Geometry",
+          title:"Input Geometry",
+          description: "The target geometry."
+        },
+        distance: {
+          type: "Double",
+          title: "Buffer Distance",
+          description: "The distance by which to buffer the geometry."
+        }
+      },
+      outputs: {
+        result: {
+          type: "Geometry",
+          title: "Result",
+          description: "The buffered geometry."
+        }
+      },
+      run: function(inputs) {
+        return {result: inputs.geom.buffer(inputs.distance)};
+      }
+    });
+
+
 Once implemented a process is invoked using the standard WPS protocol. For example
 assuming a local GeoServer the url to execute the process would be::
 
@@ -145,5 +182,6 @@ assuming a local GeoServer the url to execute the process would be::
        &identifier=py:buffer
        &datainputs=geom=POINT(0 0)@mimetype=application/wkt;distance=10
 
-
+(Substitue ``py:buffer`` for the script name followed by the extension.  E.g. 
+``js:buffer`` for JavaScript.)
             
