@@ -13,11 +13,11 @@ Scripts are located in the GeoServer data directory under a directory named
 for each scripting hook::
 
   GEOSERVER_DATA_DIR/
-     ...
-     scripts/
-        apps/
-        lib/
-        wps/
+    ...
+    scripts/
+      apps/
+      lib/
+      wps/
         
 The ``apps`` directory provides an "application" hook allowing for one to 
 provide a script invokable over http.

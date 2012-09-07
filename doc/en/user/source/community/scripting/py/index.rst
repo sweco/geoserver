@@ -16,7 +16,7 @@ app
 
 In Python the app hook is based on `WSGI <http://wsgi.org>`_ which provides a common interface
 for Python web application development. This is not a comprehensive introduction to WSGI, that 
-can be found `here <http://webpython.codepoint.net/wsgi_tutorial>`_, but the app script must
+can be found `here <http://webpython.codepoint.net/wsgi_tutorial>`__, but the app script must
 provide a function named ``app`` that takes a dictionary containing information about the 
 environment, and a function to start the response.
 
@@ -30,15 +30,15 @@ Application directories live under the ``scripts/apps`` directory under the root
 directory::
 
   GEOSERVER_DATA_DIR/
-     ...
-     scripts/
-       apps/
-          app1/
-             main.py
-             ...
-          app2/
-             main.py
-             ...
+    ...
+    scripts/
+      apps/
+        app1/
+          main.py
+          ...
+        app2/
+          main.py
+          ...
 
 The application is web accessible from the path ``/script/apps/{app}`` where ``{app}`` is 
 the name of the application. All requests that start with this path are dispatched to the 
