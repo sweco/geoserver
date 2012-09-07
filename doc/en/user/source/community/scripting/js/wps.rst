@@ -137,7 +137,7 @@ The ``run`` method returns an object with properties corresponding to the
 above described outputs - in this case, just a single ``result`` property.
 
 To see the results of this processs in action, call the WPS 
-`Execute <http://localhost:8080/geoserver/wps?service=WPS&version=1.0.0&request=Execute&identifier=js:buffer&datainputs=geom=POINT(0 0)@mimetype=application/wkt;distance=10>`_
+`Execute <http://localhost:8080/geoserver/wps?service=WPS&version=1.0.0&request=Execute&identifier=js:buffer&datainputs=geom=POINT(0%200)@mimetype=application/wkt;distance=10>`_
 method::
 
   http://localhost:8080/geoserver/wps

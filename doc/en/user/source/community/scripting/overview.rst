@@ -4,7 +4,7 @@ Scripting Extension Overview
 ============================
 
 The scripting extension provides a number of extension points called "hooks" 
-throughout GeoServer. Each hook provides a way to plug-in functionality via 
+throughout GeoServer. Each hook provides a way to plug in functionality via 
 a script. See the :ref:`scripting_hooks` section for details on each of the
 individual scripting hooks.
 
