@@ -4,9 +4,14 @@ class Catalog(object):
   """
   The GeoServer catalog. 
 
-  This class behaves like a dictionary in which the keys are ``str`` that correspond
-  to namespace prefixes / workspace names. The values are instances of 
-  :class:`Workspace <geoserver.catalog.Workspace>`. 
+  This class behaves like a dictionary in which the keys are ``str`` that 
+  correspond to namespace prefixes / workspace names. The values are instances
+  of :class:`Workspace <geoserver.catalog.Workspace>`. 
+
+  >>> cat = Catalog()
+  >>> cat.keys()
+  [u'cite', u'tiger', u'topp', u'sf']
+  >>> sf = ws['sf']
   """
   def __init__(self):
      try:

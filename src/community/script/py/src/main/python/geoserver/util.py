@@ -19,12 +19,21 @@ def info(clazz):
        object.__setattr__(self, name, value)
 
    def save(self):
-     cat = self.catalog._catalog;
-     if not self._info.getId():
-        cat.add(self._info)
-     else:
-        cat.save(self._info)
+     if hasattr(self, 'catalog'):
+       cat = self.catalog._catalog;
+       if not self._info.getId():
+          cat.add(self._info)
+       else:
+          cat.save(self._info)
+       if hasattr(self, '_onsave'):
+         self._onsave(cat)
 
+     elif hasattr(self, 'geoserver'):
+       gs = self.geoserver._geoserver
+       gs.save(self._info)  
+       if hasattr(self, '_onsave'):
+         self._onsave(gs)
+      
    clazz.__getattr__ = __getattr__
    clazz.__setattr__ = __setattr__
    clazz.save = save

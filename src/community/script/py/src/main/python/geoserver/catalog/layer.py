@@ -1,20 +1,23 @@
-from geoserver.catalog.util import info, lazy
+from geoserver.util import info, lazy
 from geoscript.layer import Layer as GeoScriptLayer
-from org.geoserver.catalog import LayerInfo, ResourceInfo
+from org.geoserver.catalog import LayerInfo, ResourceInfo, StoreInfo
 from org.geotools.feature import NameImpl as Name
 
 class Layer(object):
   """
   A GeoServer layer.
 
-  *layer* is the name of a layer. If the name does not correspond to a layer in the
-  catalog one will be created "disconnected" from the catalog.
+  The constructor takes a *layer* argument which is the name of a layer. 
 
-  *store* 
+  >>> l = Layer('topp:states')
+
+  The optional *store* argument is used to specify the containing store.
+
+  >>> l = Layer('states', 'states_shapefile')
   """
 
   def __init__(self, layer, store=None):
-    if store:
+    if store and hasattr(store, 'catalog'):
       self.catalog = store.catalog 
     else:
       from geoserver.catalog import Catalog
@@ -23,14 +26,21 @@ class Layer(object):
     self.store = None
     self._info = None
 
+    cat = self.catalog._catalog
     if isinstance(layer, ResourceInfo):
       self._info = layer 
     elif isinstance(layer, LayerInfo):
       self._info = layer.resource
     elif isinstance(layer, (str,unicode)):
-      l = self.catalog._catalog.getLayerByName(layer)
-      if l:
-        self._info = l.resource
+      if store and isinstance(store, (str, unicode)):
+        s = cat.getStoreByName(store, StoreInfo)
+        self._info = cat.getResourceByStore(s, layer, ResourceInfo)
+      elif store and hasattr(store, '_info'):
+        self._info = cat.getResourceByStore(store._info, layer, ResourceInfo)
+      elif not store:
+        l = cat.getLayerByName(layer)
+        if l:
+          self._info = l.resource
 
     if self._info:
       from geoserver.catalog import Store
@@ -59,8 +69,17 @@ class Layer(object):
       else:
         raise Exception('Unable to create layer from %s' % str(layer))
 
-  @lazy
+  #@lazy
   def data(self):
+    """
+    The data backing the layer as a geoscript layer.
+    
+    >>> l = Layer('sf:archsites')
+    >>> l.data.schema
+    archsites [the_geom: Point, cat: long, str1: str]
+    >>> l.data.count()
+    25
+    """
     fs = self._info.getFeatureSource(None, None)
     return GeoScriptLayer(workspace=self.store.data, source=fs)
 

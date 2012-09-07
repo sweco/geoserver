@@ -1,4 +1,4 @@
-from geoserver.catalog.util import info, lazy
+from geoserver.util import info, lazy
 from geoserver.catalog.layer import Layer
 from geoscript.workspace import Workspace as GeoScriptWorkspace
 from org.geoserver.catalog import StoreInfo
@@ -11,13 +11,20 @@ class Store(object):
    correspond to layer namespace and the values are instances of 
    :class:`Layer <geoserver.catalog.Layer>`
 
-   *store* is the name of the store. If the store name does not correspond to an 
+   >>> shapes = Store('taz_shapes', 'topp')
+   >>> shapes.keys()
+   [u'tasmania_cities', u'tasmania_roads', u'tasmania_state_boundaries', u'tasmania_water_bodies']
+   >>> roads = shapes['tasmanisa_roads']
+
+   The constructor takes two arguments: 
+
+   *store* is the name of the store. If the store name does not correspond to an
    existing store in the catalog the instance will be created and "disconnected"
    from the catalog. 
    
-   *workspace* is the name of the workspace the store is a part of or an instance
-   of :class:`Workspace <geoserver.catalog.Workspace>`. If no workspace is specified
-   it is taken to mean the default workspace in the catalog.
+   *workspace* is the name of the workspace the store is a part of or an 
+   instance of :class:`Workspace <geoserver.catalog.Workspace>`. If no workspace
+   is specified it is taken to mean the default workspace in the catalog.
    """
 
    def __init__(self, store, workspace=None, catalog=None):
@@ -61,8 +68,15 @@ class Store(object):
         else:
            raise Exception('Unable to create store from %s' % str(store))
 
-   @lazy
+   #@lazy
    def data(self):
+     """
+     The data backing the store as a geoscript workspace.
+     
+     >>> shapes = Store('taz_shapes', 'topp')
+     >>> shapes.data.layers()
+     ['tasmania_state_boundaries', 'tasmania_water_bodies', 'tasmania_roads', 'tasmania_cities']
+     """
      return GeoScriptWorkspace(ds=self._info.getDataStore(None))
 
    def keys(self):

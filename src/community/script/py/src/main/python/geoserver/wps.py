@@ -1,4 +1,6 @@
+import types
 from geoscript import core
+from org.geoscript.util import PyFeatureCollection
 from org.geotools.feature import FeatureCollection
 
 def process(inputs, outputs, title=None, description=None):
@@ -14,7 +16,10 @@ def process(inputs, outputs, title=None, description=None):
       # the mapping to deal with the FeatureCollection/FeatureSource to 
       # Layer mapping issue. In cases where we are not dealing with a layer 
       # like with raster data it should simply be ignored
-      return core.unmap(f(*args, **kwargs), FeatureCollection)
+      result = f(*args, **kwargs)
+      if isinstance(result, types.GeneratorType):
+        return PyFeatureCollection(result)
+      return core.unmap(result, FeatureCollection)
 
     wrapped.title = title
     wrapped.description = description

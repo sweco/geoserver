@@ -10,6 +10,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
@@ -43,6 +45,8 @@ import org.restlet.resource.StringRepresentation;
  * @author Justin Deoliveira, OpenGeo
  */
 public class SessionResource extends Resource {
+
+    static Logger LOGGER = Logger.getLogger("org.geoserver.script.rest");
 
     ScriptManager scriptMgr;
 
@@ -133,7 +137,14 @@ public class SessionResource extends Resource {
                     w.write(result.toString());
                 }
             } catch (ScriptException e) {
-                w.write(e.getMessage());
+                Throwable t = e;
+                if (t.getCause() != null) {
+                    t = t.getCause();
+                }
+                t.printStackTrace(new PrintWriter(w));
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    LOGGER.log(Level.FINE, "Script error", e);
+                }
             }
             w.flush();
         }

@@ -7,17 +7,27 @@ import java.util.Map;
 
 import javax.script.ScriptException;
 
+import org.geoserver.catalog.Catalog;
+import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.data.test.MockData;
 import org.geoserver.data.util.IOUtils;
 import org.geoserver.script.ScriptIntTestSupport;
 import org.geoserver.script.wps.ScriptProcess;
 import org.geoserver.script.wps.ScriptProcessFactory;
+import org.geotools.data.FeatureSource;
 import org.geotools.data.Parameter;
+import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.NameImpl;
 import org.geotools.process.Process;
+import org.opengis.feature.Feature;
+import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.FeatureType;
+import org.opengis.feature.type.GeometryType;
 import org.opengis.feature.type.Name;
 
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.MultiPolygon;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKTReader;
 
@@ -122,15 +132,37 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         assertEquals("correct sum", exp, geom.getArea(), 1.0);
 
     }
+    
+    public FeatureCollection<? extends FeatureType, ? extends Feature> getFeatures(String uri, String name) {
+        Catalog catalog = getCatalog();
+        FeatureTypeInfo info = catalog.getResourceByName(uri, name, 
+                FeatureTypeInfo.class);
+        assertNotNull(info);
+        FeatureSource<? extends FeatureType, ? extends Feature> source = null;
+        try {
+            source = info.getFeatureSource(null, null);
+        } catch (IOException e) {
+            // pass
+        }
+        assertNotNull(source);
+        FeatureCollection<? extends FeatureType, ? extends Feature> features = null;
+        try {
+            features = source.getFeatures();
+        } catch (IOException e) {
+            // pass
+        }
+        assertNotNull(features);
+        return features;
+    }
 
     public void testExecuteIntersectsBridgesHit() throws Exception {
         ScriptProcess process = createProcess("intersects");
+        
         WKTReader wktReader = new WKTReader();
 
         Map<String, Object> input = new HashMap<String, Object>();
         input.put("geometry", wktReader.read("POINT (0.0002 0.0007)"));
-        input.put("namespace", "http://www.opengis.net/cite");
-        input.put("featureType", "Bridges");
+        input.put("features", getFeatures("http://www.opengis.net/cite", "Bridges"));
 
         Map<String,Object> result = process.execute(input, null);
         assertNotNull("intersects result", result);
@@ -150,8 +182,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
 
         Map<String, Object> input = new HashMap<String, Object>();
         input.put("geometry", wktReader.read("POINT (10 0.0007)"));
-        input.put("namespace", "http://www.opengis.net/cite");
-        input.put("featureType", "Bridges");
+        input.put("features", getFeatures("http://www.opengis.net/cite", "Bridges"));
 
         Map<String,Object> result = process.execute(input, null);
         assertNotNull("intersects result", result);
@@ -167,8 +198,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
 
         Map<String, Object> input = new HashMap<String, Object>();
         input.put("geometry", wktReader.read("POINT (0.00216 0.00084)"));
-        input.put("namespace", "http://www.opengis.net/cite");
-        input.put("featureType", "Buildings");
+        input.put("features", getFeatures("http://www.opengis.net/cite", "Buildings"));
 
         Map<String,Object> result = process.execute(input, null);
         assertNotNull("intersects result", result);
@@ -184,8 +214,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
 
         Map<String, Object> input = new HashMap<String, Object>();
         input.put("geometry", wktReader.read("LINESTRING (0.00216 0.00084, 0.001 0.00054)"));
-        input.put("namespace", "http://www.opengis.net/cite");
-        input.put("featureType", "Buildings");
+        input.put("features", getFeatures("http://www.opengis.net/cite", "Buildings"));
 
         Map<String,Object> result = process.execute(input, null);
         assertNotNull("intersects result", result);
@@ -205,8 +234,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
 
         Map<String, Object> input = new HashMap<String, Object>();
         input.put("geometry", wktReader.read("POINT (10 0.00084)"));
-        input.put("namespace", "http://www.opengis.net/cite");
-        input.put("featureType", "Buildings");
+        input.put("features", getFeatures("http://www.opengis.net/cite", "Buildings"));
 
         Map<String,Object> result = process.execute(input, null);
         assertNotNull("intersects result", result);
@@ -215,45 +243,30 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         assertTrue("got back a boolean", obj instanceof Boolean);
         assertFalse("intersects", (Boolean) obj);
     }
-
-    public void testExecuteIntersectsBuildingsFilterHit() throws Exception {
-        ScriptProcess process = createProcess("intersects");
+    
+    public void testExecuteDistbearBuildings() throws Exception {
+        ScriptProcess process = createProcess("distbear");
         WKTReader wktReader = new WKTReader();
 
         Map<String, Object> input = new HashMap<String, Object>();
-        input.put("geometry", wktReader.read("LINESTRING (0.00216 0.00084, 0.001 0.00054)"));
-        input.put("namespace", "http://www.opengis.net/cite");
-        input.put("featureType", "Buildings");
-        input.put("filter", "ADDRESS LIKE '215 Main%'");
+        input.put("origin", wktReader.read("POINT (10 0.00084)"));
+        input.put("features", getFeatures("http://www.opengis.net/cite", "Buildings"));
 
-        Map<String,Object> result = process.execute(input, null);
-        assertNotNull("intersects result", result);
-        assertTrue("intersects in results", result.containsKey("intersects"));
-        Object obj = result.get("intersects");
-        assertTrue("got back a boolean", obj instanceof Boolean);
-        assertTrue("intersects", (Boolean) obj);
-
-        assertEquals("intersects one", 1.0, result.get("count"));
-
+        Map<String,Object> output = process.execute(input, null);
+        assertNotNull("distbear output", output);
+        assertTrue("result in outputs", output.containsKey("result"));
+        Object obj = output.get("result");
+        assertTrue("result type", obj instanceof SimpleFeatureCollection);
+        SimpleFeatureCollection features = (SimpleFeatureCollection) obj;
+        assertEquals("result size", 2, features.size());
+        
+        SimpleFeatureType schema = features.getSchema();
+        GeometryType geomType = schema.getGeometryDescriptor().getType();
+        assertEquals("geometry type", MultiPolygon.class, geomType.getBinding());
+        
+        assertNotNull("distance attribute", schema.getDescriptor("distance"));
+        assertNotNull("bearing attribute", schema.getDescriptor("bearing"));
+    
     }
-
-    public void testExecuteIntersectsBuildingsFilterMiss() throws Exception {
-        ScriptProcess process = createProcess("intersects");
-        WKTReader wktReader = new WKTReader();
-
-        Map<String, Object> input = new HashMap<String, Object>();
-        input.put("geometry", wktReader.read("POINT (0.00216 0.00084)"));
-        input.put("namespace", "http://www.opengis.net/cite");
-        input.put("featureType", "Buildings");
-        input.put("filter", "ADDRESS LIKE '123 Main%'");
-
-        Map<String,Object> result = process.execute(input, null);
-        assertNotNull("intersects result", result);
-        assertTrue("intersects in results", result.containsKey("intersects"));
-        Object obj = result.get("intersects");
-        assertTrue("got back a boolean", obj instanceof Boolean);
-        assertFalse("intersects", (Boolean) obj);
-    }
-
 
 }

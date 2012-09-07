@@ -7,4 +7,4 @@ Scripting Reference
    :maxdepth: 1
 
    py/index
-..   js/index
+   js/index

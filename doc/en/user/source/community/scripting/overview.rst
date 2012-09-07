@@ -15,11 +15,11 @@ for each scripting hook::
   GEOSERVER_DATA_DIR/
      ...
      scripts/
-        app/
+        apps/
         lib/
         wps/
         
-The ``app`` directory provides an "application" hook allowing for one to 
+The ``apps`` directory provides an "application" hook allowing for one to 
 provide a script invokable over http.
 
 The ``wps`` directory provides a Web Processing Service (WPS) process 
@@ -37,7 +37,7 @@ See :ref:`scripting_hooks` for more details.
 
 Creating scripts involves creating a script in one of these hook directories.
 New scripts are picked up automatically by GeoServer without a need to ever
-restart the server as is the case with a pure java GeoServer extension.
+restart the server as is the case with a pure Java GeoServer extension.
 
 
 

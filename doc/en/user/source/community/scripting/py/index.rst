@@ -3,6 +3,11 @@
 Python
 ======
 
+.. toctree::
+   :hidden:
+
+   api/index
+
 Script Hooks
 ------------
 
@@ -68,13 +73,13 @@ Within the app function the following things will happen:
 
 Steps 1 and 2 are accomplished by invoking the ``start_response`` function:
 
-.. code_block:: python
+.. code-block:: python
 
    start_response('200 OK', [('Content-Type', 'text/plain')]) 
    
 Step 3 is achieved by returning an array of string content:
 
-.. code_block:: python
+.. code-block:: python
 
    return ['Hello World']
    
@@ -99,7 +104,7 @@ In Python the wps/process interface is much like the other languages, with a few
 process is defined with a function named ``run`` that is decorated with the ``geoserver.wps.process``
 decorator:
 
-.. code_block:: python
+.. code-block:: python
 
    from geoserver.wps import process
    
@@ -265,5 +270,5 @@ In much the same way as GeoScript provides a convenient scripting layer on top o
 GeoTools the Python scripting extension provides a ``geoserver`` Python module that 
 provides convenient access to some of the GeoServer internals. 
 
-The GeoServer Python api is documented `here <>`_.
+The GeoServer Python api is documented :ref:`here <scripting_python_api>`.
 

@@ -70,6 +70,7 @@
     <property name="order" value="200" />
   </bean>
   
+  <!-- hiding the script edit page for now until it is actually functional 
   <bean id="scriptMenuPage" class="org.geoserver.web.MenuPageInfo">
         <property name="id" value="scriptMenuPage"/>
         <property name="titleKey" value="ScriptsPage.title"/>
@@ -78,7 +79,7 @@
         <property name="icon" value="script.png"/>
         <property name="componentClass" value="org.geoserver.script.web.ScriptsPage"/>
    </bean>
-
+  -->
   <bean id="pluginMenuPage" class="org.geoserver.web.MenuPageInfo">
         <property name="id" value="pluginMenuPage"/>
         <property name="titleKey" value="PluginsPage.title"/>
