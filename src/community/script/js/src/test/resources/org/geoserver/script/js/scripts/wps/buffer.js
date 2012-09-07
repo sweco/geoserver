@@ -21,7 +21,7 @@ exports.process = new Process({
             description: "The target geometry."
         },
         distance: {
-            type: "Double",
+            type: "Number",
             title: "Buffer Distance",
             description: "The distance by which to buffer the geometry."
         }
