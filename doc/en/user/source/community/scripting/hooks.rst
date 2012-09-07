@@ -62,7 +62,7 @@ The equivalent 'Hello World' app in JavaScript would look like the following
         }
       }; 
 
-Applications are http accessible at the path ``/scripts/apps/{app}`` where ``{app}`` 
+Applications are http accessible at the path ``/script/apps/{app}`` where ``{app}`` 
 is the name of the application. For example assuming a local GeoServer the url for
 for the application would be::
 
