@@ -66,13 +66,12 @@ public class ScriptProcessFactory extends ScriptFactory implements ProcessFactor
                 WpsHook hook = scriptMgr.lookupWpsHook(f);
                 if (hook == null) {
                     LOGGER.fine("Skipping " + f.getName() + ", no hook found");
-                }
+                } else {
+                    //use the extension as the namespace, and the basename as the process name 
+                    names.add(new NameImpl(getExtension(f.getName()), getBaseName(f.getName())));
 
-                //TODO: support multiple processes in one file
-                //TODO: support the process defining its namespace
-                
-                //use the extension as the namespace, and the basename as the process name 
-                names.add(new NameImpl(getExtension(f.getName()), getBaseName(f.getName())));
+                    //TODO: support the process defining its namespace
+                }
             }
         }
         catch (IOException e) {
