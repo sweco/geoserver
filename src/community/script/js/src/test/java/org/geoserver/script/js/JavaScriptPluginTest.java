@@ -9,6 +9,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
 import org.geoserver.script.ScriptIntTestSupport;
+import org.geoserver.script.ScriptManager;
 import org.geoserver.script.ScriptPlugin;
 import org.mozilla.javascript.NativeArray;
 import org.mozilla.javascript.Scriptable;
@@ -49,10 +50,15 @@ public class JavaScriptPluginTest extends ScriptIntTestSupport {
 
     /**
      * Test method for {@link org.geoserver.geoscript.javascript.JavaScriptModules#require()}.
+     * @throws ScriptException 
      */
-    public void testRequireGeoScript() {
-        JavaScriptPlugin plugin = getPlugin();
-        Scriptable exports = plugin.require("geoscript");
+    public void testRequireGeoScript() throws ScriptException {
+        ScriptManager scriptMgr = getScriptManager();
+        ScriptEngine engine = scriptMgr.createNewEngine("js");
+        engine.eval("var gs = require('geoscript')");
+        Object exportsObj = engine.get("gs");
+        assertTrue(exportsObj instanceof Scriptable);
+        Scriptable exports = (Scriptable) exportsObj;
         Object geomObj = exports.get("geom", exports);
         assertTrue("geom in exports", geomObj instanceof Scriptable);
         Object projObj = exports.get("proj", exports);
@@ -61,10 +67,15 @@ public class JavaScriptPluginTest extends ScriptIntTestSupport {
 
     /**
      * Test method for {@link org.geoserver.geoscript.javascript.JavaScriptModules#require()}.
+     * @throws ScriptException 
      */
-    public void testRequireGeoServer() {
-        JavaScriptPlugin plugin = getPlugin();
-        Scriptable exports = plugin.require("geoserver");
+    public void testRequireGeoServer() throws ScriptException {
+        ScriptManager scriptMgr = getScriptManager();
+        ScriptEngine engine = scriptMgr.createNewEngine("js");
+        engine.eval("var gs = require('geoserver')");
+        Object exportsObj = engine.get("gs");
+        assertTrue(exportsObj instanceof Scriptable);
+        Scriptable exports = (Scriptable) exportsObj;
         Object catalogObj = exports.get("catalog", exports);
         assertTrue("catalog in exports", catalogObj instanceof Scriptable);
     }

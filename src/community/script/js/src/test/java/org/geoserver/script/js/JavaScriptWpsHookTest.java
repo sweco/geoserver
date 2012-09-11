@@ -98,7 +98,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         assertEquals("correct sum", 6.0, (Double) sum, 0.0);
     }
     
-    public void xestBuffer() throws ScriptException, IOException, ParseException {
+    public void testBuffer() throws ScriptException, IOException, ParseException {
 
         ScriptProcess process = createProcess("buffer");
 
@@ -155,7 +155,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         return features;
     }
 
-    public void xestExecuteIntersectsBridgesHit() throws Exception {
+    public void testExecuteIntersectsBridgesHit() throws Exception {
         ScriptProcess process = createProcess("intersects");
         
         WKTReader wktReader = new WKTReader();
@@ -176,7 +176,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
 
     }
 
-    public void xestExecuteIntersectsBridgesMiss() throws Exception {
+    public void testExecuteIntersectsBridgesMiss() throws Exception {
         ScriptProcess process = createProcess("intersects");
         WKTReader wktReader = new WKTReader();
 
@@ -192,7 +192,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         assertFalse("intersects", (Boolean) obj);
     }
 
-    public void xestExecuteIntersectsBuildingsHit() throws Exception {
+    public void testExecuteIntersectsBuildingsHit() throws Exception {
         ScriptProcess process = createProcess("intersects");
         WKTReader wktReader = new WKTReader();
 
@@ -208,7 +208,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         assertTrue("intersects", (Boolean) obj);
     }
 
-    public void xestExecuteIntersectsBuildingsHitMultiple() throws Exception {
+    public void testExecuteIntersectsBuildingsHitMultiple() throws Exception {
         ScriptProcess process = createProcess("intersects");
         WKTReader wktReader = new WKTReader();
 
@@ -228,7 +228,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
 
     }
 
-    public void xestExecuteIntersectsBuildingsMiss() throws Exception {
+    public void testExecuteIntersectsBuildingsMiss() throws Exception {
         ScriptProcess process = createProcess("intersects");
         WKTReader wktReader = new WKTReader();
 
@@ -244,7 +244,7 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
         assertFalse("intersects", (Boolean) obj);
     }
     
-    public void xestExecuteDistbearBuildings() throws Exception {
+    public void testExecuteDistbearBuildings() throws Exception {
         ScriptProcess process = createProcess("distbear");
         WKTReader wktReader = new WKTReader();
 
