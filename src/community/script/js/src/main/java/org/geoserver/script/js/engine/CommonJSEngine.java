@@ -16,8 +16,6 @@ import javax.script.SimpleBindings;
 
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
-import org.mozilla.javascript.JavaScriptException;
-import org.mozilla.javascript.RhinoException;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.tools.shell.Global;
@@ -165,16 +163,6 @@ public class CommonJSEngine extends AbstractScriptEngine implements Invocable {
         Object result;
         try {
             result = method.call(cx, scope, (Scriptable) thisObj, args);
-        } catch (JavaScriptException jse) {
-            int line = (line = jse.lineNumber()) == 0 ? -1 : line;
-            Object value = jse.getValue();
-            String str = (value != null && value.getClass().getName().equals("org.mozilla.javascript.NativeError") ?
-                          value.toString() :
-                          jse.toString());
-            throw new ExtendedScriptException(jse, str, jse.sourceName(), line);
-        } catch (RhinoException re) {
-            int line = (line = re.lineNumber()) == 0 ? -1 : line;
-            throw new ExtendedScriptException(re, re.toString(), re.sourceName(), line);
         } finally {
             Context.exit();
         }

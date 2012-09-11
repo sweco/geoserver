@@ -10,7 +10,7 @@ import javax.script.ScriptException;
 
 import org.geoserver.script.ScriptPlugin;
 import org.geoserver.script.app.AppHook;
-import org.geoserver.script.js.engine.RhinoScriptEngine;
+import org.geoserver.script.js.engine.CommonJSEngine;
 import org.geotools.util.logging.Logging;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Scriptable;
@@ -40,7 +40,7 @@ public class JavaScriptAppHook extends AppHook {
             throw new ScriptException("Couldn't get exports for app.");
         }
         Scriptable scope = exports.getParentScope();
-        Context cx = RhinoScriptEngine.enterContext();
+        Context cx = CommonJSEngine.enterContext();
         Scriptable jsgiRequest = null;
         try {
             jsgiRequest = new JsgiRequest(request, response, cx, scope);

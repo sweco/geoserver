@@ -7,7 +7,7 @@ import java.util.logging.Logger;
 
 import javax.script.ScriptException;
 
-import org.geoserver.script.js.engine.RhinoScriptEngine;
+import org.geoserver.script.js.engine.CommonJSEngine;
 import org.geotools.util.logging.Logging;
 import org.mozilla.javascript.BoundFunction;
 import org.mozilla.javascript.Context;
@@ -50,7 +50,7 @@ public class JsgiResponse {
         if (bodyObj instanceof String) {
             // be lenient and convert strings to arrays
             Object[] array = {(String) bodyObj};
-            Context cx = RhinoScriptEngine.enterContext();
+            Context cx = CommonJSEngine.enterContext();
             try {
                 bodyObj = cx.newArray(scope, array);
             } finally {
@@ -115,7 +115,7 @@ public class JsgiResponse {
             
             @Override
             public void write(OutputStream outputStream) throws IOException {
-                Context cx = RhinoScriptEngine.enterContext();
+                Context cx = CommonJSEngine.enterContext();
                 FunctionObject writeFunc = new FunctionObject("bodyWriter", writeMethod, scope);
                 BoundFunction boundWrite = new BoundFunction(cx, scope, writeFunc, body, new Object[] {outputStream});
                 Object[] args = {boundWrite};
