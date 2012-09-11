@@ -31,8 +31,6 @@ public class JavaScriptAppHook extends AppHook {
     public void run(Request request, Response response, ScriptEngine engine)
             throws ScriptException, IOException {
 
-        JavaScriptPlugin jsPlugin = (JavaScriptPlugin) plugin;
-
         Invocable invocable = (Invocable) engine;
         Object exportsObj = engine.get("exports");
         Scriptable exports = null;
@@ -41,10 +39,11 @@ public class JavaScriptAppHook extends AppHook {
         } else {
             throw new ScriptException("Couldn't get exports for app.");
         }
+        Scriptable scope = exports.getParentScope();
         Context cx = RhinoScriptEngine.enterContext();
         Scriptable jsgiRequest = null;
         try {
-            jsgiRequest = new JsgiRequest(request, response, cx, jsPlugin.global);
+            jsgiRequest = new JsgiRequest(request, response, cx, scope);
         } catch (Exception e) {
             throw new ScriptException(e);
         } finally {
@@ -59,9 +58,9 @@ public class JavaScriptAppHook extends AppHook {
         if (!(appReturn instanceof Scriptable)) {
             throw new ScriptException("bad return from JSGI app");
         }
-        JsgiResponse jsgiResponse = new JsgiResponse((Scriptable) appReturn, jsPlugin.global);
+        JsgiResponse jsgiResponse = new JsgiResponse((Scriptable) appReturn, scope);
         try {
-            jsgiResponse.commit(response, jsPlugin.global);
+            jsgiResponse.commit(response, scope);
         } catch (Exception e) {
             throw new ScriptException("Failed to write response: " + e.getMessage());
         }
