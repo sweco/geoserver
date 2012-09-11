@@ -1,6 +1,7 @@
 package org.geoserver.script.js;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Arrays;
@@ -23,8 +24,7 @@ public class JavaScriptPlugin extends ScriptPlugin {
 
     private static final long serialVersionUID = 1L;
     private Logger LOGGER = Logging.getLogger("org.geoserver.script.js");
-
-    private File libRoot;
+    private ScriptManager scriptMgr;
 
     protected JavaScriptPlugin() {
         super("js", CommonJSEngineFactory.class);
@@ -43,7 +43,7 @@ public class JavaScriptPlugin extends ScriptPlugin {
     @Override
     public void init(ScriptManager scriptMgr) throws Exception {
         super.init(scriptMgr);
-        libRoot = scriptMgr.getLibRoot("js");
+        this.scriptMgr = scriptMgr;
         scriptMgr.getEngineManager().registerEngineExtension(
                 "js", new CommonJSEngineFactory(getModulePaths()));
     }
@@ -80,6 +80,12 @@ public class JavaScriptPlugin extends ScriptPlugin {
         }
 
         // User modules
+        File libRoot;
+        try {
+            libRoot = scriptMgr.getLibRoot("js");
+        } catch (IOException e) {
+            throw new RuntimeException("Trouble getting JavaScript library root.", e);
+        }
         String userModulePath = libRoot.toURI().toString();
 
         return (List<String>) Arrays.asList(geoscriptModulePath, geoserverModulePath, userModulePath);
