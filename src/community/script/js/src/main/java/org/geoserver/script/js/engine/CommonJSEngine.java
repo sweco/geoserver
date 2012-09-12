@@ -3,7 +3,6 @@ package org.geoserver.script.js.engine;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
-import java.lang.reflect.Method;
 
 import javax.script.AbstractScriptEngine;
 import javax.script.Bindings;
@@ -23,7 +22,6 @@ import org.mozilla.javascript.tools.shell.Global;
 public class CommonJSEngine extends AbstractScriptEngine implements Invocable {
 
     private CommonJSEngineFactory factory;
-    private InterfaceImplementor implementor;
     
     public CommonJSEngine() {
         this(new CommonJSEngineFactory(null));
@@ -31,20 +29,6 @@ public class CommonJSEngine extends AbstractScriptEngine implements Invocable {
 
     public CommonJSEngine(CommonJSEngineFactory factory) {
         this.factory = factory;
-
-        //construct object used to implement getInterface
-        implementor = new InterfaceImplementor(this) {
-            protected Object convertResult(Method method, Object res)
-                                        throws ScriptException {
-                Class<?> desiredType = method.getReturnType();
-                if (desiredType == Void.TYPE) {
-                    return null;
-                } else {
-                    return Context.jsToJava(res, desiredType);
-                }
-            }
-        };
- 
     
     }
     
@@ -111,23 +95,12 @@ public class CommonJSEngine extends AbstractScriptEngine implements Invocable {
 
     @Override
     public <T> T getInterface(Class<T> cls) {
-        try {
-            return implementor.getInterface(null, cls);
-        } catch (ScriptException e) {
-            return null;
-        }
+        throw new RuntimeException("getInterface not implemented");
     }
 
     @Override
     public <T> T getInterface(Object thisObj, Class<T> cls) {
-        if (thisObj == null) {
-            throw new IllegalArgumentException("script object can not be null");
-        }
-        try {
-            return implementor.getInterface(thisObj, cls);
-        } catch (ScriptException e) {
-            return null;
-        }
+        throw new RuntimeException("getInterface not implemented");
     }
 
     @Override
