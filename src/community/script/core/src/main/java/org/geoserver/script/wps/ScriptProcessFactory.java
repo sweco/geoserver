@@ -100,12 +100,18 @@ public class ScriptProcessFactory extends ScriptFactory implements ProcessFactor
         }
     }
 
+    /**
+     * Get description given a process identifier.  Returns null if process
+     * has no description (WPS spec says process abstract is optional).
+     */
     public InternationalString getDescription(Name name) {
+        String desc;
         try {
-            return new SimpleInternationalString(process(name).getDescription());
+            desc = process(name).getDescription();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        return desc != null ? new SimpleInternationalString(desc) : null;
     }
     
     public Map<String, Parameter<?>> getParameterInfo(Name name) {
