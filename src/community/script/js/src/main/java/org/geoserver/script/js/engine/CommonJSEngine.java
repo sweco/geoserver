@@ -47,16 +47,10 @@ public class CommonJSEngine extends AbstractScriptEngine implements Invocable {
     
     @Override
     public Object eval(Reader reader, ScriptContext context) throws ScriptException {
-        Bindings bindings = context.getBindings(ScriptContext.ENGINE_SCOPE);
-        String filename = null;
-        if (context != null && bindings != null) {
-            filename = (String) bindings.get(ScriptEngine.FILENAME);
-        }
+        String filename = (String) get(ScriptEngine.FILENAME);
         if (filename == null) {
-            filename = (String) get(ScriptEngine.FILENAME);
+            filename = "<Unknown Source>";
         }
-        
-        filename = filename == null ? "<Unknown source>" : filename;
         Object result;
         EngineScope scope = getRuntimeScope(context);
         Context cx = enterContext();
