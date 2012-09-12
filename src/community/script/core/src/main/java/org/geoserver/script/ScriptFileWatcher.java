@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
+import javax.script.Bindings;
+import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
@@ -48,6 +50,8 @@ public class ScriptFileWatcher extends FileWatcher<ScriptEngine> {
     @Override
     protected ScriptEngine parseFileContents(InputStream in) throws IOException {
         engine = scriptMgr.createNewEngine(getFile());
+        Bindings bindings = engine.getBindings(ScriptContext.ENGINE_SCOPE);
+        bindings.put(ScriptEngine.FILENAME, getFile().getPath());
         try {
             engine.eval(new InputStreamReader(in));
         } catch (ScriptException e) {
