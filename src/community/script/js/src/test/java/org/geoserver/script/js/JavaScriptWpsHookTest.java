@@ -2,6 +2,7 @@ package org.geoserver.script.js;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,7 +28,9 @@ import org.opengis.feature.type.GeometryType;
 import org.opengis.feature.type.Name;
 
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.GeometryCollection;
 import com.vividsolutions.jts.geom.MultiPolygon;
+import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKTReader;
 
@@ -269,4 +272,45 @@ public class JavaScriptWpsHookTest extends ScriptIntTestSupport {
     
     }
 
+    public void testExecuteBufferedUnion() throws Exception {
+        ScriptProcess process = createProcess("bufferedUnion");
+        WKTReader wktReader = new WKTReader();
+
+        Map<String, Object> input = new HashMap<String, Object>();
+        ArrayList<Geometry> geoms = new ArrayList<Geometry>(2);
+        geoms.add(wktReader.read("POINT (0 0)"));
+        geoms.add(wktReader.read("POINT (1 0)"));
+        input.put("geom", geoms);
+        input.put("distance", 2);
+
+        Map<String,Object> output = process.execute(input, null);
+        assertNotNull("output", output);
+        assertTrue("result in outputs", output.containsKey("result"));
+        Object obj = output.get("result");
+        assertTrue("result type", obj instanceof Polygon);
+        Polygon geom = (Polygon) obj;
+        assertEquals(16.43, geom.getArea(), 0.01);
+    }
+
+    public void testExecuteBufferSplit() throws Exception {
+        ScriptProcess process = createProcess("bufferSplit");
+        WKTReader wktReader = new WKTReader();
+
+        Map<String, Object> input = new HashMap<String, Object>();
+        input.put("geom", wktReader.read("POINT (0 0)"));
+        input.put("distance", 0.5);
+        input.put("line", wktReader.read("LINESTRING (-1 -1, 1 1)"));
+
+        Map<String,Object> output = process.execute(input, null);
+        assertNotNull("output", output);
+        assertTrue("result in outputs", output.containsKey("result"));
+        Object obj = output.get("result");
+        assertTrue("result type", obj instanceof GeometryCollection);
+        GeometryCollection geom = (GeometryCollection) obj;
+        assertEquals(2, geom.getNumGeometries());
+        assertEquals(0.39, geom.getGeometryN(0).getArea(), 0.01);
+        assertEquals(0.39, geom.getGeometryN(1).getArea(), 0.01);
+    }
+
+    
 }
