@@ -14,6 +14,7 @@ import javax.script.ScriptException;
 import javax.script.SimpleBindings;
 
 import org.mozilla.javascript.Context;
+import org.mozilla.javascript.EcmaError;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
@@ -56,7 +57,9 @@ public class CommonJSEngine extends AbstractScriptEngine implements Invocable {
         Context cx = enterContext();
         try {
             result = cx.evaluateReader(scope, reader, filename, 1, null);
-        } catch (IOException e) {
+        } catch (EcmaError e) {
+            throw new ScriptException(e.getMessage(), e.sourceName(), e.lineNumber(), e.columnNumber());
+        } catch (Exception e) {
             throw new ScriptException(e);
         } finally {
             Context.exit();
