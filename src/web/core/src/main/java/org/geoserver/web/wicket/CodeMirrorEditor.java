@@ -143,7 +143,7 @@ public class CodeMirrorEditor extends FormComponentPanel<String> {
             public CharSequence decorateScript(CharSequence script) {
                 // textarea.value = codemirrorinstance.getCode()
                 String id = getTextAreaMarkupId();
-                return "document.getElementById('" + id + "').value = document.gsEditors." + id + ".getCode();" + script;
+                return "document.getElementById('" + id + "').value = document.gsEditors." + id + ".getValue();" + script;
             }
         };
     }
