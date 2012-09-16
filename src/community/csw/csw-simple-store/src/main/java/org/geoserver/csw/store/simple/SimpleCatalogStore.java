@@ -38,6 +38,7 @@ import org.opengis.feature.type.Name;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory2;
 import org.opengis.filter.identity.FeatureId;
+import org.xml.sax.helpers.NamespaceSupport;
 
 /**
  * A simple implementation of {@link CatalogStore} geared towards test support. 
@@ -92,8 +93,12 @@ public class SimpleCatalogStore implements CatalogStore {
         FeatureCollection records = new RecordsFeatureCollection(root, startIndex);
 
         // filtering
-        if (q.getFilter() != Filter.INCLUDE) {
-            records = new FilteringFeatureCollection<FeatureType, Feature>(records, q.getFilter());
+        if (q.getFilter() != null && q.getFilter() != Filter.INCLUDE) {
+            Filter filter = q.getFilter();
+            OWSAnyExpander expander = new OWSAnyExpander();
+            Filter expanded = (Filter) filter.accept(expander, null);
+            
+            records = new FilteringFeatureCollection<FeatureType, Feature>(records, expanded);
         }
 
         // sorting

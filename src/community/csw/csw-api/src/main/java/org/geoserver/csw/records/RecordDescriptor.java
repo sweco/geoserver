@@ -9,6 +9,7 @@ import java.util.Set;
 
 import net.opengis.cat.csw20.ElementSetType;
 
+import org.geotools.data.Query;
 import org.opengis.feature.type.FeatureType;
 import org.opengis.feature.type.Name;
 import org.xml.sax.helpers.NamespaceSupport;
@@ -44,4 +45,14 @@ public interface RecordDescriptor {
      * @return
      */
     NamespaceSupport getNamespaceSupport();
+    
+    /**
+     * Allow the descriptor to adjust the query to the internal representation of records.
+     * For example, in the case of SimpleLiteral we have a complex type with simple content,
+     * something that we cannot readily represent in GeoTools
+     * 
+     * @param query
+     * @return
+     */
+    Query adaptQuery(Query query);
 }

@@ -81,7 +81,7 @@ public class DescribeRecordTest extends CSWTestSupport {
         raw.put("request", "DescribeRecord");
         raw.put("namespace",
                 "xmlns(=http://www.opengis.net/cat/csw/2.0.2),xmlns(rim=urn:oasis:names:tc:ebxml-regrep:xsd:rim:3.0)");
-        raw.put("typename", "csw:Record,rim:RegistryPackage");
+        raw.put("typename", "Record,rim:RegistryPackage");
         raw.put("schemalanguage", "XMLSCHEMA");
         raw.put("outputFormat", "application/xml");
 
@@ -97,6 +97,16 @@ public class DescribeRecordTest extends CSWTestSupport {
         DescribeRecordType dr = (DescribeRecordType) reader.read(null,
                 getResourceAsReader("DescribeRecord.xml"), (Map) null);
         assertDescribeRecordValid(dr);
+    }
+    
+    // this is one of the CITE tests, unknown type names should just be ignored
+    public void testDummyRecord() throws Exception {
+        Document dom = getAsDOM("csw?service=CSW&version=2.0.2&request=DescribeRecord&typeName=csw:DummyRecord");
+        checkValidationErrors(dom);
+        // print(dom);
+
+        assertXpathEvaluatesTo("1", "count(/csw:DescribeRecordResponse)", dom);
+        assertXpathEvaluatesTo("0", "count(//csw:SchemaComponent)", dom);
     }
 
     public void testBasicGetLocalSchema() throws Exception {
@@ -161,14 +171,14 @@ public class DescribeRecordTest extends CSWTestSupport {
         assertCswRecordSchema(dom, false);
     }
     
-    public void testInvalidTypeName() throws Exception {
-        Document dom = getAsDOM("csw?service=CSW&version=2.0.2&request=DescribeRecord&typeName=FairyTales");
-        checkOws10Exception(dom, ServiceException.INVALID_PARAMETER_VALUE, "typename");
+    public void testMissingOutputFormat() throws Exception {
+        Document dom = getAsDOM("csw?service=CSW&version=2.0.2&request=DescribeRecord&outputFormat=text/sgml");
+        checkOws10Exception(dom, ServiceException.INVALID_PARAMETER_VALUE, "outputFormat");
     }
     
-    public void testInvalidNamespace() throws Exception {
-        Document dom = getAsDOM("csw?service=CSW&version=2.0.2&request=DescribeRecord&typeName=Record&namespace=xmlns(=http://www.opengis.net/csw/4.200.127)");
-        checkOws10Exception(dom, ServiceException.INVALID_PARAMETER_VALUE, "typename");
+    public void testInvalidSchemaLanguage() throws Exception {
+        Document dom = getAsDOM("csw?service=CSW&version=2.0.2&request=DescribeRecord&schemaLanguage=http://purl.oclc.org/dsdl/schematron");
+        checkOws10Exception(dom, ServiceException.INVALID_PARAMETER_VALUE, "schemaLanguage");
     }
-
+    
 }
