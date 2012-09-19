@@ -4,6 +4,8 @@
  */
 package org.geoserver.csw;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -11,6 +13,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import net.opengis.cat.csw20.CapabilitiesType;
@@ -36,7 +41,7 @@ import net.opengis.ows10.TelephoneType;
 
 import org.geoserver.catalog.KeywordInfo;
 import org.geoserver.config.ContactInfo;
-import org.geoserver.csw.store.CatalogCapabilities;
+import org.geoserver.csw.records.CSWRecordDescriptor;
 import org.geoserver.csw.store.CatalogStore;
 import org.geoserver.ows.URLMangler.URLType;
 import org.geoserver.ows.util.RequestUtils;
@@ -49,6 +54,8 @@ import org.geotools.filter.capability.SpatialCapabiltiesImpl;
 import org.geotools.filter.capability.SpatialOperatorsImpl;
 import org.geotools.util.logging.Logging;
 import org.geotools.xml.EMFUtils;
+import org.opengis.feature.type.FeatureType;
+import org.opengis.feature.type.Name;
 import org.opengis.filter.FilterFactory2;
 import org.opengis.filter.capability.ArithmeticOperators;
 import org.opengis.filter.capability.ComparisonOperators;
@@ -61,6 +68,7 @@ import org.opengis.filter.capability.SpatialCapabilities;
 import org.opengis.filter.capability.SpatialOperator;
 import org.opengis.filter.capability.SpatialOperators;
 import org.springframework.context.ApplicationContext;
+import org.xml.sax.helpers.NamespaceSupport;
 
 /**
  * The CSW GetCapabilities implementation
@@ -70,9 +78,185 @@ import org.springframework.context.ApplicationContext;
  */
 @SuppressWarnings("unchecked")
 public class GetCapabilities {
+    private static final String CSW_VERSION = "2.0.2";
     static final Logger LOGGER = Logging.getLogger(GetCapabilities.class);
     static Csw20Factory cswf = Csw20Factory.eINSTANCE;
     static Ows10Factory owsf = Ows10Factory.eINSTANCE;
+    
+    private static final String version = CSW_VERSION;
+
+    static public Map<String, List<DomainType>> operationParameters = new HashMap<String, List<DomainType>>();
+    static public Map<String, List<DomainType>> operationConstraints = new HashMap<String, List<DomainType>>();
+
+    static
+    {
+        /** 
+         * OperationMetadata 
+         **/
+        operationParameters.put("OperationsMetadata", new LinkedList<DomainType>());
+        operationConstraints.put("OperationsMetadata", new LinkedList<DomainType>());
+        
+        // - Parameters
+        DomainType opMetadataParam1 = owsf.createDomainType();
+        DomainType opMetadataParam2 = owsf.createDomainType();
+        opMetadataParam1.setName("service");
+        opMetadataParam1.getValue().add("http://www.opengis.net/cat/csw/2.0.2");
+        opMetadataParam2.setName("version");
+        opMetadataParam2.getValue().add(version);
+        operationParameters.get("OperationsMetadata").add(opMetadataParam1);
+        operationParameters.get("OperationsMetadata").add(opMetadataParam2);
+        
+        // - Constraints
+        DomainType opMetadataConstraint1 = owsf.createDomainType();
+        opMetadataConstraint1.setName("PostEncoding");
+        opMetadataConstraint1.getValue().add("XML");
+        operationConstraints.get("OperationsMetadata").add(opMetadataConstraint1);
+        
+        /** 
+         * GetCapabilities 
+         **/
+        operationParameters.put("GetCapabilities", new LinkedList<DomainType>());
+        operationConstraints.put("GetCapabilities", new LinkedList<DomainType>());
+
+        // - Parameters
+        DomainType getCapabilitiesParam = owsf.createDomainType();
+        getCapabilitiesParam.setName("sections");
+        getCapabilitiesParam.getValue().add("ServiceIdentification");
+        getCapabilitiesParam.getValue().add("ServiceProvider");
+        getCapabilitiesParam.getValue().add("OperationsMetadata");
+        getCapabilitiesParam.getValue().add("Filter_Capabilities");
+        operationParameters.get("GetCapabilities").add(getCapabilitiesParam);
+
+        // - Constraints
+        DomainType getCapabilitiesConstraint = owsf.createDomainType();
+        getCapabilitiesConstraint.setName("PostEncoding");
+        getCapabilitiesConstraint.getValue().add("XML");
+        operationConstraints.get("GetCapabilities").add(getCapabilitiesConstraint);
+
+        /** 
+         * DescribeRecord 
+         **/
+        operationParameters.put("DescribeRecord", new LinkedList<DomainType>());
+        operationConstraints.put("DescribeRecord", new LinkedList<DomainType>());
+        
+        // - Parameters
+        DomainType describeRecordParam1 = owsf.createDomainType();
+        DomainType describeRecordParam2 = owsf.createDomainType();
+        DomainType describeRecordParam3 = owsf.createDomainType();
+        describeRecordParam1.setName("typeName");
+        describeRecordParam1.getValue().add("csw:Record");
+        describeRecordParam1.getValue().add("gmd:MD_Metadata");
+        describeRecordParam2.setName("outputFormat");
+        describeRecordParam2.getValue().add("application/xml");
+        describeRecordParam3.setName("schemaLanguage");
+        describeRecordParam3.getValue().add("http://www.w3.org/TR/xmlschema-1/");
+        operationParameters.get("DescribeRecord").add(describeRecordParam1);
+        operationParameters.get("DescribeRecord").add(describeRecordParam2);
+        operationParameters.get("DescribeRecord").add(describeRecordParam3);
+
+        // - Constraints
+        DomainType describeRecordConstraint = owsf.createDomainType();
+        describeRecordConstraint.setName("PostEncoding");
+        describeRecordConstraint.getValue().add("XML");
+        operationConstraints.get("DescribeRecord").add(describeRecordConstraint);
+        
+        /** 
+         * GetRecords 
+         **/
+        operationParameters.put("GetRecords", new LinkedList<DomainType>());
+        operationConstraints.put("GetRecords", new LinkedList<DomainType>());
+        
+        // - Parameters
+        DomainType getRecordsParam1 = owsf.createDomainType();
+        DomainType getRecordsParam2 = owsf.createDomainType();
+        DomainType getRecordsParam3 = owsf.createDomainType();
+        DomainType getRecordsParam4 = owsf.createDomainType();
+        DomainType getRecordsParam5 = owsf.createDomainType();
+        getRecordsParam1.setName("resultType");
+        getRecordsParam1.getValue().add("hits");
+        getRecordsParam1.getValue().add("results");
+        getRecordsParam1.getValue().add("validate");
+        getRecordsParam2.setName("outputFormat");
+        getRecordsParam2.getValue().add("application/xml");
+        getRecordsParam3.setName("outputSchema");
+        getRecordsParam3.getValue().add("http://www.opengis.net/cat/csw/2.0.2");
+        getRecordsParam3.getValue().add("http://www.isotc211.org/2005/gmd");
+        getRecordsParam4.setName("typeNames");
+        getRecordsParam4.getValue().add("csw:Record");
+        getRecordsParam4.getValue().add("gmd:MD_Metadata");
+        getRecordsParam5.setName("CONSTRAINTLANGUAGE");
+        getRecordsParam5.getValue().add("FILTER");
+        getRecordsParam5.getValue().add("CQL_TEXT");
+        operationParameters.get("GetRecords").add(getRecordsParam1);
+        operationParameters.get("GetRecords").add(getRecordsParam2);
+        operationParameters.get("GetRecords").add(getRecordsParam3);
+        operationParameters.get("GetRecords").add(getRecordsParam4);
+        operationParameters.get("GetRecords").add(getRecordsParam5);
+
+        // - Constraints
+        DomainType getRecordConstraint1 = owsf.createDomainType();
+        getRecordConstraint1.setName("PostEncoding");
+        getRecordConstraint1.getValue().add("XML");
+        operationConstraints.get("GetRecords").add(getRecordConstraint1);
+        
+        /** 
+         * GetRecordById 
+         **/
+        operationParameters.put("GetRecordById", new LinkedList<DomainType>());
+        operationConstraints.put("GetRecordById", new LinkedList<DomainType>());
+        
+        // - Parameters
+        DomainType getRecordByIdParam1 = owsf.createDomainType();
+        DomainType getRecordByIdParam2 = owsf.createDomainType();
+        DomainType getRecordByIdParam3 = owsf.createDomainType();
+        DomainType getRecordByIdParam4 = owsf.createDomainType();
+        getRecordByIdParam1.setName("resultType");
+        getRecordByIdParam1.getValue().add("hits");
+        getRecordByIdParam1.getValue().add("results");
+        getRecordByIdParam1.getValue().add("validate");
+        getRecordByIdParam2.setName("outputFormat");
+        getRecordByIdParam2.getValue().add("application/xml");
+        getRecordByIdParam3.setName("outputSchema");
+        getRecordByIdParam3.getValue().add("http://www.opengis.net/cat/csw/2.0.2");
+        getRecordByIdParam3.getValue().add("http://www.isotc211.org/2005/gmd");
+        getRecordByIdParam4.setName("ElementSetName");
+        getRecordByIdParam4.getValue().add("brief");
+        getRecordByIdParam4.getValue().add("summary");
+        getRecordByIdParam4.getValue().add("full");
+        operationParameters.get("GetRecordById").add(getRecordByIdParam1);
+        operationParameters.get("GetRecordById").add(getRecordByIdParam2);
+        operationParameters.get("GetRecordById").add(getRecordByIdParam3);
+        operationParameters.get("GetRecordById").add(getRecordByIdParam4);
+
+        // - Constraints
+        DomainType getRecordByIdConstraint1 = owsf.createDomainType();
+        getRecordByIdConstraint1.setName("PostEncoding");
+        getRecordByIdConstraint1.getValue().add("XML");
+        operationConstraints.get("GetRecordById").add(getRecordByIdConstraint1);
+
+        /** 
+         * GetDomain 
+         **/
+        operationParameters.put("GetDomain", new LinkedList<DomainType>());
+        operationConstraints.put("GetDomain", new LinkedList<DomainType>());
+        
+        // - Parameters
+        DomainType getDomainParam1 = owsf.createDomainType();
+        DomainType getDomainParam2 = owsf.createDomainType();
+        getDomainParam1.setName("parameterName");
+        getDomainParam1.getValue().add("xsd:anyURI");
+        getDomainParam2.setName("propertyName");
+        getDomainParam2.getValue().add("xsd:anyURI");
+        operationParameters.get("GetDomain").add(getDomainParam1);
+        operationParameters.get("GetDomain").add(getDomainParam2);
+        
+        /** 
+         * Transaction 
+         **/
+        operationParameters.put("Transaction", new LinkedList<DomainType>());
+        operationConstraints.put("Transaction", new LinkedList<DomainType>());
+        
+    }
 
     private static final boolean logicalOperators = true;
 
@@ -95,13 +279,13 @@ public class GetCapabilities {
     public CapabilitiesType run(GetCapabilitiesType request) throws CSWException {
         // do the version negotiation dance
         SectionsType sections = null;
-        List<String> provided = Collections.singletonList(CatalogCapabilities.getVersion());
+        List<String> provided = Collections.singletonList(CSW_VERSION);
         List<String> accepted = null;
         if (request.getAcceptVersions() != null)
             accepted = request.getAcceptVersions().getVersion();
         String version = RequestUtils.getVersionOws11(provided, accepted);
 
-        if (!CatalogCapabilities.getVersion().equals(version)) {
+        if (!CSW_VERSION.equals(version)) {
             throw new CSWException("Could not understand version:" + version);
         }
 
@@ -111,7 +295,7 @@ public class GetCapabilities {
 
         // encode the response
         CapabilitiesType caps = cswf.createCapabilitiesType();
-        caps.setVersion(CatalogCapabilities.getVersion());
+        caps.setVersion(CSW_VERSION);
 
         // ServiceIdentification
         if (sections == null || requestedSection("ServiceIdentification", sections)) {
@@ -137,7 +321,7 @@ public class GetCapabilities {
             CodeType CSW = owsf.createCodeType();
             CSW.setValue("CSW");
             si.setServiceType(CSW);
-            si.setServiceTypeVersion(CatalogCapabilities.getVersion());
+            si.setServiceTypeVersion(CSW_VERSION);
             si.setFees(csw.getFees());
 
             if (csw.getAccessConstraints() != null) {
@@ -210,13 +394,13 @@ public class GetCapabilities {
             }
             
             // - Parameters
-            for (DomainType param : CatalogCapabilities.operationParameters.get("OperationsMetadata"))
+            for (DomainType param : operationParameters.get("OperationsMetadata"))
             {
                 operationsMetadata.getParameter().add(param);
             }
 
             // - Constraints
-            for (DomainType constraint : CatalogCapabilities.operationConstraints.get("OperationsMetadata"))
+            for (DomainType constraint : operationConstraints.get("OperationsMetadata"))
             {
                 operationsMetadata.getConstraint().add(constraint);
             }
@@ -299,13 +483,13 @@ public class GetCapabilities {
         getCapabilitiesHTTP.getPost().add(getCapabilitiesPost);
 
         // - Parameters
-        for (DomainType param : CatalogCapabilities.operationParameters.get("GetCapabilities"))
+        for (DomainType param : operationParameters.get("GetCapabilities"))
         {
             getCapabilities.getParameter().add(param);
         }
 
         // - Constraints
-        for (DomainType constraint : CatalogCapabilities.operationConstraints.get("GetCapabilities"))
+        for (DomainType constraint : operationConstraints.get("GetCapabilities"))
         {
             getCapabilities.getConstraint().add(constraint);
         }
@@ -349,13 +533,13 @@ public class GetCapabilities {
         describeRecordHTTP.getPost().add(describeRecordPost);
 
         // - Parameters
-        for (DomainType param : CatalogCapabilities.operationParameters.get("DescribeRecord"))
+        for (DomainType param : operationParameters.get("DescribeRecord"))
         {
             describeRecord.getParameter().add(param);
         }
 
         // - Constraints
-        for (DomainType constraint : CatalogCapabilities.operationConstraints.get("DescribeRecord"))
+        for (DomainType constraint : operationConstraints.get("DescribeRecord"))
         {
             describeRecord.getConstraint().add(constraint);
         }
@@ -399,15 +583,40 @@ public class GetCapabilities {
         getRecordsHTTP.getPost().add(getRecordsPost);
 
         // - Parameters
-        for (DomainType param : CatalogCapabilities.operationParameters.get("GetRecords"))
+        for (DomainType param : operationParameters.get("GetRecords"))
         {
             getRecords.getParameter().add(param);
         }
 
         // - Constraints
-        for (DomainType constraint : CatalogCapabilities.operationConstraints.get("GetRecords"))
+        for (DomainType constraint : operationConstraints.get("GetRecords"))
         {
             getRecords.getConstraint().add(constraint);
+        }
+        
+        // the additional queriables based on the store
+        try {
+            for(FeatureType ft : store.getRecordSchemas()) {
+                // TODO: encode the ISO additional queriables too
+                if(ft.equals(CSWRecordDescriptor.RECORD)) {
+                    List<Name> queriables = store.getCapabilities().getQueriables(ft.getName());
+                    if(queriables != null && queriables.size() > 0) {
+                        DomainType dt = owsf.createDomainType();
+                        dt.setName("SupportedDublinCoreQueryables");
+                        
+                        for (Name q : queriables) {
+                            NamespaceSupport nss = CSWRecordDescriptor.NAMESPACES;
+                            String prefix = nss.getPrefix(q.getNamespaceURI());
+                            dt.getValue().add(prefix + ":" + q.getLocalPart());
+                        }
+                        
+                        getRecords.getConstraint().add(dt);
+                    }
+                }
+                
+            }
+        } catch (IOException e) {
+            LOGGER.log(Level.WARNING, "Failed to encode getRecords additional queriables", e);
         }
     }
 
@@ -449,13 +658,13 @@ public class GetCapabilities {
         getRecordByIdHTTP.getPost().add(getRecordByIdPost);
         
         // - Parameters
-        for (DomainType param : CatalogCapabilities.operationParameters.get("GetRecordById"))
+        for (DomainType param : operationParameters.get("GetRecordById"))
         {
             getRecordById.getParameter().add(param);
         }
 
         // - Constraints
-        for (DomainType constraint : CatalogCapabilities.operationConstraints.get("GetRecordById"))
+        for (DomainType constraint : operationConstraints.get("GetRecordById"))
         {
             getRecordById.getConstraint().add(constraint);
         }
@@ -498,14 +707,45 @@ public class GetCapabilities {
         getDomainPost.getConstraint().add(getDomainPostConstraints);
         getDomainHTTP.getPost().add(getDomainPost);
 
-        // - Parameters
-        for (DomainType param : CatalogCapabilities.operationParameters.get("GetDomain"))
+        // - Fixed Parameters
+        for (DomainType param : operationParameters.get("GetDomain"))
         {
             getDomain.getParameter().add(param);
         }
+        
+        // The domain queriables list from the catalog store
+        try {
+            Set<String> summary = new HashSet<String>();
+            for(FeatureType ft : store.getRecordSchemas()) {
+                    List<Name> queriables = store.getCapabilities().getDomainQueriables(ft.getName());
+                    
+                    if(queriables != null && queriables.size() > 0) {
+                        for (Name q : queriables) {
+                            NamespaceSupport nss = CSWRecordDescriptor.NAMESPACES;
+                            String prefix = nss.getPrefix(q.getNamespaceURI());
+                            summary.add(prefix + ":" + q.getLocalPart());
+                        }
+                        
+                        
+                    }
+                }
+                
+            if(summary.size() > 0) {
+                List<String> sorted = new ArrayList<String>(summary);
+                Collections.sort(sorted);
+                DomainType dt = owsf.createDomainType();
+                dt.setName("PropertyName");
+                for (String name : sorted) {
+                    dt.getValue().add(name);
+                }
+                getDomain.getParameter().add(dt);
+            }
+        } catch (IOException e) {
+            LOGGER.log(Level.WARNING, "Failed to encode getDomain ParameterName values", e);
+        }
 
         // - Constraints
-        for (DomainType constraint : CatalogCapabilities.operationConstraints.get("GetDomain"))
+        for (DomainType constraint : operationConstraints.get("GetDomain"))
         {
             getDomain.getConstraint().add(constraint);
         }
@@ -549,13 +789,13 @@ public class GetCapabilities {
         transactionHTTP.getPost().add(transactionPost);
         
         // - Parameters
-        for (DomainType param : CatalogCapabilities.operationParameters.get("Transaction"))
+        for (DomainType param : operationParameters.get("Transaction"))
         {
             transaction.getParameter().add(param);
         }
 
         // - Constraints
-        for (DomainType constraint : CatalogCapabilities.operationConstraints.get("Transaction"))
+        for (DomainType constraint : operationConstraints.get("Transaction"))
         {
             transaction.getConstraint().add(constraint);
         }
