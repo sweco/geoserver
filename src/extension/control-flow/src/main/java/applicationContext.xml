@@ -14,5 +14,24 @@
 
     <!-- IP blacklist filter -->
     <bean id="ipBlacklistFilter" class="org.geoserver.flow.controller.IpBlacklistFilter" />
-	
+
+
+    <!-- REST Mappings -->
+
+    <bean id="flowConfigFinder" class="org.geoserver.flow.rest.FlowConfigFinder"/>
+
+    <bean id="controlFlowRestMappings" class="org.geoserver.rest.RESTMapping">
+      <property name="routes">
+       <map>
+        <entry>
+          <key><value>/controlflow/config</value></key>
+          <value>flowConfigFinder</value>
+        </entry>
+        <entry>
+          <key><value>/controlflow/config.{format}</value></key>
+          <value>flowConfigFinder</value>
+        </entry>
+        </map>
+      </property>
+    </bean>
 </beans>
