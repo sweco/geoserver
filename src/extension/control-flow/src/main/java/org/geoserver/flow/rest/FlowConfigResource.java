@@ -45,8 +45,7 @@ public class FlowConfigResource extends ReflectiveResource {
         Integer gwc = (props.getProperty("ows.gwc") != null) ? Integer.parseInt(props
                 .getProperty("ows.gwc")) : null;
 
-        ConfigProps configProps = new ConfigProps(global, user, ip, timeout, gwc, Runtime
-                .getRuntime().availableProcessors());
+        ConfigProps configProps = new ConfigProps(global, user, ip, timeout, gwc);
         return configProps;
     }
 

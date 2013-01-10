@@ -21,16 +21,12 @@ public class ConfigProps {
 
     private final Integer gwc;
 
-    private int availableCores;
-
-    public ConfigProps(Integer global, Integer user, Integer ip, Integer timeout, Integer gwc,
-            int availableCores) {
+    public ConfigProps(Integer global, Integer user, Integer ip, Integer timeout, Integer gwc) {
         this.global = global;
         this.user = user;
         this.ip = ip;
         this.timeout = timeout;
         this.gwc = gwc;
-        this.availableCores = availableCores;
     }
 
     public Integer getGlobal() {
@@ -51,10 +47,6 @@ public class ConfigProps {
 
     public Integer getGwc() {
         return gwc;
-    }
-
-    public int getAvailableCores() {
-        return availableCores;
     }
 
 }
