@@ -17,6 +17,8 @@ import org.restlet.data.Request;
 import org.restlet.data.Response;
 import org.vfny.geoserver.global.GeoserverDataDirectory;
 
+import com.thoughtworks.xstream.XStream;
+
 /**
  * 
  * @author Juan Marin, OpenGeo
@@ -49,4 +51,10 @@ public class FlowConfigResource extends ReflectiveResource {
         return configProps;
     }
 
+    @Override
+    protected void configureXStream(XStream xstream) {
+        super.configureXStream(xstream);
+        xstream.alias("controlflow", ConfigProps.class);
+    }
+    
 }
