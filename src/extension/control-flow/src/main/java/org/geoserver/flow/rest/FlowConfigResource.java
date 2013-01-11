@@ -14,14 +14,18 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import org.geoserver.rest.ReflectiveResource;
+import org.geoserver.rest.format.DataFormat;
+import org.geoserver.rest.format.ReflectiveJSONFormat;
 import org.restlet.Context;
 import org.restlet.data.Request;
 import org.restlet.data.Response;
 import org.vfny.geoserver.global.GeoserverDataDirectory;
 
 import com.thoughtworks.xstream.XStream;
+import com.thoughtworks.xstream.io.json.JettisonMappedXmlDriver;
 
 /**
  * 
@@ -39,13 +43,18 @@ public class FlowConfigResource extends ReflectiveResource {
         Properties props = new Properties();
         props.load(new FileInputStream(new File(GeoserverDataDirectory.getGeoserverDataDirectory(),
                 "controlflow.properties")));
-        return props;
+        Map<String, String> propsMap = new HashMap<String, String>();
+        Set<Object> keys = props.keySet();
+        for (Object key : keys) {
+            propsMap.put((String) key, props.getProperty((String) key));
+        }
+        return propsMap;
     }
 
     @Override
     protected void configureXStream(XStream xstream) {
         super.configureXStream(xstream);
-        xstream.alias("controlflow", Properties.class);
+        xstream.alias("controlflow", Map.class);
         xstream.registerConverter(new FlowConfigConverter());
     }
 
