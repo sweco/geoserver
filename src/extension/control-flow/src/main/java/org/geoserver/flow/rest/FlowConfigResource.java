@@ -43,19 +43,14 @@ public class FlowConfigResource extends ReflectiveResource {
         Properties props = new Properties();
         props.load(new FileInputStream(new File(GeoserverDataDirectory.getGeoserverDataDirectory(),
                 "controlflow.properties")));
-        Map<String, String> propsMap = new HashMap<String, String>();
-        Set<Object> keys = props.keySet();
-        for (Object key : keys) {
-            propsMap.put((String) key, props.getProperty((String) key));
-        }
-        return propsMap;
+        return props;
     }
 
     @Override
     protected void configureXStream(XStream xstream) {
         super.configureXStream(xstream);
-        xstream.alias("controlflow", Map.class);
-        xstream.registerConverter(new FlowConfigConverter());
+        xstream.alias("controlflow", Properties.class);
+        //xstream.registerConverter(new FlowConfigConverter());
     }
 
 }

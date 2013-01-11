@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Set;
 
 import com.thoughtworks.xstream.converters.Converter;
@@ -16,18 +17,20 @@ public class FlowConfigConverter implements Converter {
 
     @Override
     public boolean canConvert(Class clazz) {
-        return clazz.equals(HashMap.class);
+        return clazz.equals(Properties.class);
     }
 
     @Override
     public void marshal(Object value, HierarchicalStreamWriter writer, MarshallingContext context) {
-        Map<String, String> propsMap = (Map<String, String>) value;
-        Set<Entry<String, String>> entrySet = propsMap.entrySet();
-        Iterator<Entry<String, String>> entryIterator = entrySet.iterator();
-        while (entryIterator.hasNext()) {
-            Entry<String, String> entry = entryIterator.next();
-            writer.startNode(entry.getKey());
-            writer.setValue(entry.getValue());
+        Properties props = (Properties) value;
+        //writer.startNode(arg0)
+        //writer.setValue(props.toString());
+        Set<Entry<Object, Object>> entrySet = props.entrySet();
+        Iterator<Entry<Object, Object>> it = entrySet.iterator();
+        while (it.hasNext()) {
+            Entry<Object, Object> entry = it.next();
+            writer.startNode(entry.getKey().toString());
+            writer.setValue(entry.getValue().toString());
             writer.endNode();
         }
     }
