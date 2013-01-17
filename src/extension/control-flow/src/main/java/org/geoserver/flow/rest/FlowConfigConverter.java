@@ -1,8 +1,6 @@
 package org.geoserver.flow.rest;
 
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
@@ -23,8 +21,6 @@ public class FlowConfigConverter implements Converter {
     @Override
     public void marshal(Object value, HierarchicalStreamWriter writer, MarshallingContext context) {
         Properties props = (Properties) value;
-        //writer.startNode(arg0)
-        //writer.setValue(props.toString());
         Set<Entry<Object, Object>> entrySet = props.entrySet();
         Iterator<Entry<Object, Object>> it = entrySet.iterator();
         while (it.hasNext()) {
@@ -36,9 +32,15 @@ public class FlowConfigConverter implements Converter {
     }
 
     @Override
-    public Object unmarshal(HierarchicalStreamReader arg0, UnmarshallingContext arg1) {
-        // TODO Auto-generated method stub
-        return null;
+    public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
+        Properties properties = new Properties();
+        while (reader.hasMoreChildren()) {
+            reader.moveDown();
+            String nodeName = reader.getNodeName();
+            properties.setProperty(nodeName, reader.getValue());
+            reader.moveUp();
+        }
+        return properties;
     }
 
 }
