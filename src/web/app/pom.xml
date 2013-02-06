@@ -916,6 +916,29 @@
         </dependency>
       </dependencies>
 		</profile>    
+     <profile>
+      <id>geogit</id>
+      <activation>
+        <property><name>geogit</name></property>
+      </activation> 
+      <dependencies>
+        <dependency>
+          <groupId>org.geogit</groupId>
+          <artifactId>geogit-web-api</artifactId>
+          <version>0.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+          <groupId>org.geogit</groupId>
+          <artifactId>geogit-geotools</artifactId>
+          <version>0.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+          <groupId>org.geogit</groupId>
+          <artifactId>geogit-geoserver</artifactId>
+          <version>0.1-SNAPSHOT</version>
+        </dependency>
+      </dependencies>
+    </profile>
  </profiles>
 
 </project>
