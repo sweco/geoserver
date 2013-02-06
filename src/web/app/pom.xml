@@ -925,17 +925,17 @@
         <dependency>
           <groupId>org.geogit</groupId>
           <artifactId>geogit-web-api</artifactId>
-          <version>0.1-SNAPSHOT</version>
+          <version>0.2-SNAPSHOT</version>
         </dependency>
         <dependency>
           <groupId>org.geogit</groupId>
           <artifactId>geogit-geotools</artifactId>
-          <version>0.1-SNAPSHOT</version>
+          <version>0.2-SNAPSHOT</version>
         </dependency>
         <dependency>
           <groupId>org.geogit</groupId>
           <artifactId>geogit-geoserver</artifactId>
-          <version>0.1-SNAPSHOT</version>
+          <version>0.2-SNAPSHOT</version>
         </dependency>
       </dependencies>
     </profile>
