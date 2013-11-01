@@ -57,7 +57,7 @@ public class GetStyles {
                     // add the default style first
                     style = cloneStyle(style);
                     style.setDefault(true);
-                    style.setName(layer.getDefaultStyle().prefixedName());
+                    style.setName(layer.getDefaultStyle().getName());
                     namedLayer.styles().add(style);
                     // add alternate styles
                     for (StyleInfo si : layer.getStyles()) {
