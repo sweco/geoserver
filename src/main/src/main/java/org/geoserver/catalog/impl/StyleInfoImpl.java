@@ -56,6 +56,11 @@ public class StyleInfoImpl implements StyleInfo {
         this.name = name;
     }
 
+    @Override
+    public String prefixedName() {
+        return workspace != null ? workspace.getName() + ":" + name : name;
+    }
+
     public WorkspaceInfo getWorkspace() {
         return workspace;
     }
