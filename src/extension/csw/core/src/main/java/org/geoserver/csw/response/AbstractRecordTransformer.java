@@ -56,6 +56,10 @@ public abstract class AbstractRecordTransformer extends AbstractCSWTransformer {
             Enumeration declaredPrefixes = ns.getDeclaredPrefixes();
             while (declaredPrefixes.hasMoreElements()) {
                 String prefix = (String) declaredPrefixes.nextElement();
+                if ("xml".equalsIgnoreCase(prefix)) {
+                    // skip xml namespace, it's implied and IE browsers have an issue with it
+                    continue;
+                }
                 String uri = ns.getURI(prefix);
                 addAttribute(attributes, prefix==""? "xmlns" : "xmlns:" + prefix, uri);     
             }
