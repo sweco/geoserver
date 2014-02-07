@@ -4,6 +4,7 @@
  */
 package org.geoserver.platform;
 
+import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
@@ -17,6 +18,7 @@ public interface Resource {
   
   InputStream in();
   OutputStream out();
+  File file();
   
   long lastmodified();
   
