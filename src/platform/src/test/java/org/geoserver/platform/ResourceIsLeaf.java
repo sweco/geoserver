@@ -13,7 +13,7 @@ public class ResourceIsLeaf extends BaseMatcher<Resource> {
     public boolean matches(Object item) {
         if(item instanceof Resource) {
             Resource res = (Resource)item;
-            return res.exists() && res.list()!=null;
+            return res.getType() == Resource.Type.RESOURCE;
         }
         return false;
     }

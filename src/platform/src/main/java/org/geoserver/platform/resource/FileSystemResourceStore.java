@@ -25,7 +25,8 @@ import org.springframework.util.FileSystemUtils;
  * Implementation of ResourceStore backed by the file system.
  */
 public class FileSystemResourceStore implements ResourceStore {
-    private File resourceDirectory;
+    
+    private File baseDirectory;
 
     public FileSystemResourceStore(File resourceDirectory) {
         if (resourceDirectory == null) {
@@ -41,7 +42,7 @@ public class FileSystemResourceStore implements ResourceStore {
             }            
         }
         if( resourceDirectory.exists() && resourceDirectory.isDirectory() ){
-            this.resourceDirectory = resourceDirectory;
+            this.baseDirectory = resourceDirectory;
         }
         else {
             throw new IllegalArgumentException("Unable to acess directory " + resourceDirectory );            
@@ -76,7 +77,7 @@ public class FileSystemResourceStore implements ResourceStore {
         
         public FileSystemResource(String path) {
             this.path = path;
-            this.file = FileSystemResourceStore.file( resourceDirectory, path );
+            this.file = FileSystemResourceStore.file( baseDirectory, path );
         }
 
         @Override
@@ -152,8 +153,7 @@ public class FileSystemResourceStore implements ResourceStore {
         public List<Resource> list() {
             String array[] = file.list();
             if( array == null ){
-                // not a directory
-                return Collections.emptyList();
+                return null; // not a directory
             }            
             List<Resource> list = new ArrayList<Resource>( array.length );
             for( String filename : array ){
@@ -161,16 +161,20 @@ public class FileSystemResourceStore implements ResourceStore {
             }
             return list;
         }
-
         @Override
-        public boolean exists() {
-            return file.exists();
+        public Type getType() {
+            if( !file.exists() ){
+                return Type.UNDEFINED;
+            }
+            else if (file.isDirectory()){
+                return Type.DIRECTORY;
+            }
+            else if (file.isFile()){
+                return Type.RESOURCE;
+            }
+            else {
+                throw new IllegalStateException("Path does not represent a configuration resource: "+path );                
+            }
         }
-
-        @Override
-        public boolean mkdirs() {
-            return file.mkdirs();
-        }
-
     }
 }

@@ -12,7 +12,7 @@ public class ResourceNotExists extends BaseMatcher<Resource> {
     @Override
     public boolean matches(Object item) {
         if(item instanceof Resource) {
-            return !((Resource) item).exists();
+            return ((Resource) item).getType() == Resource.Type.UNDEFINED;
         }
         return false;
     }
