@@ -2,7 +2,7 @@
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
-package org.geoserver.platform;
+package org.geoserver.platform.resource;
 
 /**
  * Used to manage configuration storage (file system, test harness, or database blob).

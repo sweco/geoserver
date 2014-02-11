@@ -17,8 +17,6 @@ import java.util.List;
 
 import javax.media.jai.operator.FileStoreDescriptor;
 
-import org.geoserver.platform.Resource;
-import org.geoserver.platform.ResourceStore;
 import org.springframework.util.FileSystemUtils;
 
 /**

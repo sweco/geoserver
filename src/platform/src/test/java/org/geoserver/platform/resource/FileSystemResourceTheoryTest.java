@@ -2,7 +2,6 @@ package org.geoserver.platform.resource;
 
 import java.io.File;
 
-import org.geoserver.platform.Resource;
 import org.geoserver.platform.ResourceTheoryTest;
 import org.junit.Before;
 import org.junit.Rule;

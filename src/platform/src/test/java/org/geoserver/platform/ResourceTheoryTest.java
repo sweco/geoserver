@@ -12,6 +12,7 @@ import static org.geoserver.platform.resource.ResourceMatchers.*;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.geoserver.platform.resource.Resource;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;

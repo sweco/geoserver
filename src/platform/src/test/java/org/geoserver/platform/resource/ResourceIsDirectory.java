@@ -4,8 +4,7 @@
  */
 package org.geoserver.platform.resource;
 
-import org.geoserver.platform.Resource;
-import org.geoserver.platform.Resource.Type;
+import org.geoserver.platform.resource.Resource.Type;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 
