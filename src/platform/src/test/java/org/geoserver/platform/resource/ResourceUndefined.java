@@ -5,22 +5,23 @@
 package org.geoserver.platform.resource;
 
 import org.geoserver.platform.Resource;
+import org.geoserver.platform.Resource.Type;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 
-public class ResourceExists extends BaseMatcher<Resource> {
+public class ResourceUndefined extends BaseMatcher<Resource> {
     
     @Override
     public boolean matches(Object item) {
         if(item instanceof Resource) {
-            return ((Resource) item).exists();
+            return ((Resource) item).getType()==Type.UNDEFINED;
         }
         return false;
     }
     
     @Override
     public void describeTo(Description description) {
-        description.appendText("resource that exists");
+        description.appendText("resource that has not been defined");
     }
     
 }

@@ -5,6 +5,7 @@
 package org.geoserver.platform.resource;
 
 import org.geoserver.platform.Resource;
+import org.geoserver.platform.Resource.Type;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 
@@ -14,7 +15,7 @@ public class ResourceIsDirectory extends BaseMatcher<Resource> {
     public boolean matches(Object item) {
         if(item instanceof Resource) {
             Resource res = (Resource)item;
-            return res.exists() && res.list()!=null;
+            return res.getType()==Type.DIRECTORY;
         }
         return false;
     }

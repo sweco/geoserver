@@ -39,7 +39,7 @@ public abstract class ResourceTheoryTest {
     public void theoryExtantHaveDate(String path) throws Exception {
         Resource res = getResource(path);
         
-        assumeThat(res, exists());
+        assumeThat(res, defined());
         
         assertThat(res.lastmodified(), notNullValue());
     }
@@ -62,7 +62,7 @@ public abstract class ResourceTheoryTest {
     public void theoryLeavesHaveIstream(String path) throws Exception {
         Resource res = getResource(path);
         
-        assumeThat(res, is(leaf()));
+        assumeThat(res, is(resource()));
         
         assertThat(res.in(), notNullValue());
     }
@@ -71,7 +71,7 @@ public abstract class ResourceTheoryTest {
     public void theoryLeavesHaveOstream(String path) throws Exception {
         Resource res = getResource(path);
         
-        assumeThat(res, is(leaf()));
+        assumeThat(res, is(resource()));
         
         assertThat(res.out(), notNullValue());
     }
@@ -80,7 +80,7 @@ public abstract class ResourceTheoryTest {
     public void theoryLeavesPersistData(String path) throws Exception {
         Resource res = getResource(path);
         
-        assumeThat(res, is(leaf()));
+        assumeThat(res, is(resource()));
         
         byte[] test = {42, 29, 32, 120, 69, 0, 1};
         

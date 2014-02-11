@@ -4,15 +4,19 @@ import org.geoserver.platform.Resource;
 import org.hamcrest.Matcher;
 
 public class ResourceMatchers {
-    public static Matcher<Resource> exists() {
-        return new ResourceExists();
+    public static Matcher<Resource> defined() {
+        return new ResourceDefined();
     }
     
-    public static Matcher<Resource> notExists() {
-        return new ResourceNotExists();
+    public static Matcher<Resource> undefined() {
+        return new ResourceUndefined();
     }
     
-    public static Matcher<Resource> leaf() {
+    public static Matcher<Resource> resource() {
         return new ResourceIsLeaf();
+    }
+    
+    public static Matcher<Resource> directory() {
+        return new ResourceIsDirectory();
     }
 }
