@@ -23,6 +23,11 @@ public interface Resource {
   long lastmodified();
   
   Resource getParent();
+  
+  /**
+   * Resources contained by this resource.
+   * @return The children of this resource, or null if a leaf.
+   */
   List<Resource> list();
 
   boolean exists();
