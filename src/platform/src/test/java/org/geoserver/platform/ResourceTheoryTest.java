@@ -7,7 +7,7 @@ package org.geoserver.platform;
 import static org.junit.Assert.*;
 import static org.junit.Assume.*;
 import static org.hamcrest.CoreMatchers.*;
-import static org.geoserver.platform.ResourceMatchers.*;
+import static org.geoserver.platform.resource.ResourceMatchers.*;
 
 import java.io.InputStream;
 import java.io.OutputStream;
