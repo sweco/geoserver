@@ -26,39 +26,60 @@ import org.junit.runner.RunWith;
 @RunWith(Theories.class)
 public abstract class ResourceTheoryTest {
     
+    protected abstract Resource getResource(String path) throws Exception;
+    
     @Theory
-    public void theoryExtantHaveDate(Resource res) throws Exception {
+    public void theoryNotNull(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        assertThat(res, notNullValue());
+    }
+
+    @Theory
+    public void theoryExtantHaveDate(String path) throws Exception {
+        Resource res = getResource(path);
+        
         assumeThat(res, exists());
         
         assertThat(res.lastmodified(), notNullValue());
     }
     
     @Theory
-    public void theoryHavePath(Resource res) throws Exception {
+    public void theoryHaveSamePath(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        assertThat(res.getPath(), is(equalTo(path)));
+    }
+    
+    @Theory
+    public void theoryHaveName(String path) throws Exception {
+        Resource res = getResource(path);
+        
         assertThat(res.getPath(), notNullValue());
     }
     
     @Theory
-    public void theoryHaveName(Resource res) throws Exception {
-        assertThat(res.getPath(), notNullValue());
-    }
-    
-    @Theory
-    public void theoryLeavesHaveIstream(Resource res) throws Exception {
+    public void theoryLeavesHaveIstream(String path) throws Exception {
+        Resource res = getResource(path);
+        
         assumeThat(res, is(leaf()));
         
         assertThat(res.in(), notNullValue());
     }
     
     @Theory
-    public void theoryLeavesHaveOstream(Resource res) throws Exception {
+    public void theoryLeavesHaveOstream(String path) throws Exception {
+        Resource res = getResource(path);
+        
         assumeThat(res, is(leaf()));
         
         assertThat(res.out(), notNullValue());
     }
     
     @Theory
-    public void theoryLeavesPersistData(Resource res) throws Exception {
+    public void theoryLeavesPersistData(String path) throws Exception {
+        Resource res = getResource(path);
+        
         assumeThat(res, is(leaf()));
         
         byte[] test = {42, 29, 32, 120, 69, 0, 1};

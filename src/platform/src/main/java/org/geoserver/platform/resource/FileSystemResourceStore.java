@@ -53,7 +53,7 @@ public class FileSystemResourceStore implements ResourceStore {
             String next = path.substring(0,index);
             file = new File( file, next );
             
-            path = path.substring(index);
+            path = path.substring(index+1);
         }
         file = new File( file, path );
         
