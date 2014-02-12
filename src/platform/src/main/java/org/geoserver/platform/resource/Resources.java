@@ -17,13 +17,11 @@ public class Resources {
     /**
      * Search for resources using pattern and last modified time.
      * 
-     * @param store
-     * @param pattern
+     * @param resource
      * @param lastModified
-     * @return
+     * @return list of modified resoruces
      */
-    List<Resource> search(ResourceStore store, String pattern, long lastModified) {
-        Resource resource = store.get(pattern);        
+    List<Resource> search(Resource resource, long lastModified) {
         if (resource.getType() == Type.DIRECTORY) {
             ArrayList<Resource> results = new ArrayList<Resource>();
             for( Resource child : resource.list() ){
