@@ -2,7 +2,7 @@
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
-package org.geoserver.platform;
+package org.geoserver.platform.resource;
 
 import static org.junit.Assert.*;
 import static org.junit.Assume.*;
@@ -49,21 +49,27 @@ public abstract class ResourceTheoryTest {
         
         assumeThat(res, defined());
         
-        assertThat(res.lastmodified(), notNullValue());
+        long result = res.lastmodified();
+        
+        assertThat(result, notNullValue());
     }
     
     @Theory
     public void theoryHaveSamePath(String path) throws Exception {
         Resource res = getResource(path);
         
-        assertThat(res.getPath(), is(equalTo(path)));
+        String result = res.getPath();
+        
+        assertThat(result, is(equalTo(path)));
     }
     
     @Theory
     public void theoryHaveName(String path) throws Exception {
         Resource res = getResource(path);
         
-        assertThat(res.getPath(), notNullValue());
+        String result = res.getPath();
+        
+        assertThat(result, notNullValue());
     }
     
     @Theory
@@ -72,7 +78,9 @@ public abstract class ResourceTheoryTest {
         
         assumeThat(res, is(resource()));
         
-        assertThat(res.in(), notNullValue());
+        InputStream result = res.in();
+        
+        assertThat(result, notNullValue());
     }
     
     @Theory
@@ -81,7 +89,9 @@ public abstract class ResourceTheoryTest {
         
         assumeThat(res, is(resource()));
         
-        assertThat(res.out(), notNullValue());
+        OutputStream result = res.out();
+        
+        assertThat(result, notNullValue());
     }
     
     @Theory
@@ -90,7 +100,9 @@ public abstract class ResourceTheoryTest {
         
         assumeThat(res, is(undefined()));
         
-        assertThat(res.in(), notNullValue());
+        InputStream result = res.in();
+        
+        assertThat(result, notNullValue());
     }
     
     @Theory
@@ -99,7 +111,9 @@ public abstract class ResourceTheoryTest {
         
         assumeThat(res, is(undefined()));
         
-        assertThat(res.out(), notNullValue());
+        OutputStream result = res.out();
+        
+        assertThat(result, notNullValue());
     }
     
     @Theory
@@ -152,7 +166,9 @@ public abstract class ResourceTheoryTest {
         Resource res = getResource(path);
         assumeThat(res, is(resource()));
         
-        assertThat(res.list(), nullValue());
+        Collection<Resource> result = res.list();
+        
+        assertThat(result, nullValue());
     }
     
     @Theory
@@ -160,7 +176,9 @@ public abstract class ResourceTheoryTest {
         Resource res = getResource(path);
         assumeThat(res, is(undefined()));
         
-        assertThat(res.list(), nullValue());
+        Collection<Resource> result = res.list();
+        
+        assertThat(result, nullValue());
     }
     
     @Theory
@@ -168,7 +186,9 @@ public abstract class ResourceTheoryTest {
         Resource res = getResource(path);
         assumeThat(res, is(directory()));
         
-        assertThat(res.list(), notNullValue());
+        Collection<Resource> result = res.list();
+        
+        assertThat(result, notNullValue());
     }
     
     @Theory
@@ -176,9 +196,11 @@ public abstract class ResourceTheoryTest {
         Resource res = getResource(path);
         assumeThat(res, is(directory()));
         Collection<Resource> children = res.list();
-        assumeThat(children, not(empty()));
+        assumeThat(children, not(empty())); // Make sure this resource has children
+        
         for(Resource child: children) {
-            assertThat(child.getParent(), equalTo(res));
+            Resource parent = child.getParent();
+            assertThat(parent, equalTo(res));
         }
     }
     
@@ -187,13 +209,15 @@ public abstract class ResourceTheoryTest {
         Resource res = getResource(path);
         assumeThat(res, is(directory()));
         Resource parent = res.getParent();
-        assumeThat(path,parent, notNullValue());
+        assumeThat(path,parent, notNullValue()); // Make sure this resource has a parent
         
-        assertThat(path,parent.list(), hasItem(res)); // this assumed equals was written!
+        Collection<Resource> result = parent.list();
+        
+        assertThat(path,result, hasItem(res)); // this assumed equals was written!
     }
     
     @Theory
-    public void theorySamePathGivesSameResource(String path) throws Exception {
+    public void theorySamePathGivesEquivalentResource(String path) throws Exception {
         Resource res1 = getResource(path);
         Resource res2 = getResource(path);
         
