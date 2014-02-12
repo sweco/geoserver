@@ -13,8 +13,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.geoserver.platform.resource.Resource;
+import org.junit.Rule;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 
 /**
@@ -26,6 +28,9 @@ import org.junit.runner.RunWith;
  */
 @RunWith(Theories.class)
 public abstract class ResourceTheoryTest {
+    
+    @Rule
+    public ExpectedException exception = ExpectedException.none();
     
     protected abstract Resource getResource(String path) throws Exception;
     
@@ -78,10 +83,28 @@ public abstract class ResourceTheoryTest {
     }
     
     @Theory
-    public void theoryLeavesPersistData(String path) throws Exception {
+    public void theoryUndefinedHaveIstream(String path) throws Exception {
         Resource res = getResource(path);
         
-        assumeThat(res, is(resource()));
+        assumeThat(res, is(undefined()));
+        
+        assertThat(res.in(), notNullValue());
+    }
+    
+    @Theory
+    public void theoryUndefinedHaveOstream(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        assumeThat(res, is(undefined()));
+        
+        assertThat(res.out(), notNullValue());
+    }
+    
+    @Theory
+    public void theoryNonDirectoriesPersistData(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        assumeThat(res, not(directory()));
         
         byte[] test = {42, 29, 32, 120, 69, 0, 1};
         
@@ -103,4 +126,23 @@ public abstract class ResourceTheoryTest {
         }
         assertThat(result, equalTo(test));
     }
+    
+    @Theory
+    public void theoryDirectoriesHaveNoIstreams(String path) throws Exception {
+        Resource res = getResource(path);
+        assumeThat(res, is(directory()));
+        
+        exception.expect(IllegalStateException.class);
+        res.in();
+    }
+    
+    @Theory
+    public void theoryDirectoriesHaveNoOstreams(String path) throws Exception {
+        Resource res = getResource(path);
+        assumeThat(res, is(directory()));
+        
+        exception.expect(IllegalStateException.class);
+        res.out();
+    }
+
 }
