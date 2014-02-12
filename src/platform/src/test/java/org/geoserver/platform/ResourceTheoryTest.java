@@ -6,11 +6,12 @@ package org.geoserver.platform;
 
 import static org.junit.Assert.*;
 import static org.junit.Assume.*;
-import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.Matchers.*;
 import static org.geoserver.platform.resource.ResourceMatchers.*;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collection;
 
 import org.geoserver.platform.resource.Resource;
 import org.junit.Rule;
@@ -137,12 +138,74 @@ public abstract class ResourceTheoryTest {
     }
     
     @Theory
-    public void theoryDirectoriesHaveNoOstreams(String path) throws Exception {
+    public void theoryDirectoriesHaveNoOstream(String path) throws Exception {
         Resource res = getResource(path);
         assumeThat(res, is(directory()));
         
         exception.expect(IllegalStateException.class);
         res.out();
     }
-
+    
+    @Theory
+    public void theoryLeavesHaveNoListOfChildren(String path) throws Exception {
+        Resource res = getResource(path);
+        assumeThat(res, is(resource()));
+        
+        assertThat(res.list(), nullValue());
+    }
+    
+    @Theory
+    public void theoryUndefinedHaveEmptyListOfChildren(String path) throws Exception {
+        Resource res = getResource(path);
+        assumeThat(res, is(undefined()));
+        
+        assertThat(res.list(), notNullValue());
+        assertThat(res.list(), empty());
+    }
+    
+    @Theory
+    public void theoryDirectoriesHaveChildren(String path) throws Exception {
+        Resource res = getResource(path);
+        assumeThat(res, is(directory()));
+        
+        assertThat(res.list(), notNullValue());
+    }
+    
+    @Theory
+    public void theoryChildrenKnowTheirParents(String path) throws Exception {
+        Resource res = getResource(path);
+        assumeThat(res, is(directory()));
+        Collection<Resource> children = res.list();
+        assumeThat(children, not(empty()));
+        for(Resource child: children) {
+            assertThat(child.getParent(), equalTo(res));
+        }
+    }
+    
+    @Theory
+    public void theoryParentsKnowTheirChildren(String path) throws Exception {
+        Resource res = getResource(path);
+        assumeThat(res, is(directory()));
+        Resource parent = res.getParent();
+        assumeThat(parent, notNullValue());
+        
+        assertThat(parent.list(), hasItem(res));
+    }
+    
+    @Theory
+    public void theorySamePathGivesSameResource(String path) throws Exception {
+        Resource res1 = getResource(path);
+        Resource res2 = getResource(path);
+        
+        assertThat(res2, equalTo(res1));
+    }
+    
+    @Theory
+    public void theoryParentIsDirectory(String path) throws Exception {
+        Resource res = getResource(path);
+        Resource parent = res.getParent();
+        assumeThat(parent, notNullValue());
+        
+        assertThat(parent, is(directory()));
+    }
 }
