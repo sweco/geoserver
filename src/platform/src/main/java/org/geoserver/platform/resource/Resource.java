@@ -77,7 +77,7 @@ public interface Resource {
      * List of directory contents.
      * 
      * @see File#listFiles()
-     * @return List of directory contents, or null if this resoruce is not a directory
+     * @return List of directory contents, or null if this resource is not a directory
      */
     List<Resource> list();
 

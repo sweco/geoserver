@@ -22,7 +22,7 @@ public class PathsTest {
         assertEquals(2,names("a/b").size());
         assertEquals(1,names("a/").size());
         assertEquals(1,names("a").size());
-        assertEquals(1,names("").size());
+        assertEquals(0,names("").size());
         
         assertEquals( BASE, path(""));
         assertEquals("directory/file.txt",

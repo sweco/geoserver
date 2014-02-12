@@ -108,7 +108,7 @@ public class Paths {
         return buf.toString();
     }
     public static List<String> names(String path){
-        if( path == null ){
+        if( path == null || path.length()==0){
             return Collections.emptyList();
         }
         int index=0;

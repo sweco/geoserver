@@ -48,13 +48,9 @@ public class FileSystemResourceStore implements ResourceStore {
     }
     
     private static File file( File file, String path ){
-        for( int index = 0; index != -1; index = path.indexOf('/') ){
-            String next = path.substring(0,index);
-            file = new File( file, next );
-            
-            path = path.substring(index+1);
+        for( String item : Paths.names(path) ){
+            file = new File( file, item );           
         }
-        file = new File( file, path );
         
         return file;
     }
@@ -96,8 +92,8 @@ public class FileSystemResourceStore implements ResourceStore {
 
         @Override
         public InputStream in() {
-            File file = file();
-            if( !file.exists() ){
+            File actualFile = file();
+            if( !actualFile.exists() ){
                 throw new IllegalStateException("File not found "+path);
             }
             try {
@@ -109,19 +105,12 @@ public class FileSystemResourceStore implements ResourceStore {
 
         @Override
         public OutputStream out() {
-            File file = file();
-            if( !file.exists() ){
-                try {
-                    boolean created = file.createNewFile();
-                    if( !created ){
-                        // file was already available?!?
-                    }
-                } catch (IOException e) {
-                    throw new IllegalStateException("Cannot create "+path);
-                }
+            File actualFile = file();
+            if( !actualFile.exists() ){
+                throw new IllegalStateException("Cannot access "+actualFile);
             }
             try {
-                return new FileOutputStream( file );
+                return new FileOutputStream( actualFile );
             } catch (FileNotFoundException e) {
                 throw new IllegalStateException("Cannot access "+path);
             }
@@ -129,6 +118,28 @@ public class FileSystemResourceStore implements ResourceStore {
 
         @Override
         public File file() {
+            if( !file.exists() ){
+                try {
+                    File parent = file.getParentFile();
+                    if( !parent.exists() ){
+                        boolean created = parent.mkdirs();
+                        if( !created ){
+                            throw new IllegalStateException("Unable to create "+parent.getAbsolutePath() );
+                        }
+                    }
+                    if (parent.isDirectory()){
+                        boolean created = file.createNewFile();
+                        if( !created ){
+                            throw new FileNotFoundException("Unable to create "+file.getAbsolutePath() );
+                        }
+                    }
+                    else {
+                        throw new FileNotFoundException("Unable to create"+file.getName()+" - not a directory " + parent.getAbsolutePath() );
+                    }
+                } catch (IOException e) {
+                    throw new IllegalStateException("Cannot create "+path);
+                }
+            }
             return file;
         }
         @Override
@@ -155,7 +166,8 @@ public class FileSystemResourceStore implements ResourceStore {
             }            
             List<Resource> list = new ArrayList<Resource>( array.length );
             for( String filename : array ){
-                list.add( FileSystemResourceStore.this.get( path+"/"+filename) );
+                Resource resource = FileSystemResourceStore.this.get( Paths.path( path, filename ));
+                list.add( resource );
             }
             return list;
         }
@@ -174,5 +186,36 @@ public class FileSystemResourceStore implements ResourceStore {
                 throw new IllegalStateException("Path does not represent a configuration resource: "+path );                
             }
         }
+        
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((path == null) ? 0 : path.hashCode());
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            FileSystemResource other = (FileSystemResource) obj;
+            if (path == null) {
+                if (other.path != null)
+                    return false;
+            } else if (!path.equals(other.path))
+                return false;
+            return true;
+        }
+
+        @Override
+        public String toString() {
+            return path;
+        }
+        
     }
 }

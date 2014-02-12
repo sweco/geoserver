@@ -14,6 +14,7 @@ import java.io.OutputStream;
 import java.util.Collection;
 
 import org.geoserver.platform.resource.Resource;
+import org.geoserver.platform.resource.Resource.Type;
 import org.junit.Rule;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
@@ -155,12 +156,11 @@ public abstract class ResourceTheoryTest {
     }
     
     @Theory
-    public void theoryUndefinedHaveEmptyListOfChildren(String path) throws Exception {
+    public void theoryUndefinedHaveNullListOfChildren(String path) throws Exception {
         Resource res = getResource(path);
         assumeThat(res, is(undefined()));
         
-        assertThat(res.list(), notNullValue());
-        assertThat(res.list(), empty());
+        assertThat(res.list(), nullValue());
     }
     
     @Theory
@@ -187,9 +187,9 @@ public abstract class ResourceTheoryTest {
         Resource res = getResource(path);
         assumeThat(res, is(directory()));
         Resource parent = res.getParent();
-        assumeThat(parent, notNullValue());
+        assumeThat(path,parent, notNullValue());
         
-        assertThat(parent.list(), hasItem(res));
+        assertThat(path,parent.list(), hasItem(res)); // this assumed equals was written!
     }
     
     @Theory
@@ -204,8 +204,10 @@ public abstract class ResourceTheoryTest {
     public void theoryParentIsDirectory(String path) throws Exception {
         Resource res = getResource(path);
         Resource parent = res.getParent();
-        assumeThat(parent, notNullValue());
+        assumeThat(path+" not root", parent, notNullValue());
         
-        assertThat(parent, is(directory()));
+        if( res.getType() != Type.UNDEFINED){
+            assertThat(path+" directory",parent, is(directory()));
+        }
     }
 }
