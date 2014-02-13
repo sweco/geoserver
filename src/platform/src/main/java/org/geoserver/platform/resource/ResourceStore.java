@@ -4,38 +4,55 @@
  */
 package org.geoserver.platform.resource;
 
+
 /**
  * Used to manage configuration storage (file system, test harness, or database blob).
  * <p>
  * InputStream used to access configuration information:
- * <pre><code>
+ * 
+ * <pre>
+ * <code>
  * Properties properties = new Properties();
  * properties.load( resourceStore.get("module/configuration.properties").in() );
- * </code></pre>
+ * </code>
+ * </pre>
  * 
  * An OutputStream is provided for storage (Resources will be created as needed):
- * <pre><code>
+ * 
+ * <pre>
+ * <code>
  * Properties properties = new Properties();
  * properties.put("hello","world");
  * OutputStream out = resourceStore.get("module/configuration.properties").out();
  * properties.store( out, null );
  * out.close();
- * </code></pre>
+ * </code>
+ * </pre>
  * 
  * Resources can also be extracted to a file if needed.
- * <pre><code>
+ * 
+ * <pre>
+ * <code>
  * File file = resourceStore.get("module/logo.png");
  * BufferedImage img = ImageIO.read( file );
- * </code></pre>
+ * </code>
+ * </pre>
+ * 
+ * The base directory is available using {@link Paths#BASE} (as "") but relative paths ("." and "..") are not supported.
  * 
  * @see Resources
+ * @see Resource
  */
 public interface ResourceStore {
     /**
      * Path based resource access.
      * 
+     * The returned Resource acts as a handle, and may be UNDEFINED. In general Resources are created
+     * in a lazy fashion when used for the first time.
+     * 
      * @param path 
-     * @return resource
+     * @return Resource at the indicated location
+     * @throws
      */
     Resource get(String path);
 }

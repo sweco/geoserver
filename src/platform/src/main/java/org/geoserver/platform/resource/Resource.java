@@ -20,11 +20,34 @@ import java.util.List;
  */
 public interface Resource {
     /**
+     * Enumeration indicating kind of resource used.
+     */
+    public enum Type {
+        /**
+         * Resource directory (contents available using {@link Resource#list()}).
+         * 
+         * @see File#isDirectory()
+         */
+        DIRECTORY,
+        /**
+         * Resource used for content. Content access available through {@link Resource#in()} and {@link Resource#out()}.
+         */
+        RESOURCE,
+    
+        /**
+         * Undefined resource.
+         * 
+         * @see File#exists()
+         */
+        UNDEFINED
+    }
+
+    /**
      * Resource path used by {@link ResourceStore.get}.
      * 
      * @return resource path
      */
-    String getPath();
+    String path();
 
     /**
      * Name of the resource denoted by {@link #getPath()} . This is the last name in the path name sequence corresponding to {@link File#getName()}.
@@ -71,38 +94,29 @@ public interface Resource {
      * @see File#getParentFile()
      * @return Resource located parent path, or null ResourceStore base directory
      */
-    Resource getParent();
+    Resource parent();
 
     /**
+     * Path based resource access which can be used to access {@link #list()} contents or create a new undefined resource.
+     * 
+     * The returned Resource acts as a handle, and may be UNDEFINED. In general Resources are created in a lazy fashion when used for the first time.
+     * 
+     * This method is used to access directory contents, relative paths such as ".." and "." are not supported.
+     * 
+     * @param resourcePath path to child resource
+     * @return Resource at the indicated path
+     */
+    Resource get(String resourcePath);
+    
+    /**
      * List of directory contents.
+     * 
+     * The listed files exist (and may be DIRECTORY or RESOURCE items).
      * 
      * @see File#listFiles()
      * @return List of directory contents, or null if this resource is not a directory
      */
     List<Resource> list();
-
-    /**
-     * Enumeration indicating kind of resource used.
-     */
-    public enum Type {
-        /**
-         * Resource directory (contents available using {@link Resource#list()}).
-         * 
-         * @see File#isDirectory()
-         */
-        DIRECTORY,
-        /**
-         * Resource used for content. Content access available through {@link Resource#in()} and {@link Resource#out()}.
-         */
-        RESOURCE,
-
-        /**
-         * Undefined resource.
-         * 
-         * @see File#exists()
-         */
-        UNDEFINED
-    };
 
     /**
      * Resource type.
@@ -113,9 +127,4 @@ public interface Resource {
      * @return
      */
     Type getType();
-
-    // mkdirs() not needed, just create a child resource
-    // boolean mkdirs();
-    // createNew() not needed, just start writing the contents
-    // boolean createNew();
 }

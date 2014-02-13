@@ -60,6 +60,11 @@ public class FileSystemResourceStore implements ResourceStore {
         return new FileSystemResource( path );
     }
     
+    @Override
+    public String toString() {
+        return "ResourceStore "+baseDirectory;
+    }
+    
     /**
      * Direct implementation of Resource.
      * <p>
@@ -75,31 +80,25 @@ public class FileSystemResourceStore implements ResourceStore {
         }
 
         @Override
-        public String getPath() {
+        public String path() {
             return path;
         }
 
         @Override
         public String name() {
-            int split = path.lastIndexOf('/');
-            if( split == -1 ){
-                return path;
-            }
-            else {
-                return path.substring(split+1);
-            }
+            return Paths.name( path );
         }
 
         @Override
         public InputStream in() {
             File actualFile = file();
             if( !actualFile.exists() ){
-                throw new IllegalStateException("File not found "+path);
+                throw new IllegalStateException("File not found "+actualFile);
             }
             try {
                 return new FileInputStream( file );
             } catch (FileNotFoundException e) {
-                throw new IllegalStateException("File not found "+path);
+                throw new IllegalStateException("File not found "+actualFile,e);
             }
         }
 
@@ -112,7 +111,7 @@ public class FileSystemResourceStore implements ResourceStore {
             try {
                 return new FileOutputStream( actualFile );
             } catch (FileNotFoundException e) {
-                throw new IllegalStateException("Cannot access "+path);
+                throw new IllegalStateException("Cannot access "+actualFile,e);
             }
         }
 
@@ -137,7 +136,7 @@ public class FileSystemResourceStore implements ResourceStore {
                         throw new FileNotFoundException("Unable to create"+file.getName()+" - not a directory " + parent.getAbsolutePath() );
                     }
                 } catch (IOException e) {
-                    throw new IllegalStateException("Cannot create "+path);
+                    throw new IllegalStateException("Cannot create "+path, e);
                 }
             }
             return file;
@@ -148,7 +147,7 @@ public class FileSystemResourceStore implements ResourceStore {
         }
 
         @Override
-        public Resource getParent() {
+        public Resource parent() {
             int split = path.lastIndexOf('/');
             if (split == -1 ){
                 return FileSystemResourceStore.this.get(""); // root
@@ -158,6 +157,17 @@ public class FileSystemResourceStore implements ResourceStore {
             }
         }
 
+        @Override
+        public Resource get(String resourcePath) {
+            if( resourcePath == null ){
+                throw new NullPointerException("Resource path required");
+            }
+            if( "".equals(resourcePath)){
+                return this;
+            }
+            return FileSystemResourceStore.this.get( Paths.path( path, resourcePath ) );
+        }
+        
         @Override
         public List<Resource> list() {
             String array[] = file.list();

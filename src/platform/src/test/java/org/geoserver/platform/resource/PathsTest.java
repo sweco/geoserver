@@ -33,6 +33,20 @@ public class PathsTest {
         // handling invalid values        
         assertNull( path( (String) null)); // edge case
         assertEquals( "foo", path("foo/"));
+        
+        try {
+            assertEquals("foo",path(".","foo") );
+            fail(". invalid");
+        }
+        catch( IllegalArgumentException expected){            
+        }
+
+        try {
+            assertEquals("foo",path("foo/bar","..") );
+            fail(".. invalid");
+        }
+        catch( IllegalArgumentException expected){            
+        }
     }
     @Test
     public void parentTest() {
