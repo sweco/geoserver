@@ -4,6 +4,7 @@
  */
 package org.geoserver.platform.resource;
 
+
 /**
  * Used to manage configuration storage (file system, test harness, or database blob).
  * <p>
@@ -34,8 +35,12 @@ public interface ResourceStore {
     /**
      * Path based resource access.
      * 
+     * The returned Resource acts as a handle, and may be UNDEFINED. In general Resources are created
+     * in a lazy fashion when used for the first time.
+     * 
      * @param path 
-     * @return resource
+     * @return Resource at the indicated location
+     * @throws
      */
     Resource get(String path);
 }
