@@ -20,13 +20,17 @@ import java.util.logging.Logger;
 
 import javax.servlet.ServletContext;
 
+import org.geoserver.platform.resource.FileSystemResourceStore;
 import org.geoserver.platform.resource.ResourceStore;
+import org.geoserver.platform.resource.Resources;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.web.context.WebApplicationContext;
+
+import com.mockrunner.ejb.Configuration;
 
 
 /**
@@ -63,21 +67,30 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
 
     /** "path" for resource lookups */
     Set<File> searchLocations;
+    
+    /**
+     * ResourceStore used for configuration resources.
+     * 
+     * Initially this is configured to access resources in the base directory, however spring may inject an external implementation (jdbc database
+     * blob, github, ...).
+     */
+    ResourceStore resources;
 
     /**
-     * Base directory
+     * Base directory used to access unmanaged files.
      */
     File baseDirectory;
 
     /**
-     * Creates a new resource loader with no base directory.
+     * Creates a new resource loader (with no base directory).
      * <p>
-     * Such a constructed resource loader is not capable of creating resources
-     * from relative paths.
+     * Used to construct a GeoServerResourceLoader for test cases (and is unable to create resources from relative paths.
      * </p>
      */
     public GeoServerResourceLoader() {
         searchLocations = new TreeSet<File>();
+        baseDirectory = null;
+        resources = Resources.EMPTY;
     }
 
     /**
@@ -89,6 +102,8 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
     public GeoServerResourceLoader(File baseDirectory) {
         this();
         this.baseDirectory = baseDirectory;
+        this.resources = new FileSystemResourceStore( baseDirectory );
+        
         setSearchLocations((Set<File>) Collections.EMPTY_SET);
     }
     
@@ -103,8 +118,14 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
                 }
             }
         }
+        if( resources == Resources.EMPTY ){
+            // lookup the configuration resources
+            if( baseDirectory != null ){
+                resources = new FileSystemResourceStore( baseDirectory );
+            }
+        }
         
-        //add additional lookup locations
+        // add additional lookup locations
         if (baseDirectory != null) {
             addSearchLocation(new File(baseDirectory, "data"));
         }
@@ -123,6 +144,15 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
                 }
             }
         }
+        if( LOGGER.isLoggable(Level.INFO)){
+            if( searchLocations.size() > 1 ){
+                LOGGER.info("Search Location base directory "+baseDirectory );
+                LOGGER.info("Search Location resource store "+resources);
+                for( File location : searchLocations ){
+                    LOGGER.info("Search Location "+location );
+                }
+            }
+        }
     }
     
     /**
@@ -136,6 +166,8 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
 
     /**
      * Sets the search locations used for resource lookups.
+     * 
+     * The {@link #baseDirectory} is always incuded in {@link #searchLocations}.
      *
      * @param searchLocations A set of {@link File}.
      */
@@ -157,6 +189,8 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
 
     /**
      * Sets the base directory.
+     * 
+     * The base directory is included in {@link #searchLocations}.
      *
      * @param baseDirectory
      */
@@ -167,7 +201,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
     }
 
     /**
-     * Performs a resource lookup.
+     * Performs file lookup.
      *
      * @param location The name of the resource to lookup, can be absolute or
      * relative.
@@ -199,7 +233,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
                 + (parent != null ? parent.getPath() : "null"));
         }
         
-        //first to an existance check
+        //first to an existence check
         File file = parent != null ? new File(parent,location) : new File(location);
         
         if (file.exists()) {
