@@ -86,7 +86,7 @@ public class FileSystemResourceStore implements ResourceStore {
                 return path;
             }
             else {
-                return path.substring(split);
+                return path.substring(split+1);
             }
         }
 

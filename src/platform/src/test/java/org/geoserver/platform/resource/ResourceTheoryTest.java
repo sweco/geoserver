@@ -9,12 +9,17 @@ import static org.junit.Assume.*;
 import static org.hamcrest.Matchers.*;
 import static org.geoserver.platform.resource.ResourceMatchers.*;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.List;
 
 import org.geoserver.platform.resource.Resource;
 import org.geoserver.platform.resource.Resource.Type;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
@@ -70,6 +75,18 @@ public abstract class ResourceTheoryTest {
         String result = res.getPath();
         
         assertThat(result, notNullValue());
+    }
+    
+    @Theory
+    public void theoryNameIsEndOfPath(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        List<String> elements = Paths.names(path);
+        String lastElement = elements.get(elements.size()-1);
+        
+        String result = res.name();
+        
+        assertThat(result, equalTo(lastElement));
     }
     
     @Theory
@@ -233,5 +250,133 @@ public abstract class ResourceTheoryTest {
         if( res.getType() != Type.UNDEFINED){
             assertThat(path+" directory",parent, is(directory()));
         }
+    }
+    
+    @Theory
+    public void theoryHaveFile(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        File result = res.file();
+        
+        assertThat(result, notNullValue());
+    }
+    
+    @Theory
+    public void theoryNonDirectoriesHaveFileWithSameContents(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        assumeThat(res, not(directory()));
+        
+        byte[] test = {42, 29, 32, 120, 69, 0, 1};
+        
+        OutputStream ostream = res.out();
+        try {
+            ostream.write(test);
+        } finally {
+            ostream.close();
+        }
+        
+        byte[] result=new byte[test.length];
+        
+        InputStream istream = new FileInputStream(res.file());
+        try {
+            istream.read(result);
+            assertThat(istream.read(), is(-1));
+        } finally {
+            istream.close();
+        }
+        assertThat(result, equalTo(test));
+    }
+    
+    @Theory
+    public void theoryDirectoriesHaveFileWithSameNamedChildren(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        assumeThat(res, is(directory()));
+        
+        File dir = res.file();
+        
+        Collection<Resource> resChildren = res.list();
+        String[] fileChildrenNames = dir.list();
+        
+        String[] resChildrenNames = new String[resChildren.size()];
+        
+        int i=0;
+        for(Resource child: resChildren) {
+            resChildrenNames[i]=child.name();
+            i++;
+        }
+        
+        assertThat(fileChildrenNames, arrayContainingInAnyOrder(resChildrenNames));
+    }
+    
+    // This is the behaviour of the file based implementation. Should this be required or left 
+    // undefined with clear documentation indicating that it's implementation dependent?
+    //@Ignore
+    @Theory
+    public void theoryAlteringFileAltersResource(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        assumeThat(res, not(directory()));
+        
+        byte[] testResource = {42, 29, 32, 120, 69, 0, 1};
+        byte[] testFile = {27, 3, 5, 90, -120, -3};
+        
+        // Write to resource
+        {
+            OutputStream ostream = res.out();
+            try {
+                ostream.write(testResource);
+            } finally {
+                ostream.close();
+            }
+        }
+        
+        // Write to file
+        {
+            OutputStream ostream = new FileOutputStream(res.file());
+            try {
+                ostream.write(testFile);
+            } finally {
+                ostream.close();
+            }
+        }
+        
+        // Read from resource
+        byte[] result=new byte[testFile.length];
+        
+        InputStream istream = res.in();
+        try {
+            istream.read(result);
+            assertThat(istream.read(), is(-1));
+        } finally {
+            istream.close();
+        }
+        
+        // Should be what was written to the file
+        assertThat(result, equalTo(testFile));
+    }
+    
+    // This is the behaviour of the file based implementation. Should this be required or left 
+    // undefined with clear documentation indicating that it's implementation dependent?
+    //@Ignore
+    @Theory
+    public void theoryAddingFileToDirectoryAddsResource(String path) throws Exception {
+        Resource res = getResource(path);
+        
+        assumeThat(res, is(directory()));
+        
+        File dir = res.file();
+        
+        File file = new File(dir, "newFileCreatedDirectly");
+        
+        assumeTrue(file.createNewFile());
+        
+        Resource child = getResource(Paths.path(res.getPath(), "newFileCreatedDirectly"));
+        Collection<Resource> children = res.list();
+        
+        assertThat(child, is(defined()));
+        
+        assertThat(children, hasItem(child));
     }
 }
