@@ -29,9 +29,12 @@ package org.geoserver.platform.resource;
  * BufferedImage img = ImageIO.read( file );
  * </code></pre>
  * 
+ * The ResourceStore acts as the Resource for the {@link Paths#BASE} directory.
+ * 
  * @see Resources
+ * @see Resource
  */
-public interface ResourceStore {
+public interface ResourceStore extends Resource {
     /**
      * Path based resource access.
      * 
@@ -43,4 +46,20 @@ public interface ResourceStore {
      * @throws
      */
     Resource get(String path);
+    
+    /**
+     * ResoruceStore acts as {@link Paths#BASE} directory.
+     * 
+     * @return {@link Paths#BASE}
+     */
+    @Override
+    public String getPath();
+    
+    /**
+     * Parent <code>null</code> for {@link Paths#BASE}.
+     * 
+     * @return null as ResourceStore acts as the {@link Paths#BASE} directory.
+     */
+    @Override
+    public Resource getParent();
 }

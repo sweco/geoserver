@@ -74,7 +74,19 @@ public interface Resource {
     Resource getParent();
 
     /**
+     * Path based resource access which can be used to access {@link #list()} contents or create a new undefined resource.
+     * 
+     * The returned Resource acts as a handle, and may be UNDEFINED. In general Resources are created in a lazy fashion when used for the first time.
+     * 
+     * @param path
+     * @return Resource at the indicated path
+     */
+    Resource get(String path);
+    
+    /**
      * List of directory contents.
+     * 
+     * The listed files exist (and may be DIRECTORY or RESOURCE items).
      * 
      * @see File#listFiles()
      * @return List of directory contents, or null if this resource is not a directory
