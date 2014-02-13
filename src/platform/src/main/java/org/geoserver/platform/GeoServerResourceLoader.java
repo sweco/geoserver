@@ -20,6 +20,7 @@ import java.util.logging.Logger;
 
 import javax.servlet.ServletContext;
 
+import org.geoserver.platform.resource.ResourceStore;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -29,26 +30,29 @@ import org.springframework.web.context.WebApplicationContext;
 
 
 /**
- * Manages resources in GeoServer.
+ * Access to resources in GeoServer including configuration information and unmanaged cache or log files.
  * <p>
  * The loader maintains a search path in which it will use to look up resources.
- * The {@link #baseDirectory} is a member of this path.
- * </p>
- * <p>
- * Files and directories created by the resource loader are made relative to
+ * <ul>
+ * <li>Configuration is  accessed using {@link ResourceStore#get(String)} which provides stream based access. If required configuration can
+ * be unpacked into a file in the data directory. The most common example is for use as a template.
+ * <li>Files in the data directory can also be used as a temporary cache. These files should be considered temporary and may need to be
+ * recreated (when upgrading or for use on different nodes in a cluster).</li>
+ * <li>
+ * </ul>
+ * The {@link #baseDirectory} is a member of this path. Files and directories created by the resource loader are made relative to
  * {@link #baseDirectory}.
  * </p>
  * <p>
- * <pre>
- *         <code>
+ * <pre><code>
  * File dataDirectory = ...
  * GeoServerResourceLoader loader = new GeoServerResourceLoader( dataDirectory );
  * loader.addSearchLocation( new File( "/WEB-INF/" ) );
  * loader.addSearchLocation( new File( "/data" ) );
  * ...
- * File catalog = loader.find( "catalog.xml" );
- *         </code>
- * </pre>
+ * Resource catalog = loader.get("catalog.xml");
+ * File log = loader.find("logs/geoserver.log");
+ * </code></pre>
  * </p>
  *
  * @author Justin Deoliveira, The Open Planning Project, jdeolive@openplans.org
@@ -58,7 +62,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
     private static final Logger LOGGER = org.geotools.util.logging.Logging.getLogger("org.vfny.geoserver.global");
 
     /** "path" for resource lookups */
-    Set searchLocations;
+    Set<File> searchLocations;
 
     /**
      * Base directory
@@ -73,7 +77,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * </p>
      */
     public GeoServerResourceLoader() {
-        searchLocations = new TreeSet();
+        searchLocations = new TreeSet<File>();
     }
 
     /**
@@ -81,10 +85,11 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      *
      * @param baseDirectory The directory in which
      */
+    @SuppressWarnings("unchecked")
     public GeoServerResourceLoader(File baseDirectory) {
         this();
         this.baseDirectory = baseDirectory;
-        setSearchLocations(Collections.EMPTY_SET);
+        setSearchLocations((Set<File>) Collections.EMPTY_SET);
     }
     
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
@@ -134,8 +139,8 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      *
      * @param searchLocations A set of {@link File}.
      */
-    public void setSearchLocations(Set searchLocations) {
-        this.searchLocations = new HashSet(searchLocations);
+    public void setSearchLocations(Set<File> searchLocations) {
+        this.searchLocations = new HashSet<File>(searchLocations);
 
         //always add the base directory
         if (baseDirectory != null) {
@@ -206,7 +211,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
         } else {
             //try a relative url if no parent specified
             if ( parent == null ) {
-                for (Iterator f = searchLocations.iterator(); f.hasNext();) {
+                for (Iterator<File> f = searchLocations.iterator(); f.hasNext();) {
                     File base = (File) f.next();
                     file = new File(base, location);
     
@@ -577,7 +582,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
     /**
      * Copies a resource relative to a particular class from the classpath to the specified file. 
      */
-    public void copyFromClassPath( String resource, File target, Class scope ) throws IOException {
+    public void copyFromClassPath( String resource, File target, Class<?> scope ) throws IOException {
         InputStream is = null; 
         OutputStream os = null;
         byte[] buffer = new byte[4096];
@@ -651,7 +656,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
 
         String dataDirStr = null;
         String msgPrefix = null;
-        int iVar = 0;
+        
         // Loop over variable names
         for (int i = 0; i < varStrs.length && dataDirStr == null; i++) {
             
@@ -701,7 +706,6 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
 
                 // Sweet, we can work with this
                 dataDirStr = value;
-                iVar = i;
             }
         }
         
