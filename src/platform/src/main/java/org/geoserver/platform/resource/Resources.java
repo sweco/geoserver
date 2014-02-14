@@ -18,111 +18,6 @@ import org.geoserver.platform.resource.Resource.Type;
  */
 public class Resources {
     
-    private static final class NullResourceStore extends NullResource implements ResourceStore {
-        final long MODIFIED = System.currentTimeMillis();
-        private NullResourceStore(){
-            super("");            
-        }
-        @Override
-        public Resource get(final String resourcePath) {
-            if( Paths.BASE.equals( resourcePath )){
-                return this;
-            }
-            return new NullResource(resourcePath);
-        }
-        @Override
-        public long lastmodified() {
-            return MODIFIED;
-        }
-        public String toString() {
-            return "Resources.EMPTY";
-        }
-    }    
-    private static class NullResource implements Resource {
-        String path;
-
-        private NullResource(String resourcePath) {
-            path = resourcePath;
-        }
-
-        @Override
-        public String getPath() {
-            return path;
-        }
-
-        @Override
-        public String name() {
-            return Paths.name( path );
-        }
-
-        @Override
-        public InputStream in() {
-            throw new IllegalStateException("Unable to read from ResourceStore.EMPTY");
-        }
-
-        @Override
-        public OutputStream out() {
-            throw new IllegalStateException("Unable to write to ResourceStore.EMPTY");
-        }
-
-        @Override
-        public File file() {
-            throw new IllegalStateException("No file access to ResourceStore.EMPTY");
-        }
-
-        @Override
-        public long lastmodified() {
-            return EMPTY.lastmodified();
-        }
-
-        @Override
-        public Resource getParent() {
-            return EMPTY.get(Paths.parent(path));
-        }
-        @Override
-        public Resource get(final String resourcePath) {
-            return EMPTY.get( Paths.path( path, resourcePath) );
-        }
-        @Override
-        public List<Resource> list() {
-            return null;
-        }
-
-        @Override
-        public Type getType() {
-            return Type.UNDEFINED;
-        }
-
-        @Override
-        public int hashCode() {
-            final int prime = 31;
-            int result = 1;
-            result = prime * result + ((path == null) ? 0 : path.hashCode());
-            return result;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj)
-                return true;
-            if (obj == null)
-                return false;
-            if (getClass() != obj.getClass())
-                return false;
-            Resource other = (Resource) obj;
-            if (path == null) {
-                if (other.getPath() != null)
-                    return false;
-            } else if (!path.equals(other.getPath()))
-                return false;
-            return true;
-        }
-
-        @Override
-        public String toString() {
-            return path;
-        }
-    }
     /**
      * Empty placeholder for ResourceStore.
      * <p>
@@ -130,7 +25,96 @@ public class Resources {
      * This implementation prevents client code from requiring null checks on {@link ResourceStore#get(String)}. IllegalStateException
      * are thrown by in(), out() and file() which are the usual methods clients require error handling.  
      */
-    public static ResourceStore EMPTY = new NullResourceStore();
+    public static ResourceStore EMPTY = new ResourceStore() {
+        final long MODIFIED = System.currentTimeMillis();
+        @Override
+        public Resource get(final String resourcePath) {
+            return new Resource(){
+                String path = resourcePath;
+                @Override
+                public String path() {
+                    return path;
+                }
+
+                @Override
+                public String name() {
+                    return Paths.name( path );
+                }
+
+                @Override
+                public InputStream in() {
+                    throw new IllegalStateException("Unable to read from ResourceStore.EMPTY");
+                }
+
+                @Override
+                public OutputStream out() {
+                    throw new IllegalStateException("Unable to write to ResourceStore.EMPTY");
+                }
+
+                @Override
+                public File file() {
+                    throw new IllegalStateException("No file access to ResourceStore.EMPTY");
+                }
+
+                @Override
+                public long lastmodified() {
+                    return MODIFIED;
+                }
+
+                @Override
+                public Resource parent() {
+                    return EMPTY.get(Paths.parent(path));
+                }
+
+                public Resource get(String resourcePath) {
+                    return EMPTY.get(Paths.path(this.path, resourcePath));
+                }
+                
+                @Override
+                public List<Resource> list() {
+                    return null;
+                }
+
+                @Override
+                public Type getType() {
+                    return Type.UNDEFINED;
+                }
+
+                @Override
+                public int hashCode() {
+                    final int prime = 31;
+                    int result = 1;
+                    result = prime * result + ((path == null) ? 0 : path.hashCode());
+                    return result;
+                }
+                
+                @Override
+                public boolean equals(Object obj) {
+                    if (this == obj)
+                        return true;
+                    if (obj == null)
+                        return false;
+                    if (getClass() != obj.getClass())
+                        return false;
+                    Resource other = (Resource) obj;
+                    if (path == null) {
+                        if (other.path() != null)
+                            return false;
+                    } else if (!path.equals(other.path()))
+                        return false;
+                    return true;
+                }
+
+                @Override
+                public String toString() {
+                    return path;
+                }
+            };
+        }
+        public String toString() {
+            return "Resources.EMPTY";
+        }
+    };
     /**
      * Search for resources using pattern and last modified time.
      * 

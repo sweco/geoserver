@@ -1,8 +1,11 @@
 package org.geoserver.platform.resource;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Utility class for handling Resource paths in a consistent fashion.
@@ -98,6 +101,9 @@ public class Paths {
         final int LIMIT = names.size();
         for( int i=0; i<LIMIT; i++) {
             String item = names.get(i);
+            if( INVALID.contains(item)){
+                throw new IllegalArgumentException( "Contains invalid "+ item + " path: "+path);
+            }
             if( item != null ){
                 buf.append(item);
                 if(i<LIMIT-1){
@@ -107,6 +113,8 @@ public class Paths {
         }
         return buf.toString();
     }
+    static final Set<String> INVALID = new HashSet<String>(Arrays.asList(new String[]{"..","."}));
+    
     public static List<String> names(String path){
         if( path == null || path.length()==0){
             return Collections.emptyList();

@@ -63,7 +63,7 @@ public abstract class ResourceTheoryTest {
     public void theoryHaveSamePath(String path) throws Exception {
         Resource res = getResource(path);
         
-        String result = res.getPath();
+        String result = res.path();
         
         assertThat(result, is(equalTo(path)));
     }
@@ -72,7 +72,7 @@ public abstract class ResourceTheoryTest {
     public void theoryHaveName(String path) throws Exception {
         Resource res = getResource(path);
         
-        String result = res.getPath();
+        String result = res.path();
         
         assertThat(result, notNullValue());
     }
@@ -216,7 +216,7 @@ public abstract class ResourceTheoryTest {
         assumeThat(children, not(empty())); // Make sure this resource has children
         
         for(Resource child: children) {
-            Resource parent = child.getParent();
+            Resource parent = child.parent();
             assertThat(parent, equalTo(res));
         }
     }
@@ -225,7 +225,7 @@ public abstract class ResourceTheoryTest {
     public void theoryParentsKnowTheirChildren(String path) throws Exception {
         Resource res = getResource(path);
         assumeThat(res, is(directory()));
-        Resource parent = res.getParent();
+        Resource parent = res.parent();
         assumeThat(path,parent, notNullValue()); // Make sure this resource has a parent
         
         Collection<Resource> result = parent.list();
@@ -244,7 +244,7 @@ public abstract class ResourceTheoryTest {
     @Theory
     public void theoryParentIsDirectory(String path) throws Exception {
         Resource res = getResource(path);
-        Resource parent = res.getParent();
+        Resource parent = res.parent();
         assumeThat(path+" not root", parent, notNullValue());
         
         if( res.getType() != Type.UNDEFINED){
@@ -372,7 +372,7 @@ public abstract class ResourceTheoryTest {
         
         assumeTrue(file.createNewFile());
         
-        Resource child = getResource(Paths.path(res.getPath(), "newFileCreatedDirectly"));
+        Resource child = getResource(Paths.path(res.path(), "newFileCreatedDirectly"));
         Collection<Resource> children = res.list();
         
         assertThat(child, is(defined()));

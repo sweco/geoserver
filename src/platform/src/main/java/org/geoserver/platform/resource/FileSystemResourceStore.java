@@ -22,14 +22,11 @@ import org.springframework.util.FileSystemUtils;
 /**
  * Implementation of ResourceStore backed by the file system.
  */
-public class FileSystemResourceStore extends FileSystemResource implements ResourceStore {
+public class FileSystemResourceStore implements ResourceStore {
     
-    File baseDirectory;
+    private File baseDirectory;
 
     public FileSystemResourceStore(File resourceDirectory) {
-        super(Paths.BASE);
-        this.file = resourceDirectory;
-        
         if (resourceDirectory == null) {
             throw new NullPointerException("root resource directory required");
         }
@@ -50,7 +47,7 @@ public class FileSystemResourceStore extends FileSystemResource implements Resou
         }
     }
     
-    static File file( File file, String path ){
+    private static File file( File file, String path ){
         for( String item : Paths.names(path) ){
             file = new File( file, item );           
         }
@@ -59,188 +56,176 @@ public class FileSystemResourceStore extends FileSystemResource implements Resou
     }
     
     @Override
-    protected FileSystemResourceStore store() {
-        return this;
-    }
-    
-    @Override
     public Resource get(String path) {
-        if( Paths.BASE.equals( path )){
-            return this;
-        }
-        path = Paths.path(path); // sanity check
-        return new FileSystemResource( path ){
-
-            @Override
-            protected FileSystemResourceStore store() {
-                return FileSystemResourceStore.this;
-            }            
-        };
+        return new FileSystemResource( path );
     }
     
     @Override
     public String toString() {
-        return "FileResourceStore "+baseDirectory;
-    }
-}
-
-/**
- * Direct implementation of Resource.
- * <p>
- * This implementation is a stateless data object, acting as a simple handle around a File.
- */
-abstract class FileSystemResource implements Resource {
-    
-    String path;
-    File file;
-    
-    public FileSystemResource(String path) {
-        this.path = path;
-        this.file = FileSystemResourceStore.file( store().baseDirectory, path );
+        return "ResourceStore "+baseDirectory;
     }
     
-    abstract protected FileSystemResourceStore store();
-    
-    @Override
-    public String getPath() {
-        return path;
-    }
-
-    @Override
-    public String name() {
-        return Paths.name( path );
-    }
-
-    @Override
-    public InputStream in() {
-        File actualFile = file();
-        if( !actualFile.exists() ){
-            throw new IllegalStateException("File not found "+actualFile);
+    /**
+     * Direct implementation of Resource.
+     * <p>
+     * This implementation is a stateless data object, acting as a simple handle around a File.
+     */
+    class FileSystemResource implements Resource {
+        String path;
+        File file;
+        
+        public FileSystemResource(String path) {
+            this.path = path;
+            this.file = FileSystemResourceStore.file( baseDirectory, path );
         }
-        try {
-            return new FileInputStream( file );
-        } catch (FileNotFoundException e) {
-            throw new IllegalStateException("File not found "+actualFile,e);
-        }
-    }
 
-    @Override
-    public OutputStream out() {
-        File actualFile = file();
-        if( !actualFile.exists() ){
-            throw new IllegalStateException("Cannot access "+actualFile);
+        @Override
+        public String path() {
+            return path;
         }
-        try {
-            return new FileOutputStream( actualFile );
-        } catch (FileNotFoundException e) {
-            throw new IllegalStateException("Cannot access "+actualFile,e);
-        }
-    }
 
-    @Override
-    public File file() {
-        if( !file.exists() ){
+        @Override
+        public String name() {
+            return Paths.name( path );
+        }
+
+        @Override
+        public InputStream in() {
+            File actualFile = file();
+            if( !actualFile.exists() ){
+                throw new IllegalStateException("File not found "+actualFile);
+            }
             try {
-                File parent = file.getParentFile();
-                if( !parent.exists() ){
-                    boolean created = parent.mkdirs();
-                    if( !created ){
-                        throw new IllegalStateException("Unable to create "+parent.getAbsolutePath() );
-                    }
-                }
-                if (parent.isDirectory()){
-                    boolean created = file.createNewFile();
-                    if( !created ){
-                        throw new FileNotFoundException("Unable to create "+file.getAbsolutePath() );
-                    }
-                }
-                else {
-                    throw new FileNotFoundException("Unable to create"+file.getName()+" - not a directory " + parent.getAbsolutePath() );
-                }
-            } catch (IOException e) {
-                throw new IllegalStateException("Cannot create "+path, e);
+                return new FileInputStream( file );
+            } catch (FileNotFoundException e) {
+                throw new IllegalStateException("File not found "+actualFile,e);
             }
         }
-        return file;
-    }
-    @Override
-    public long lastmodified() {
-        return file.lastModified();
-    }
 
-    @Override
-    public Resource getParent() {
-        int split = path.lastIndexOf('/');
-        if (split == -1 ){
-            return store().get(""); // root
+        @Override
+        public OutputStream out() {
+            File actualFile = file();
+            if( !actualFile.exists() ){
+                throw new IllegalStateException("Cannot access "+actualFile);
+            }
+            try {
+                return new FileOutputStream( actualFile );
+            } catch (FileNotFoundException e) {
+                throw new IllegalStateException("Cannot access "+actualFile,e);
+            }
         }
-        else {
-            return store().get( path.substring(0,split) );
-        }
-    }
 
-    @Override
-    public Resource get(String resourcePath) {
-        return store().get( Paths.path( this.path, resourcePath ) );
-    }
-    
-    @Override
-    public List<Resource> list() {
-        String array[] = file.list();
-        if( array == null ){
-            return null; // not a directory
-        }            
-        List<Resource> list = new ArrayList<Resource>( array.length );
-        for( String filename : array ){
-            Resource resource = store().get( Paths.path( path, filename ));
-            list.add( resource );
+        @Override
+        public File file() {
+            if( !file.exists() ){
+                try {
+                    File parent = file.getParentFile();
+                    if( !parent.exists() ){
+                        boolean created = parent.mkdirs();
+                        if( !created ){
+                            throw new IllegalStateException("Unable to create "+parent.getAbsolutePath() );
+                        }
+                    }
+                    if (parent.isDirectory()){
+                        boolean created = file.createNewFile();
+                        if( !created ){
+                            throw new FileNotFoundException("Unable to create "+file.getAbsolutePath() );
+                        }
+                    }
+                    else {
+                        throw new FileNotFoundException("Unable to create"+file.getName()+" - not a directory " + parent.getAbsolutePath() );
+                    }
+                } catch (IOException e) {
+                    throw new IllegalStateException("Cannot create "+path, e);
+                }
+            }
+            return file;
         }
-        return list;
-    }
-    @Override
-    public Type getType() {
-        if( !file.exists() ){
-            return Type.UNDEFINED;
+        @Override
+        public long lastmodified() {
+            return file.lastModified();
         }
-        else if (file.isDirectory()){
-            return Type.DIRECTORY;
-        }
-        else if (file.isFile()){
-            return Type.RESOURCE;
-        }
-        else {
-            throw new IllegalStateException("Path does not represent a configuration resource: "+path );                
-        }
-    }
-    
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((path == null) ? 0 : path.hashCode());
-        return result;
-    }
 
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        FileSystemResource other = (FileSystemResource) obj;
-        if (path == null) {
-            if (other.path != null)
+        @Override
+        public Resource parent() {
+            int split = path.lastIndexOf('/');
+            if (split == -1 ){
+                return FileSystemResourceStore.this.get(""); // root
+            }
+            else {
+                return FileSystemResourceStore.this.get( path.substring(0,split) );
+            }
+        }
+
+        @Override
+        public Resource get(String resourcePath) {
+            if( resourcePath == null ){
+                throw new NullPointerException("Resource path required");
+            }
+            if( "".equals(resourcePath)){
+                return this;
+            }
+            return FileSystemResourceStore.this.get( Paths.path( path, resourcePath ) );
+        }
+        
+        @Override
+        public List<Resource> list() {
+            String array[] = file.list();
+            if( array == null ){
+                return null; // not a directory
+            }            
+            List<Resource> list = new ArrayList<Resource>( array.length );
+            for( String filename : array ){
+                Resource resource = FileSystemResourceStore.this.get( Paths.path( path, filename ));
+                list.add( resource );
+            }
+            return list;
+        }
+        @Override
+        public Type getType() {
+            if( !file.exists() ){
+                return Type.UNDEFINED;
+            }
+            else if (file.isDirectory()){
+                return Type.DIRECTORY;
+            }
+            else if (file.isFile()){
+                return Type.RESOURCE;
+            }
+            else {
+                throw new IllegalStateException("Path does not represent a configuration resource: "+path );                
+            }
+        }
+        
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((path == null) ? 0 : path.hashCode());
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
                 return false;
-        } else if (!path.equals(other.path))
-            return false;
-        return true;
-    }
+            if (getClass() != obj.getClass())
+                return false;
+            FileSystemResource other = (FileSystemResource) obj;
+            if (path == null) {
+                if (other.path != null)
+                    return false;
+            } else if (!path.equals(other.path))
+                return false;
+            return true;
+        }
 
-    @Override
-    public String toString() {
-        return path;
+        @Override
+        public String toString() {
+            return path;
+        }
+        
     }
-    
 }
