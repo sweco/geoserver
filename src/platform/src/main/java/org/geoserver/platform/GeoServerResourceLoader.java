@@ -228,8 +228,19 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
         File file = find( null, location );
         
         Resource resource = resources.get( Paths.convert(location) );
-        File check = resource.getType() == Type.UNDEFINED ? null : resource.file();
-        
+        File check;
+        switch ( resource.getType()) {
+        case DIRECTORY:
+            check = resource.dir();
+            break;
+            
+        case RESOURCE:
+            check = resource.file();
+            break;
+        default:
+            check = null;
+            break;
+        }        
         return check( file, check );
     }
     
@@ -258,13 +269,34 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
         File check = null;
         if( parent == null || baseDirectory.equals(parent)){
             Resource resource = resources.get( Paths.convert(location) );
-            check = resource.getType() == Type.UNDEFINED ? null : resource.file();
+            switch ( resource.getType()) {
+            case DIRECTORY:
+                check = resource.dir();
+                break;
+                
+            case RESOURCE:
+                check = resource.file();
+                break;
+            default:
+                check = null;
+                break;
+            }
         }
         else {
-            String directory = Paths.convert(baseDirectory,parent);
-            String path = Paths.path( directory, location );
-            Resource resource = resources.get( Paths.convert(path) );
-            check = resource.getType() == Type.UNDEFINED ? null : resource.file();
+            String path = Paths.convert(baseDirectory,parent,location);
+            Resource resource = resources.get( path );
+            switch ( resource.getType()) {
+            case DIRECTORY:
+                check = resource.dir();
+                break;
+                
+            case RESOURCE:
+                check = resource.file();
+                break;
+            default:
+                check = null;
+                break;
+            } 
         }        
         
         if (file.exists()) {

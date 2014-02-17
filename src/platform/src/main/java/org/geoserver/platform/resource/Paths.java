@@ -160,23 +160,12 @@ public class Paths {
                 return convert(file.getPath());
             }
         }
-        if( file.isAbsolute() ){
-            URI baseURI = base.toURI();
-            URI fileURI = file.toURI();
+        URI baseURI = base.toURI();
+        URI fileURI = file.toURI();
     
-            URI relativize = baseURI.relativize(fileURI);
+        URI relativize = baseURI.relativize(fileURI);
     
-            return relativize.getPath();
-        }
-        else {
-            File resolved = new File( base, file.getPath() );
-            URI baseURI = base.toURI();
-            URI fileURI = resolved.toURI();
-    
-            URI relativize = baseURI.relativize(fileURI);
-    
-            return relativize.getPath();
-        }
+        return relativize.getPath();
     }
 
     /**
