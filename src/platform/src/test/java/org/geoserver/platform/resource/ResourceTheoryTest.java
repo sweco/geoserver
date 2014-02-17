@@ -19,7 +19,6 @@ import java.util.List;
 
 import org.geoserver.platform.resource.Resource;
 import org.geoserver.platform.resource.Resource.Type;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
@@ -255,8 +254,19 @@ public abstract class ResourceTheoryTest {
     @Theory
     public void theoryHaveFile(String path) throws Exception {
         Resource res = getResource(path);
+        assumeThat(res, resource());
         
         File result = res.file();
+        
+        assertThat(result, notNullValue());
+    }
+    
+    @Theory
+    public void theoryHaveDir(String path) throws Exception {
+        Resource res = getResource(path);
+        assumeThat(res, directory());
+        
+        File result = res.dir();
         
         assertThat(result, notNullValue());
     }
@@ -294,7 +304,7 @@ public abstract class ResourceTheoryTest {
         
         assumeThat(res, is(directory()));
         
-        File dir = res.file();
+        File dir = res.dir();
         
         Collection<Resource> resChildren = res.list();
         String[] fileChildrenNames = dir.list();
@@ -366,7 +376,7 @@ public abstract class ResourceTheoryTest {
         
         assumeThat(res, is(directory()));
         
-        File dir = res.file();
+        File dir = res.dir();
         
         File file = new File(dir, "newFileCreatedDirectly");
         

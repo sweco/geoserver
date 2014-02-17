@@ -4,7 +4,6 @@
  */
 package org.geoserver.platform.resource;
 
-
 /**
  * Used to manage configuration storage (file system, test harness, or database blob).
  * <p>
@@ -55,4 +54,25 @@ public interface ResourceStore {
      * @throws
      */
     Resource get(String path);
+    
+    /**
+     * Remove resource at indicated path (including individual resources or directories).
+     * <p>
+     * Returns <code>true</code> if Resource was removed (or was never present). For read-only content (or if a security check) prevents the resource
+     * from being removed <code>false</code> is returned.
+     * </p>
+     * 
+     * @param path
+     * @return <code>false</code> if unable to remove and resource is still present, <code>true</code> if resource is now UNDEFINED.
+     */
+    boolean remove( String path);
+    
+    /**
+     * Move resource at indicated path (including individual resources or directories).
+     * 
+     * @param path Path of resource to move
+     * @param target path for moved resource
+     * @return true if resource was moved target path
+     */
+    boolean move( String path, String target);
 }

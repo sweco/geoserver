@@ -1,5 +1,7 @@
 package org.geoserver.platform.resource;
 
+import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -81,7 +83,7 @@ public class Paths {
             return path.substring(0,last)+"."+extension;
         }
     }
-    
+
     /**
      * Path construction.
      * 
@@ -142,4 +144,96 @@ public class Paths {
         
         return names;
     }
+    
+    /**
+     * Convert to file to resource path.
+     * 
+     * @param base directory location
+     * @param file relative file reference
+     * @return relative path used for Resource lookup
+     */
+    public static String convert(File base, File file) {
+        if (base == null) {
+            if (file.isAbsolute()) {
+                throw new NullPointerException("Unable to determine relative path");
+            } else {
+                return convert(file.getPath());
+            }
+        }
+        if( file == null ){
+            return Paths.BASE;
+        }
+        URI baseURI = base.toURI();
+        URI fileURI = file.toURI();
+        
+        if( fileURI.toString().startsWith( baseURI.toString())){
+            URI relativize = baseURI.relativize(fileURI);
+    
+            return relativize.getPath();
+        }
+        else {
+            return convert( file.getPath() );
+        }
+    }
+
+    /**
+     * Convert to file to resource path, allows for relative references (but is limited to content within the provided base directory).
+     * 
+     * 
+     * @param base directory location
+     * @param folder context for relative path (may be "." or null for base directory)
+     * @param fileLocation File path (using {@link File#separator}) allowing for relative references
+     * @return relative path used for Resource lookup
+     */
+    public static String convert(File base, File folder, String fileLocation) {
+        if (base == null) {
+            throw new NullPointerException("Base directory required for relative path");
+        }
+        List<String> folderPath = names(convert( base, folder ));
+        List<String> filePath = names(convert(fileLocation));
+        
+        List<String> resolvedPath = new ArrayList<String>( folderPath.size()+filePath.size() );
+        resolvedPath.addAll(folderPath);
+        
+        for( String item : filePath ){
+           if( item == null ) continue;
+           if( item.equals(".")) continue;
+           if( item.equals("..")){
+               if( !resolvedPath.isEmpty() ){
+                   resolvedPath.remove( resolvedPath.size()-1);
+                   continue;
+               }
+               else {
+                   throw new IllegalStateException("File location "+fileLocation+" outside of "+base.getPath());
+               }
+           }
+           resolvedPath.add(item);
+        }
+        return path( resolvedPath.toArray(new String[resolvedPath.size()]) );
+    }
+    /**
+     * Convert a filePath to resource path (relative to base directory), this method
+     * does not support absolute file paths.
+     * 
+     * This method converts file paths (using {@link File#separator}) to the URL style paths used for {@link ResourceStore#get(String)}.
+     * 
+     * @param directory directory used to resolve relative reference lookup
+     * @param filePath File path using {@link File#separator}
+     * @return Resource path suitable for use with {@link ResourceStore#get(String)} or null for absolute path
+     */
+    public static String convert( String filePath ){        
+        if( filePath == null ) {
+            return null;
+        }
+        if ( filePath.length()==0) {
+            return filePath;
+        }
+        if( File.separatorChar == '/'){
+            return filePath;
+        }
+        else {
+            return filePath.replace(File.separatorChar, '/');
+        }
+    }
+
 }

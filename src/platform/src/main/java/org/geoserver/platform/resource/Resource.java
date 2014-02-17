@@ -80,6 +80,16 @@ public interface Resource {
     File file();
 
     /**
+     * Directory access to resource contents.
+     * 
+     * Directory contents may need to be unpacked into the GeoServer data directory prior to use. Do not assume the file exists before calling this
+     * method.
+     * 
+     * @return directory access to resource contents.
+     */
+    File dir();
+    
+    /**
      * Time this resource was last modified.
      * 
      * @see File#lastModified()
