@@ -2,6 +2,8 @@ package org.geoserver.platform.resource;
 
 import static org.junit.Assert.*;
 
+import java.io.File;
+
 import org.junit.Test;
 
 import static  org.geoserver.platform.resource.Paths.*;
@@ -66,5 +68,33 @@ public class PathsTest {
         assertEquals("directory/file.txt", sidecar("directory/file","txt"));
         assertEquals("directory/file.prj", sidecar("directory/file.txt","prj"));
     }
-
+    
+    @Test
+    public void convert1(){
+        File folder = new File( "folder");
+        File file1 = new File( "file1");
+        File file2 = new File( folder, "file2");
+        File relative = new File( new File(".."),"file1");
+        
+        assertEquals( "folder", Paths.convert(folder.getPath()) );
+        assertEquals( "folder/file2", Paths.convert(file2.getPath()) );
+        assertEquals( "file1", Paths.convert(file1.getPath()) );
+    }
+    
+    @Test
+    public void convert2(){
+        File home = new File( System.getProperty("user.home"));
+        File directory = new File(home,"directory");
+        File folder = new File( directory, "folder");
+        File file1 = new File( directory, "file1");
+        File file2 = new File( folder, "file2");
+        File relative = new File( new File(".."),"file1");
+        
+        assertEquals( "folder", Paths.convert(directory,folder));
+        assertEquals( "folder/file2", Paths.convert(directory,file2));
+        assertEquals( "file1", Paths.convert(directory,file1));
+        
+        String relativePath = relative.getPath();
+        assertEquals( "file1", Paths.convert(directory,folder,relativePath) );        
+    }
 }

@@ -57,6 +57,11 @@ public class Resources {
                 }
 
                 @Override
+                public File dir() {
+                    throw new IllegalStateException("No directory access to ResourceStore.EMPTY");
+                }
+                
+                @Override
                 public long lastmodified() {
                     return MODIFIED;
                 }

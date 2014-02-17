@@ -139,8 +139,46 @@ public class FileSystemResourceStore implements ResourceStore {
                     throw new IllegalStateException("Cannot create "+path, e);
                 }
             }
-            return file;
+            if( file.isDirectory()){
+                throw new IllegalStateException("Directory (not a file) at "+path);
+            }
+            else {
+                return file;
+            }
         }
+
+        @Override
+        public File dir() {
+            if( !file.exists() ){
+                try {
+                    File parent = file.getParentFile();
+                    if( !parent.exists() ){
+                        boolean created = parent.mkdirs();
+                        if( !created ){
+                            throw new IllegalStateException("Unable to create "+parent.getAbsolutePath() );
+                        }
+                    }
+                    if (parent.isDirectory()){
+                        boolean created = file.mkdir();
+                        if( !created ){
+                            throw new FileNotFoundException("Unable to create "+file.getAbsolutePath() );
+                        }
+                    }
+                    else {
+                        throw new FileNotFoundException("Unable to create"+file.getName()+" - not a directory " + parent.getAbsolutePath() );
+                    }
+                } catch (IOException e) {
+                    throw new IllegalStateException("Cannot create "+path, e);
+                }
+            }
+            if( file.isFile()){
+                throw new IllegalStateException("File (not a directory) at "+path);
+            }
+            else {
+                return file;
+            }
+        }        
+        
         @Override
         public long lastmodified() {
             return file.lastModified();

@@ -29,7 +29,7 @@ public class FileSystemResourceTheoryTest extends ResourceTheoryTest {
     public void setUp() throws Exception {
         folder.newFile("FileA");
         folder.newFile("FileB");
-        File c = folder.newFolder("DirC");
+        File c = folder.newFolder("DirC");        
         (new File(c, "FileD")).createNewFile();
         folder.newFolder("DirE");
         store = new FileSystemResourceStore(folder.getRoot());
