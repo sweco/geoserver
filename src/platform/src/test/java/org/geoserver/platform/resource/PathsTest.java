@@ -74,7 +74,6 @@ public class PathsTest {
         File folder = new File( "folder");
         File file1 = new File( "file1");
         File file2 = new File( folder, "file2");
-        File relative = new File( new File(".."),"file1");
         
         assertEquals( "folder", Paths.convert(folder.getPath()) );
         assertEquals( "folder/file2", Paths.convert(file2.getPath()) );

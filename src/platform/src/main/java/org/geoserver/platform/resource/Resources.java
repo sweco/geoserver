@@ -119,6 +119,14 @@ public class Resources {
         public String toString() {
             return "Resources.EMPTY";
         }
+        @Override
+        public boolean remove(String path) {
+            return false; // unable to remove empty resource
+        }
+        @Override
+        public boolean move(String path, String target) {
+            return false; // unable to move empty resource
+        }
     };
     /**
      * Search for resources using pattern and last modified time.

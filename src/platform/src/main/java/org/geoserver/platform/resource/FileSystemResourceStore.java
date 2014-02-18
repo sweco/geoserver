@@ -7,17 +7,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-import javax.media.jai.operator.FileStoreDescriptor;
-
-import org.springframework.util.FileSystemUtils;
+import com.sun.xml.internal.rngom.parse.IllegalSchemaException;
 
 /**
  * Implementation of ResourceStore backed by the file system.
@@ -60,6 +53,28 @@ public class FileSystemResourceStore implements ResourceStore {
         return new FileSystemResource( path );
     }
     
+    @Override
+    public boolean remove(String path) {
+        File file = FileSystemResourceStore.file( baseDirectory, path );
+        
+        return Files.delete( file );
+    }
+    
+    @Override
+    public boolean move(String path, String target) {
+        File file = FileSystemResourceStore.file( baseDirectory, path );
+        File dest = FileSystemResourceStore.file( baseDirectory, target );
+        
+        if( !file.exists() && !dest.exists()){
+            return true; // moving an undefined resource
+        }
+        
+        try {
+            return Files.move(file, dest);
+        } catch (IOException e) {
+            throw new IllegalStateException("Unable to move "+path+" to "+target, e);
+        }
+    }
     @Override
     public String toString() {
         return "ResourceStore "+baseDirectory;
@@ -109,7 +124,7 @@ public class FileSystemResourceStore implements ResourceStore {
                 throw new IllegalStateException("Cannot access "+actualFile);
             }
             try {
-                return new FileOutputStream( actualFile );
+                return Files.out( actualFile );
             } catch (FileNotFoundException e) {
                 throw new IllegalStateException("Cannot access "+actualFile,e);
             }
