@@ -162,10 +162,15 @@ public class Paths {
         }
         URI baseURI = base.toURI();
         URI fileURI = file.toURI();
+        
+        if( fileURI.toString().startsWith( baseURI.toString())){
+            URI relativize = baseURI.relativize(fileURI);
     
-        URI relativize = baseURI.relativize(fileURI);
-    
-        return relativize.getPath();
+            return relativize.getPath();
+        }
+        else {
+            return convert( file.getPath() );
+        }
     }
 
     /**

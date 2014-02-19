@@ -1,6 +1,7 @@
 package org.geoserver.platform.resource;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -17,6 +18,78 @@ import org.geoserver.platform.resource.Resource.Type;
  * @author Jody Garnett
  */
 public class Resources {
+    
+    /**
+     * Checks {@link Resource#getType()} and returns existing file() or dir()
+     * as appropriate, or null for {@link Resource.Type#UNDEFINED}.
+     * 
+     * This approach is a reproduction of GeoServerResourceLoader find logic.
+     * 
+     * @see Resource#dir()
+     * @see Resource#file()
+     * 
+     * @param resource
+     * @return Existing file, or null for {@link Resource.Type#UNDEFINED}.
+     */
+    public static File findFile( Resource resource ){
+        if( resource == null ){
+            return null;
+        }
+        switch ( resource.getType()) {
+        case DIRECTORY:
+            return resource.dir();
+            
+        case RESOURCE:
+            return resource.file();
+            
+        default:
+            return null;
+        }
+    }
+    
+    /**
+     * Create a new firectory for the provided resource (this will only work for {@link Resource.Type#UNDEFINED}).
+     * 
+     * This approach is a reproduction of GeoServerResourceLoader createNewDirectory logic.
+     * 
+     * @param resource
+     * @return newly created file
+     * @throws IOException
+     */
+    public static File createNewDirectory( Resource resource ) throws IOException {
+        switch( resource.getType() ){
+        case DIRECTORY:
+            throw new IOException("New directory "+ resource.path() + " already exists as DIRECTORY");
+        case RESOURCE:
+            throw new IOException("New directory "+ resource.path() + " already exists as RESOURCE");
+        case UNDEFINED:
+            return resource.dir(); // will create directory as needed
+        default:
+            return null; 
+        }
+    }
+    
+    /**
+     * Create a new file for the provided resource (this will only work for {@link Resource.Type#UNDEFINED}).
+     * 
+     * This approach is a reproduction of GeoServerResourceLoader createNewFile logic.
+     * 
+     * @param resource
+     * @return newly created file
+     * @throws IOException
+     */
+    public static File createNewFile( Resource resource ) throws IOException {
+        switch( resource.getType() ){
+        case DIRECTORY:
+            throw new IOException("New file "+ resource.path() + " already exists as DIRECTORY");
+        case RESOURCE:
+            throw new IOException("New file "+ resource.path() + " already exists as RESOURCE");
+        case UNDEFINED:
+            return resource.file(); // will create directory as needed
+        default:
+            return null; 
+        }
+    }
     
     /**
      * Empty placeholder for ResourceStore.
