@@ -249,7 +249,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @deprecated Use {@link ResourceStore#get(String)} for file access
      */
     public File find( String location ) throws IOException {
-        Resource resource = resources.get( Paths.convert(location) );
+        Resource resource = get( Paths.convert(location) );
         return Resources.findFile( resource );
 
 //        File file = find( null, location );
@@ -273,7 +273,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @deprecated Use {@link ResourceStore#get(String)} for file access
      */
     public File find( String... location ) throws IOException {
-        Resource resource = resources.get( Paths.path(location) );
+        Resource resource = get( Paths.path(location) );
         return Resources.findFile( resource );
         //return find( null, location );
     }
@@ -752,7 +752,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @param resource The destination resource to copy to.
      */
     public void copyFromClassPath( String classpathResource, String resource ) throws IOException {
-        Resource res = resources.get(Paths.convert(resource));
+        Resource res = get(Paths.convert(resource));
         copyFromClassPath( classpathResource, res.file() );        
 //        File target = new File( to );
 //        if ( !target.isAbsolute() ) {
