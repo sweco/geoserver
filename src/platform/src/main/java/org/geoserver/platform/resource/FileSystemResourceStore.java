@@ -10,8 +10,6 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.sun.xml.internal.rngom.parse.IllegalSchemaException;
-
 /**
  * Implementation of ResourceStore backed by the file system.
  */
