@@ -24,7 +24,6 @@ import org.apache.commons.lang.SystemUtils;
 import org.geoserver.platform.resource.FileSystemResourceStore;
 import org.geoserver.platform.resource.Paths;
 import org.geoserver.platform.resource.Resource;
-import org.geoserver.platform.resource.Resource.Type;
 import org.geoserver.platform.resource.ResourceStore;
 import org.geoserver.platform.resource.Resources;
 import org.springframework.beans.BeansException;
@@ -68,20 +67,22 @@ import org.springframework.web.context.WebApplicationContext;
  */
 public class GeoServerResourceLoader extends DefaultResourceLoader implements ApplicationContextAware, ResourceStore {
     private static final Logger LOGGER = org.geotools.util.logging.Logging.getLogger("org.vfny.geoserver.global");
-
+    static {
+        LOGGER.setLevel(Level.FINER);
+    }
     /** "path" for resource lookups */
     Set<File> searchLocations;
     
     /** Mode used during transition to Resource use to verify functionality */ 
     private enum Compatibility {
-        /** Traditional File Logic */
-        FILE,
         /** Supplied ResourceStore used for file access */
         RESOURCE,
+        /** Use search locations to locate file */
+        SEARCH,
         /** File and Resource Logic compared, exception if inconsistent. */
-        DUAL };
+        STRICT };
     
-    private Compatibility mode = Compatibility.DUAL;
+    private Compatibility mode = Compatibility.STRICT;
     
     /**
      * ResourceStore used for configuration resources.
@@ -293,7 +294,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      *
      * @throws IOException In the event of an I/O error.
      */
-    private File search(File parent, String location) throws IOException {
+    public File search(File parent, String location) throws IOException {
         if (LOGGER.isLoggable(Level.FINEST)) {
             LOGGER.finest("Search " + location 
                 + (parent != null ? "( folder "+ parent.getPath()+")": "") );
@@ -527,7 +528,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @throws IOException
      */
     public File createDirectory(String location) throws IOException {
-        if( mode == Compatibility.DUAL || mode == Compatibility.RESOURCE ){
+        if( mode == Compatibility.STRICT || mode == Compatibility.RESOURCE ){
             Resource resource = get( Paths.convert(location) );
             return Resources.createNewDirectory(resource);
         }
@@ -554,7 +555,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @throws IOException
      */
     public File createDirectory(File parentFile, String location) throws IOException {
-        if( mode == Compatibility.DUAL || mode == Compatibility.RESOURCE ){
+        if( mode == Compatibility.STRICT || mode == Compatibility.RESOURCE ){
             Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, concat( location ) ));
             return Resources.createNewDirectory(resource);
         }
@@ -625,7 +626,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @throws IOException In the event of an I/O error.
      */
     public File createFile(String ...location) throws IOException {
-        if( mode == Compatibility.DUAL || mode == Compatibility.RESOURCE ){
+        if( mode == Compatibility.STRICT || mode == Compatibility.RESOURCE ){
             Resource resource = get( Paths.path(location) );
             return Resources.createNewFile( resource );
         }
@@ -646,7 +647,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @throws IOException In the event of an I/O error.
      */
     public File createFile(String location) throws IOException {
-        if( mode == Compatibility.DUAL || mode == Compatibility.RESOURCE ){
+        if( mode == Compatibility.STRICT || mode == Compatibility.RESOURCE ){
             Resource resource = get( Paths.convert(location) );
             return Resources.createNewFile( resource );
         }
@@ -668,7 +669,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @throws IOException In the event of an I/O error.
      */
     public File createFile(File parentFile, String... location) throws IOException{
-        if( mode == Compatibility.DUAL || mode == Compatibility.RESOURCE ){
+        if( mode == Compatibility.STRICT || mode == Compatibility.RESOURCE ){
             Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, Paths.path( location ) ));
             return Resources.createNewFile(resource);
         }
@@ -695,7 +696,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @throws IOException In the event of an I/O error.
      */
     public File createFile(File parentFile, String location) throws IOException{
-        if( mode == Compatibility.DUAL || mode == Compatibility.RESOURCE ){
+        if( mode == Compatibility.STRICT || mode == Compatibility.RESOURCE ){
             Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, location ));
             return Resources.createNewFile(resource);
         }
@@ -756,7 +757,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @param to The destination to copy to.
      */
     public void copyFromClassPath( String resource, String to ) throws IOException {
-        if( mode == Compatibility.RESOURCE || mode == Compatibility.DUAL ){
+        if( mode == Compatibility.RESOURCE || mode == Compatibility.STRICT ){
             Resource res = get(Paths.convert(to));
             copyFromClassPath( resource, res.file() );
         }
@@ -923,15 +924,15 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
     
     /**
      * Compatibility check returning appropriate file for current {@link #mode}.
-     * @param fileReference File reference produced from GeoServerResourceLoader
-     * @param resourceReference File produced from ResourceStore
+     * @param searchFile File reference produced from GeoServerResourceLoader
+     * @param resourceFile File produced from ResourceStore
      * @return checked file reference
      */
-    File check(File fileReference, File resourceReference) {
-        if (fileReference != null && resourceReference != null && !fileReference.equals(resourceReference)) {
+    File check(File searchFile, File resourceFile) {
+        if (searchFile != null && resourceFile != null && !searchFile.equals(resourceFile)) {
             try {
-                String path1 = fileReference == null ? "" : fileReference.getCanonicalPath();
-                String path2 = resourceReference == null ? "" : resourceReference
+                String path1 = searchFile == null ? "" : searchFile.getCanonicalPath();
+                String path2 = resourceFile == null ? "" : resourceFile
                         .getCanonicalPath();
                 StringBuilder msg = new StringBuilder();
 
@@ -955,7 +956,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
                 msg.append("   Resource File: ");
                 msg.append(match == -1 ? path2 : path2.substring(match));
 
-                if (mode == Compatibility.DUAL) {
+                if (mode == Compatibility.STRICT) {
                     throw new IllegalStateException(msg.toString());
                 } else {
                     LOGGER.fine(msg.toString());
@@ -965,13 +966,23 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
             }
         }
         switch( mode ){
-        case FILE:
-            return fileReference;
+        case SEARCH:
+            if( searchFile == null && resourceFile != null){
+                LOGGER.fine("Search location did not find "+resourceFile);
+            }
+            return searchFile;
         case RESOURCE:
-            return resourceReference;
-        case DUAL:
+            if( resourceFile == null && searchFile != null){
+                LOGGER.fine("Resource store did not find "+searchFile);
+            }
+            return resourceFile;
+        case STRICT:
         default:
-            return resourceReference != null ? resourceReference : fileReference;
+            if( resourceFile == null && searchFile != null){
+                LOGGER.warning("Resource store did not find "+searchFile);
+                throw new IllegalStateException("Resource store did not find "+searchFile);
+            }
+            return resourceFile != null ? resourceFile : searchFile;
         }
     }
 

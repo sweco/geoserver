@@ -261,7 +261,7 @@ public class GeoServerJ2eeRoleService extends AbstractGeoServerSecurityService
         
         LOGGER.info("Start reloading roles for service named "+getName());
         GeoServerResourceLoader loader = (GeoServerResourceLoader) GeoServerExtensions.bean("resourceLoader");
-        File webXML = loader.find( "web.xml" );
+        File webXML = loader.search( null,"web.xml" );
         
         if (webXML==null)
             throw new IOException("Cannot open /WEB-INF/web.xml");
