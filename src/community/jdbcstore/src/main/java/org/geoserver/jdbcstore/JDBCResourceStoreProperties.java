@@ -1,3 +1,7 @@
+/* Copyright (c) 2001 - 2014 OpenPlans - www.openplans.org. All rights reserved.
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.jdbcstore;
 
 import java.io.File;
@@ -13,6 +17,13 @@ import org.geotools.data.DataUtilities;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 
+/**
+ * Configuration information for JDBCResourceStore
+ * 
+ * @author Kevin Smith, Boundless
+ *
+ */
+// TODO largely copied from JDBCConfigProperties, should refactor to remove duplicate code
 public class JDBCResourceStoreProperties extends Properties {
 
     //maintain order of keys to prevent writing out in random order

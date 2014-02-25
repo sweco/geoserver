@@ -1,3 +1,7 @@
+/* Copyright (c) 2001 - 2014 OpenPlans - www.openplans.org. All rights reserved.
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.jdbcstore;
 
 import java.io.File;
@@ -23,6 +27,13 @@ import org.geotools.util.logging.Logging;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.web.context.ServletContextAware;
 
+/**
+ * Factory to load configuration information for JDBCResourceStore
+ * 
+ * @author Kevin Smith, Boundless
+ *
+ */
+// TODO largely copied from JDBCConfigPropertiesFactoryBean, should refactor to remove duplicate code
 public class JDBCResourceStorePropertiesFactoryBean extends PropertiesFactoryBean implements ServletContextAware {
 
     private static final Logger LOGGER = Logging.getLogger(JDBCGeoServerLoader.class);
@@ -42,8 +53,8 @@ public class JDBCResourceStorePropertiesFactoryBean extends PropertiesFactoryBea
     /**
      * DDL scripts copied to <data dir>/jdbcstore/scripts/ on first startup
      */
-    private static final String[] SCRIPTS = { "dropdb.h2.sql", "dropdb.postgres.sql", 
-        "initdb.h2.sql", "initdb.postgres.sql" };
+    private static final String[] SCRIPTS = { "drop.h2.sql", "drop.postgres.sql", 
+        "init.h2.sql", "init.postgres.sql" };
 
     private static final String[] SAMPLE_CONFIGS = { "jdbcstore.properties.h2",
             "jdbcstore.properties.postgres" };
@@ -61,6 +72,7 @@ public class JDBCResourceStorePropertiesFactoryBean extends PropertiesFactoryBea
             LOGGER.info("jdbc resource store is disabled");
             return config;
         }
+        LOGGER.info("jdbc resource store is enabled");
         return config;
     }
 

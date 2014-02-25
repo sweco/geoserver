@@ -1,3 +1,7 @@
+/* Copyright (c) 2001 - 2014 OpenPlans - www.openplans.org. All rights reserved.
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.jdbcstore;
 
 import java.io.File;
@@ -29,6 +33,9 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 /**
  * Implementation of ResourceStore backed by a JDBC DataSource.
+ * 
+ * @author Kevin Smith, Boundless
+ *
  */
 public class JDBCResourceStore implements ResourceStore {
     
