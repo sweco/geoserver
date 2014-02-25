@@ -3,7 +3,7 @@ CREATE TABLE resource
   oid integer AUTO_INCREMENT NOT NULL,
   name character varying NOT NULL,
   parent integer,
-  last_modified timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_modified timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   content blob,
   CONSTRAINT resource_pkey PRIMARY KEY (oid),
   CONSTRAINT resource_parent_fkey FOREIGN KEY (parent)
@@ -15,3 +15,7 @@ CREATE TABLE resource
 
 CREATE INDEX resource_parent_name_idx
   ON resource (parent NULLS FIRST, name NULLS FIRST);
+
+INSERT INTO resource (oid, name, parent, content) VALUES (0, '', NULL, NULL);
+
+ALTER TABLE resource ALTER COLUMN oid RESTART WITH 1;
