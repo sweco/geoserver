@@ -2,6 +2,7 @@ package org.geoserver.jdbcstore;
 
 import static org.junit.Assert.*;
 import static org.hamcrest.Matchers.*;
+import static org.easymock.classextension.EasyMock.*;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -13,15 +14,32 @@ import org.h2.jdbcx.JdbcDataSource;
 import org.junit.Test;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
+import com.google.common.base.Optional;
+
 public class H2JDBCResourceStoreTest {
+    
+    JDBCResourceStoreProperties mockConfig(boolean enabled, boolean init) {
+        JDBCResourceStoreProperties config = createMock(JDBCResourceStoreProperties.class);
+        expect(config.getInitScript()).andStubReturn(JDBCResourceStore.class.getResource("init.h2.sql"));
+        expect(config.getJdbcUrl()).andStubReturn(Optional.of("jdbc:h2:mem:test"));
+        expect(config.isInitDb()).andStubReturn(init);
+        expect(config.isEnabled()).andStubReturn(enabled);
+        expect(config.isImport()).andStubReturn(init);
+        expect(config.getJndiName()).andStubReturn(Optional.<String>absent());
+        
+        return config;
+    }
     
     @Test
     public void testInitializeEmptyDB() throws Exception {
         JdbcDataSource ds = new JdbcDataSource();
         ds.setURL("jdbc:h2:mem:test");
         Connection conn = ds.getConnection();
+        JDBCResourceStoreProperties config = mockConfig(true, true);
+        replay(config);
+        
         try {
-            ResourceStore store = new JDBCResourceStore(ds, "TEST", "INFORMATION_SCHEMA", "init.h2.sql");
+            ResourceStore store = new JDBCResourceStore(ds, config);
             
             // Check that the database has a resource table with a root record
             
@@ -84,9 +102,12 @@ public class H2JDBCResourceStoreTest {
         } finally {
             insert.close();
         }
-
+        
+        JDBCResourceStoreProperties config = mockConfig(true, false);
+        replay(config);
+        
         try {
-            ResourceStore store = new JDBCResourceStore(ds, "TEST", "INFORMATION_SCHEMA", "init.h2.sql");
+            ResourceStore store = new JDBCResourceStore(ds, config);
             {
                 // Check that the database has a resource table with a root record
                 
@@ -122,10 +143,13 @@ public class H2JDBCResourceStoreTest {
         JdbcDataSource ds = new JdbcDataSource();
         ds.setURL("jdbc:h2:mem:test");
         
+        JDBCResourceStoreProperties config = mockConfig(true, true);
+        replay(config);
+        
         Connection conn = ds.getConnection();
         try {
             conn.createStatement().execute("CREATE TABLE foo (oid INTEGER PRIMARY KEY);");
-            ResourceStore store = new JDBCResourceStore(ds, "TEST", "INFORMATION_SCHEMA", "init.h2.sql");
+            ResourceStore store = new JDBCResourceStore(ds, config);
             {
                 // Check that the database has a resource table with a root record
                 

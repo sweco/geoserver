@@ -1,5 +1,7 @@
 package org.geoserver.jdbcstore;
 
+import static org.easymock.classextension.EasyMock.*;
+
 import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -17,6 +19,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.experimental.theories.DataPoints;
 import org.junit.rules.TemporaryFolder;
+
+import com.google.common.base.Optional;
 
 public class H2JDBCResourceTheoryTest extends ResourceTheoryTest {
 
@@ -79,9 +83,15 @@ public class H2JDBCResourceTheoryTest extends ResourceTheoryTest {
             insert.close();
         }
         
-        printTable();
+        JDBCResourceStoreProperties config = createMock(JDBCResourceStoreProperties.class);
+        expect(config.getInitScript()).andStubReturn(JDBCResourceStore.class.getResource("init.h2.sql"));
+        expect(config.getJdbcUrl()).andStubReturn(Optional.of("jdbc:h2:mem:test"));
+        expect(config.isInitDb()).andStubReturn(false);
+        expect(config.isEnabled()).andStubReturn(true);
+        expect(config.isImport()).andStubReturn(false);
+        expect(config.getJndiName()).andStubReturn(Optional.<String>absent());
         
-        store = new JDBCResourceStore(ds, "TEST", "INFORMATION_SCHEMA", "init.h2.sql");
+        store = new JDBCResourceStore(ds, config);
     }
     
     @After

@@ -42,11 +42,12 @@ public class JDBCResourceStore implements ResourceStore {
     private static final Logger LOGGER = org.geotools.util.logging.Logging.getLogger(JDBCResourceStore.class);
     
     private DataSource ds;
-    String catalog;
-    String schema;
-    String initScript;
+    private JDBCResourceStoreProperties config;
     
-    public JDBCResourceStore(DataSource ds, String Catalog, String Schema, String initScript) {
+    public JDBCResourceStore(DataSource ds, JDBCResourceStoreProperties config) {
+        this.ds = ds;
+        this.config = config;
+        
         Connection c;
         try {
             c = ds.getConnection();
@@ -54,23 +55,10 @@ public class JDBCResourceStore implements ResourceStore {
             throw new IllegalArgumentException("Could not connect to provided DataSource.",ex);
         }
         try {
-            DatabaseMetaData md = c.getMetaData();
-            ResultSet rs = md.getTables(catalog, schema, "RESOURCE", null);
-            if(rs.next()) {
-                // one table that appears to be what we're after.
-                String cat = rs.getString("TABLE_CAT");
-                String schema = rs.getString("TABLE_SCHEM");
-                String name = rs.getString("TABLE_NAME");
-                String type = rs.getString("TABLE_TYPE");
-                String oidCol = rs.getString("SELF_REFERENCING_COL_NAME");
-                
-                LOGGER.log(Level.INFO, "'resource' table found {0}, {1}, {2}, {3}, {4}", new Object[]{cat, schema, name, type, oidCol});
-            } else {
+            if(config.isInitDb()) {
                 LOGGER.log(Level.INFO, "Initializing Resource Store Database.");
                 initEmptyDB(ds);
             }
-        } catch (SQLException ex) {
-            throw new IllegalArgumentException("Could not read metadata from provided DataSource.",ex);
         } catch (IOException ex) {
             throw new IllegalArgumentException("Could not initialize resource database.",ex);
         }
@@ -188,6 +176,6 @@ public class JDBCResourceStore implements ResourceStore {
     private void initEmptyDB(DataSource ds) throws IOException {
         NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(ds);
         
-        Util.runScript(JDBCResourceStore.class.getResource(initScript), template.getJdbcOperations(), null);
+        Util.runScript(config.getInitScript(), template.getJdbcOperations(), null);
     }
 }
