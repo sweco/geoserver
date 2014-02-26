@@ -71,7 +71,7 @@ public abstract class ResourceTheoryTest {
     public void theoryHaveName(String path) throws Exception {
         Resource res = getResource(path);
         
-        String result = res.path();
+        String result = res.name();
         
         assertThat(result, notNullValue());
     }

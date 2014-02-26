@@ -3,12 +3,14 @@ package org.geoserver.jdbcstore;
 import static org.junit.Assert.*;
 import static org.hamcrest.Matchers.*;
 import static org.easymock.classextension.EasyMock.*;
+import static org.geoserver.platform.resource.ResourceMatchers.*;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 
 import org.geoserver.jdbcconfig.internal.Util;
+import org.geoserver.platform.resource.Resource;
 import org.geoserver.platform.resource.ResourceStore;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.Test;
@@ -168,4 +170,160 @@ public class H2JDBCResourceStoreTest {
         
     }
     
+    @Test
+    public void testBasicResourceQuery() throws Exception {
+        JdbcDataSource ds = new JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test");
+        Connection conn = ds.getConnection();
+        NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(ds);
+        
+        Util.runScript(JDBCResourceStore.class.getResource("init.h2.sql"), template.getJdbcOperations(), null);
+        
+        PreparedStatement insert = conn.prepareStatement("INSERT INTO resource (name, parent, content) VALUES (?, ?, ?)");
+        
+        try{
+            addFile("FileA", 0, "FileA Contents".getBytes(), insert);
+            addFile("FileB", 0, "FileB Contents".getBytes(), insert);
+            int c = addDir("DirC", 0, insert);
+            addFile("FileD", c, "FileD Contents".getBytes(), insert);
+            addDir("DirE", 0, insert);
+        } finally {
+            insert.close();
+        }
+        
+        JDBCResourceStoreProperties config = mockConfig(true, false);
+        replay(config);
+        
+        try {
+            ResourceStore store = new JDBCResourceStore(ds, config);
+            
+            Resource r = store.get("FileA");
+            
+            assertThat(r, not(nullValue()));
+            
+            assertThat(r, resource());
+            
+        } finally {
+            conn.close();
+        }
+        
+    }
+    @Test
+    public void testBasicDirectoryQuery() throws Exception {
+        JdbcDataSource ds = new JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test");
+        Connection conn = ds.getConnection();
+        NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(ds);
+        
+        Util.runScript(JDBCResourceStore.class.getResource("init.h2.sql"), template.getJdbcOperations(), null);
+        
+        PreparedStatement insert = conn.prepareStatement("INSERT INTO resource (name, parent, content) VALUES (?, ?, ?)");
+        
+        try{
+            addFile("FileA", 0, "FileA Contents".getBytes(), insert);
+            addFile("FileB", 0, "FileB Contents".getBytes(), insert);
+            int c = addDir("DirC", 0, insert);
+            addFile("FileD", c, "FileD Contents".getBytes(), insert);
+            addDir("DirE", 0, insert);
+        } finally {
+            insert.close();
+        }
+        
+        JDBCResourceStoreProperties config = mockConfig(true, false);
+        replay(config);
+        
+        try {
+            ResourceStore store = new JDBCResourceStore(ds, config);
+            
+            Resource r = store.get("DirE");
+            
+            assertThat(r, not(nullValue()));
+            
+            assertThat(r, directory());
+            
+        } finally {
+            conn.close();
+        }
+        
+    }
+    
+    @Test
+    public void testBasicUndefinedQuery() throws Exception {
+        JdbcDataSource ds = new JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test");
+        Connection conn = ds.getConnection();
+        NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(ds);
+        
+        Util.runScript(JDBCResourceStore.class.getResource("init.h2.sql"), template.getJdbcOperations(), null);
+        
+        PreparedStatement insert = conn.prepareStatement("INSERT INTO resource (name, parent, content) VALUES (?, ?, ?)");
+        
+        try{
+            addFile("FileA", 0, "FileA Contents".getBytes(), insert);
+            addFile("FileB", 0, "FileB Contents".getBytes(), insert);
+            int c = addDir("DirC", 0, insert);
+            addFile("FileD", c, "FileD Contents".getBytes(), insert);
+            addDir("DirE", 0, insert);
+        } finally {
+            insert.close();
+        }
+        
+        JDBCResourceStoreProperties config = mockConfig(true, false);
+        replay(config);
+        
+        try {
+            ResourceStore store = new JDBCResourceStore(ds, config);
+            
+            Resource r = store.get("DoesntExist");
+            
+            assertThat(r, not(nullValue()));
+            
+            assertThat(r, undefined());
+        } finally {
+            conn.close();
+        }
+        
+    }
+    
+    @Test
+    public void testLongQuery() throws Exception {
+        JdbcDataSource ds = new JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test");
+        Connection conn = ds.getConnection();
+        NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(ds);
+        
+        Util.runScript(JDBCResourceStore.class.getResource("init.h2.sql"), template.getJdbcOperations(), null);
+        
+        PreparedStatement insert = conn.prepareStatement("INSERT INTO resource (name, parent, content) VALUES (?, ?, ?)");
+        
+        try{
+            addFile("FileA", 0, "FileA Contents".getBytes(), insert);
+            addFile("FileB", 0, "FileB Contents".getBytes(), insert);
+            int c = addDir("DirC", 0, insert);
+            addFile("FileD", c, "FileD Contents".getBytes(), insert);
+            addDir("DirE", 0, insert);
+            int f = addDir("DirF", c, insert);
+            int g = addDir("DirG", f, insert);
+            addFile("FileH", g, "FileH Contents".getBytes(), insert);
+        } finally {
+            insert.close();
+        }
+        
+        JDBCResourceStoreProperties config = mockConfig(true, false);
+        replay(config);
+        
+        try {
+            ResourceStore store = new JDBCResourceStore(ds, config);
+            
+            Resource r = store.get("DirC/DirF/DirG/FileH");
+            
+            assertThat(r, not(nullValue()));
+            
+            assertThat(r, resource());
+        } finally {
+            conn.close();
+        }
+        
+    }
+
 }
