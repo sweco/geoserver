@@ -23,6 +23,10 @@ import org.geoserver.catalog.StoreInfo;
 import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.platform.GeoServerResourceLoader;
+import org.geoserver.platform.resource.Paths;
+import org.geoserver.platform.resource.Resource;
+import org.geoserver.platform.resource.Resource.Type;
+import org.geoserver.platform.resource.Resources;
 
 /**
  * Abstracts access to the geoserver data directory.
@@ -87,7 +91,8 @@ public class GeoServerDataDirectory {
      * null will be returned.
      */
     public File findOrCreateDir(String... location) throws IOException {
-        return resourceLoader.findOrCreateDirectory(location);
+        Resource resource = resourceLoader.get( Paths.path(location) );        
+        return resource.dir();
     }
 
     /**
@@ -95,7 +100,8 @@ public class GeoServerDataDirectory {
      * returned.
      */
     public File findFile(String... location) throws IOException {
-        return resourceLoader.find(location);
+        Resource resource = resourceLoader.get( Paths.path(location) );
+        return Resources.findFile( resource );
     }
 
     /**
@@ -106,7 +112,13 @@ public class GeoServerDataDirectory {
      * </p>
      */
     public File findDataRoot() throws IOException {
-        return dataRoot(false);
+        Resource resource = resourceLoader.get( "data" );
+        if( resource.getType() == Type.DIRECTORY ){
+            return resource.dir();
+        }
+        else {
+            return null;
+        }
     }
     
     /**
@@ -117,20 +129,21 @@ public class GeoServerDataDirectory {
      * </p>
      */
     public File findOrCreateDataRoot() throws IOException {
-        return dataRoot(true);
+        Resource resource = resourceLoader.get( "data" );
+        return resource.dir(); // will create directory as needed
     }
-    
-    File dataRoot(boolean create) throws IOException {
-        return create ? resourceLoader.findOrCreateDirectory( "data" ) 
-            : resourceLoader.find( "data");
-    }
-    
+
     /**
      * Returns a directory under the {@link #dataRoot()} directory, if the directory does not exist
      * null will be returned.
      */
     public File findDataDir( String... location ) throws IOException {
-        return dataDir( false, location );
+        Resource dataRoot = resourceLoader.get( "data" );
+        File root = dataRoot.dir();
+        System.out.println( root.getCanonicalPath() );
+        
+        Resource dataDir = dataRoot.get( Paths.path(location) );
+        return Resources.directory( dataDir );
     }
     
     /**
@@ -138,12 +151,27 @@ public class GeoServerDataDirectory {
      * it will be created.
      */
     public File findOrCreateDataDir( String... location ) throws IOException {
-        return dataDir(true, location);
+        Resource dataRoot = resourceLoader.get( "data" );
+        Resource dataDir = dataRoot.get( Paths.path(location) );
+        
+        return dataDir.dir();
     }
     
+    /**
+     * Returns a directory under the {@link #dataRoot()} directory
+     * @param create Create directory if needed
+     * @param location directory location
+     * @return Directory (which may be newly created) or null if not found 
+     */
     protected File dataDir( boolean create, String... location ) throws IOException {
-        return create ? resourceLoader.findOrCreateDirectory(dataRoot(create), location) 
-            : resourceLoader.find( dataRoot(create), location );
+        Resource dataRoot = resourceLoader.get( "data" );
+        Resource dataDir = dataRoot.get( Paths.path(location) );
+        if( create ){
+            return dataDir.dir();
+        }
+        else {
+            return Resources.directory( dataDir );
+        }
     }
     
     /**
@@ -151,20 +179,39 @@ public class GeoServerDataDirectory {
      * returned.
      */
     public File findDataFile( String... location ) throws IOException {
-        return dataFile(false,location);
+        Resource dataRoot = resourceLoader.get( "data" );
+        Resource dataFile = dataRoot.get( Paths.path(location) );
+        return Resources.file( dataFile );
     }
     
     /**
      * Returns a file under the {@link #dataRoot()} directory, if the file does not exist it a file
      * object will still be returned.
+     * @deprecated Unused
      */
     public File findOrResolveDataFile( String... location ) throws IOException {
-        return dataFile(true,location);
+        Resource dataRoot = resourceLoader.get( "data" );
+        Resource dataFile = dataRoot.get( Paths.path(location) );
+        
+        return dataFile.file();
     }
-    
+
+    /**
+     * Returns a file under the {@link #dataRoot()} directory.
+     * @param create Create file (if required)
+     * @param location file location
+     * @return File (created if needed) or null if not found 
+     * @deprecated Unused
+     */
     File dataFile( boolean create, String... location ) throws IOException {
-        return create ? resourceLoader.createFile(dataRoot(create), location) 
-            : resourceLoader.find( dataRoot(create), location );
+        Resource dataRoot = resourceLoader.get( "data" );
+        Resource dataFile = dataRoot.get( Paths.path(location) );
+        if( create ){
+            return dataFile.file();
+        }
+        else {
+            return Resources.file( dataFile );
+        }
     }
     
     /**
@@ -175,7 +222,8 @@ public class GeoServerDataDirectory {
      * </p>
      */
     public File findSecurityRoot() throws IOException {
-        return securityRoot(false);
+        Resource resource = resourceLoader.get( "security" );
+        return Resources.findFile( resource );
     }
     
     /**
@@ -186,12 +234,20 @@ public class GeoServerDataDirectory {
      * </p>
      */
     public File findOrCreateSecurityRoot() throws IOException {
-        return securityRoot(true);
+        Resource resource = resourceLoader.get( "security" );        
+        return resource.dir(); // will create directory as needed
     }
 
+    /**
+     * Access to security directory.
+     * @Unused
+     */
     File securityRoot(boolean create) throws IOException {
-        return create ? resourceLoader.findOrCreateDirectory( "security" ) 
-                : resourceLoader.find( "security");
+        if (create) {
+            return resourceLoader.findOrCreateDirectory("security");
+        } else {
+            return resourceLoader.find("security");
+        }
     }
 
     /**
@@ -199,7 +255,9 @@ public class GeoServerDataDirectory {
      * exist null will be returned.
      */
     public File findSecurityDir(String... location) throws IOException {
-        return securityDir( false, location );
+        Resource security = resourceLoader.get("security");
+        Resource directory = security.get( Paths.path(location));
+        return Resources.directory(directory);
     }
 
     /**
@@ -207,16 +265,26 @@ public class GeoServerDataDirectory {
      * exist it will be created.
      */
     public File findOrCreateSecurityDir(String... location) throws IOException {
-        return securityDir(true, location);
+        Resource security = resourceLoader.get("security");
+        Resource directory = security.get( Paths.path(location));
+        return directory.dir(); // will create directory as needed
     }
-
+    
+    /**
+     * Access to "security" folder.
+     * @Deprecated Unused
+     */
     File securityDir(boolean create, String... location) throws IOException {
-// TODO, mcr ???        
-//        return create ? resourceLoader.findOrCreateDirectory(securityRoot(create), location) 
-//            : resourceLoader.find( securityRoot(create), location );
-      return create ? resourceLoader.findOrCreateDirectory(new File("security"), location) 
-              : resourceLoader.find( securityRoot(create), location );
-        
+        if( create ){
+            Resource security = resourceLoader.get("security");
+            Resource directory = security.get( Paths.path(location));
+            return directory.dir(); // will create directory as needed
+        }
+        else {
+            Resource security = resourceLoader.get("security");
+            Resource directory = security.get( Paths.path(location));
+            return Resources.directory(directory);
+        }        
     }
 
     /**
@@ -226,7 +294,10 @@ public class GeoServerDataDirectory {
      * </p>
      */
     public void copyToSecurityDir( File f ) throws IOException {
-        FileUtils.copyFileToDirectory( f, securityRoot( true ) );
+        Resource resource = resourceLoader.get( "security" );        
+        File securityRoot = resource.dir();
+        
+        FileUtils.copyFileToDirectory( f, securityRoot );
     }
 
     /**
@@ -237,7 +308,10 @@ public class GeoServerDataDirectory {
      */
     public void copyToSecurityDir( InputStream data, String filename ) 
         throws IOException {
-        copy( data, securityRoot( true ), filename );
+        Resource resource = resourceLoader.get( "security" );        
+        File securityRoot = resource.dir();
+        
+        copy( data, securityRoot, filename );
     }
     
     /**
@@ -245,7 +319,8 @@ public class GeoServerDataDirectory {
      * returned.
      */
     public File findWorkspaceDir( WorkspaceInfo ws ) throws IOException {
-        return workspaceDir(false,ws); 
+        Resource directory = resourceLoader.get( Paths.path("workspaces", ws.getName()) );
+        return Resources.directory( directory );
     }
     
     /**
@@ -255,16 +330,19 @@ public class GeoServerDataDirectory {
      * @param create If set to true the directory will be created when it does not exist.
      */
     public File findOrCreateWorkspaceDir( WorkspaceInfo ws ) throws IOException {
-        return workspaceDir(true,ws); 
+        Resource directory = resourceLoader.get( Paths.path("workspaces", ws.getName()) );
+        return directory.dir(); 
     }
     
     File workspaceDir( boolean create, WorkspaceInfo ws ) throws IOException {
-        File workspaces = create ? resourceLoader.findOrCreateDirectory( "workspaces" ) 
-           : resourceLoader.find( "workspaces" );
-        if ( workspaces != null ) {
-            return dir(new File( workspaces, ws.getName() ), create);
+        if( create ){
+            Resource directory = resourceLoader.get( Paths.path("workspaces", ws.getName()) );
+            return directory.dir();
         }
-        return null;
+        else {
+            Resource directory = resourceLoader.get( Paths.path("workspaces", ws.getName()) );
+            return Resources.directory( directory );
+        }
     }
     
     File workspacesDir( boolean create ) throws IOException {
@@ -290,8 +368,13 @@ public class GeoServerDataDirectory {
     }
     
     File workspaceFile( boolean create, WorkspaceInfo ws ) throws IOException {
-        File wsdir = workspaceDir(create, ws);
-        return wsdir != null ? file(new File( wsdir, "workspace.xml" ), create) : null;
+        Resource workspaceFile = resourceLoader.get( Paths.path("workspaces", ws.getName(),"workspace.xml") );
+        if(create){
+            return workspaceFile.file();
+        }
+        else {
+            return Resources.file(workspaceFile);
+        }
     }
     
     /**
@@ -323,7 +406,9 @@ public class GeoServerDataDirectory {
      * </p>
      */
     public void copyToWorkspaceDir( WorkspaceInfo ws, File f ) throws IOException {
-        FileUtils.copyFileToDirectory( f, workspaceDir( true, ws ) );
+        Resource directory = resourceLoader.get( Paths.path("workspaces", ws.getName()) );
+        File workspaceDir = directory.dir();
+        FileUtils.copyFileToDirectory( f, workspaceDir );
     }
 
     /**
@@ -334,7 +419,9 @@ public class GeoServerDataDirectory {
      */
     public void copyToWorkspaceDir( WorkspaceInfo ws, InputStream data, String filename ) 
         throws IOException {
-        copy( data, workspaceDir( true, ws ), filename );
+        Resource directory = resourceLoader.get( Paths.path("workspaces", ws.getName()) );
+        File workspaceDir = directory.dir();
+        copy( data, workspaceDir, filename );
     }
     
     /**
@@ -364,9 +451,15 @@ public class GeoServerDataDirectory {
         return storeDir( true, s );
     }
     
-    File storeDir( boolean create, StoreInfo s ) throws IOException {
-        File wsdir = workspaceDir(create,s.getWorkspace());
-        return wsdir != null ? dir(new File( wsdir, s.getName() ),create) : null ;   
+    File storeDir( boolean create, StoreInfo store ) throws IOException {
+        if( create ){
+            Resource directory = resourceLoader.get( Paths.path("workspaces", store.getWorkspace().getName(),store.getName()) );
+            return directory.dir();
+        }
+        else {
+            Resource directory = resourceLoader.get( Paths.path("workspaces", store.getWorkspace().getName(),store.getName()) );
+            return Resources.directory( directory );
+        }
     }
     
     /**
@@ -557,7 +650,8 @@ public class GeoServerDataDirectory {
      * is returned.
      */
     public File findNamespaceFile( WorkspaceInfo ws ) throws IOException {
-        return workspaceDir(false,ws);
+        Resource directory = resourceLoader.get( Paths.path("workspaces", ws.getName()) );
+        return Resources.directory( directory );
     }
     
     /**
@@ -565,12 +659,19 @@ public class GeoServerDataDirectory {
      * object is still returned.
      */
     public File findOrResolveNamespaceFile( WorkspaceInfo ws ) throws IOException {
-        return workspaceDir(true,ws);
+        Resource directory = resourceLoader.get( Paths.path("workspaces", ws.getName()) );
+        return directory.dir();
     }
     
     File namespaceFile( boolean create, WorkspaceInfo ws ) throws IOException {
-        File wsdir = workspaceDir(create, ws);
-        return wsdir != null ? file(new File( wsdir, "namespace.xml"), create) : null;
+        if( create ){
+            Resource resource = resourceLoader.get( Paths.path("workspaces", ws.getName(),"namespace.xml") );
+            return resource.file();
+        }
+        else {
+            Resource resource = resourceLoader.get( Paths.path("workspaces", ws.getName(),"namespace.xml") );
+            return Resources.file( resource );
+        }
     }
     
     /**
@@ -616,12 +717,19 @@ public class GeoServerDataDirectory {
     }
 
     File styleDir(boolean create, WorkspaceInfo ws) throws IOException {
-        File base = ws != null ? workspaceDir(true, ws) : null;
-        File d = resourceLoader.find( base, "styles" );
-        if ( d == null && create ) {
-            d = resourceLoader.createDirectory( base, "styles" );
+        Resource styles;
+        if( ws == null ){
+            styles = resourceLoader.get("styles");
         }
-        return d;
+        else {
+            styles = resourceLoader.get( Paths.path("workspaces", ws.getName(),"styles") );
+        }
+        if( create ){
+            return styles.dir();
+        }
+        else {
+            return Resources.directory(styles);
+        }
     }
 
     /**

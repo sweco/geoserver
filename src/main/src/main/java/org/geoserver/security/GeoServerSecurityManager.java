@@ -661,12 +661,16 @@ public class GeoServerSecurityManager extends ProviderManager implements Applica
      * Role configuration root directory.
      */
     public File getRoleRoot() throws IOException {
-        return getRoleRoot(true); 
+        return dataDir.findOrCreateSecurityDir("role"); 
     }
 
     public File getRoleRoot(boolean create) throws IOException {
-        return create ? 
-            dataDir.findOrCreateSecurityDir("role") : dataDir.findSecurityDir("role");
+        if( create ) { 
+            return dataDir.findOrCreateSecurityDir("role");
+        }
+        else {
+            return dataDir.findSecurityDir("role");
+        }
     }
 
     /**

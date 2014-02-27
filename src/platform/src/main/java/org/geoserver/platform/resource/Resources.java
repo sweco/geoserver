@@ -48,6 +48,46 @@ public class Resources {
     }
     
     /**
+     * Checks {@link Resource#getType()} and returns existing dir() if available, or null for {@link Resource.Type#UNDEFINED}
+     * or {@link Resource.Type#FILE}.
+     * 
+     * This approach is a reproduction of GeoServerDataDirectory findDataDir logic and will not create a new directory.
+     * 
+     * @see Resource#dir()
+     * 
+     * @param resource
+     * @return Existing directory, or null
+     */
+    public static File directory( Resource resource ){
+        if( resource != null && resource.getType() == Type.DIRECTORY ){
+            return resource.dir();
+        }
+        else {
+            return null;
+        }
+    }
+
+    /**
+     * Checks {@link Resource#getType()} and returns existing file() if available, or null for {@link Resource.Type#UNDEFINED}
+     * or {@link Resource.Type#DIRECTORY}.
+     * 
+     * This approach is a reproduction of GeoServerDataDirectory findDataFile logic and will not create a new file.
+     * 
+     * @see Resource#file()
+     * 
+     * @param resource
+     * @return Existing file, or null
+     */
+    public static File file( Resource resource ){
+        if( resource != null && resource.getType() == Type.DIRECTORY ){
+            return resource.dir();
+        }
+        else {
+            return null;
+        }
+    }
+    
+    /**
      * Create a new firectory for the provided resource (this will only work for {@link Resource.Type#UNDEFINED}).
      * 
      * This approach is a reproduction of GeoServerResourceLoader createNewDirectory logic.
