@@ -211,6 +211,43 @@ public class Paths {
         }
         return path( resolvedPath.toArray(new String[resolvedPath.size()]) );
     }
+    
+    /**
+     * Convert to file to resource path, allows for relative references (but is limited to content within the provided base directory).
+     * 
+     * 
+     * @param base directory location
+     * @param folder context for relative path (may be "." or null for base directory)
+     * @param fileLocation File path (using {@link File#separator}) allowing for relative references
+     * @return relative path used for Resource lookup
+     */
+    public static String convert(File base, File folder, String ...location) {
+        if (base == null) {
+            throw new NullPointerException("Base directory required for relative path");
+        }
+        List<String> folderPath = names(convert( base, folder ));
+        List<String> filePath = Arrays.asList( location );
+        
+        List<String> resolvedPath = new ArrayList<String>( folderPath.size()+filePath.size() );
+        resolvedPath.addAll(folderPath);
+        
+        for( String item : filePath ){
+           if( item == null ) continue;
+           if( item.equals(".")) continue;
+           if( item.equals("..")){
+               if( !resolvedPath.isEmpty() ){
+                   resolvedPath.remove( resolvedPath.size()-1);
+                   continue;
+               }
+               else {
+                   throw new IllegalStateException("File location "+filePath+" outside of "+base.getPath());
+               }
+           }
+           resolvedPath.add(item);
+        }
+        return path( resolvedPath.toArray(new String[resolvedPath.size()]) );
+    }
+    
     /**
      * Convert a filePath to resource path (relative to base directory), this method
      * does not support absolute file paths.

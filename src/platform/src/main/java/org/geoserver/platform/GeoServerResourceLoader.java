@@ -275,7 +275,8 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
             LOGGER.finest("Looking up resource " + location + " with parent " 
                 + (parentFile != null ? parentFile.getPath() : "null"));
         }
-        Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, location ));
+        String path = Paths.convert(getBaseDirectory(), parentFile, location );
+        Resource resource = get( path);
         File file = Resources.findFile( resource );
         
         File search = search( parentFile, location );
@@ -387,9 +388,10 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @throws IOException Any I/O errors that occur.
      */
     public File find( File parentFile, String... location ) throws IOException {
-        Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, concat(location)));
-        File file = Resources.findFile( resource );        
-        
+        String path = Paths.convert(getBaseDirectory(), parentFile, location);
+        Resource resource = get(path);
+        File file = Resources.findFile(resource);
+
         File search = search( parentFile, concat( location ) );
         
         return check( search, file );
@@ -430,9 +432,10 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      *  find or create.
      */
     public File findOrCreateDirectory( File parentFile, String... location ) throws IOException {
-        Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, concat(location)));
+        String path = Paths.convert(getBaseDirectory(), parentFile, location);
+        Resource resource = get(path);
         File directory = resource.dir(); // will create directory as needed
-        
+
         File check = findOrCreateDirectory(parentFile, concat(location));
         
         return check( check, directory );
@@ -467,7 +470,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @throws IOException If any i/o errors occur.
      */
     public File findOrCreateDirectory( File parentFile, String location ) throws IOException {
-        String path = Paths.convert(baseDirectory,parentFile,location);
+        String path = Paths.convert(getBaseDirectory(),parentFile,location);
         Resource resource = get( path );
         File directory = resource.dir(); // will create directory as needed
         
@@ -506,7 +509,8 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @return newly created directory
      */
     public File createDirectory(File parentFile, String... location) throws IOException {
-        Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, concat( location ) ));
+        String path = Paths.convert(getBaseDirectory(), parentFile, location);
+        Resource resource = get(path);
         return Resources.createNewDirectory(resource);
         //return createDirectory(parentFile,concat(location));
     }
@@ -555,8 +559,9 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * @throws IOException
      */
     public File createDirectory(File parentFile, String location) throws IOException {
-        if( mode == Compatibility.STRICT || mode == Compatibility.RESOURCE ){
-            Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, concat( location ) ));
+        if (mode == Compatibility.STRICT || mode == Compatibility.RESOURCE) {
+            String path = Paths.convert(getBaseDirectory(), parentFile, location);
+            Resource resource = get(path);
             return Resources.createNewDirectory(resource);
         }
         else {
@@ -670,7 +675,8 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      */
     public File createFile(File parentFile, String... location) throws IOException{
         if( mode == Compatibility.STRICT || mode == Compatibility.RESOURCE ){
-            Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, Paths.path( location ) ));
+            String path = Paths.convert(getBaseDirectory(), parentFile, location );
+            Resource resource = get( path);
             return Resources.createNewFile(resource);
         }
         else {
@@ -697,7 +703,8 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      */
     public File createFile(File parentFile, String location) throws IOException{
         if( mode == Compatibility.STRICT || mode == Compatibility.RESOURCE ){
-            Resource resource = get( Paths.convert(getBaseDirectory(), parentFile, location ));
+            String path = Paths.convert(getBaseDirectory(), parentFile, location );
+            Resource resource = get( path);
             return Resources.createNewFile(resource);
         }
         else {
