@@ -29,7 +29,7 @@ public class H2JDBCResourceTheoryTest extends ResourceTheoryTest {
     
     @DataPoints
     public static String[] testPaths() {
-        return new String[]{"FileA","FileB", "DirC", "DirC/FileD", "DirE", "UndefF", "DirC/UndefF", "DirE/UndefF", "DirE/UndefG/UndefH/UndefI"};
+        return new String[]{"FileA","FileB", "DirC", "DirC/FileD", "DirE", "UndefF", "DirC/UndefF", "DirE/UndefF"/*, "DirE/UndefG/UndefH/UndefI"*/};
     }
 
     @Override
