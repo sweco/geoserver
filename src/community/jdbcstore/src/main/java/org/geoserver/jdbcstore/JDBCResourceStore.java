@@ -53,10 +53,15 @@ public class JDBCResourceStore implements ResourceStore {
     private JDBCResourceStoreProperties config;
     private NamedParameterJdbcOperations template;
     
+    private Dialect dialect;
+    
     public JDBCResourceStore(DataSource ds, JDBCResourceStoreProperties config) {
         this.ds = ds;
         this.config = config;
         template = new NamedParameterJdbcTemplate(ds);
+        
+        // TODO: need to set this properly
+        dialect = new H2Dialect();
         
         Connection c;
         try {
@@ -93,19 +98,7 @@ public class JDBCResourceStore implements ResourceStore {
             throw new IllegalArgumentException("Could not connect to DataSource.",ex);
         } 
         try {
-            PreparedStatement stmt;
-            if(true) {
-                String sql = "CALL find_by_path(?, ?)";
-                stmt = c.prepareStatement(sql);
-                stmt.setInt(1, 0);
-                stmt.setString(2, path);
-            } else {
-                String sql = "WITH RECURSIVE path(oid, name, parent, depth, directory) AS ( SELECT oid, name, parent, 0, true FROM resource WHERE oid=? UNION ALL SELECT cur.oid, cur.name, cur.parent, rec.depth+1, content IS NULL FROM resource AS cur, path AS rec WHERE cur.parent=rec.oid AND cur.name=?[depth+1]) SELECT name,oid,parent,depth,directory FROM path ORDER BY depth DESC LIMIT 1;";
-                stmt = c.prepareStatement(sql);
-                stmt.setInt(1, 0);
-                Array names = c.createArrayOf("VARCHAR", namesList.toArray());
-                stmt.setArray(2, names);
-            }
+            PreparedStatement stmt = dialect.getFindByPathQuery(c, 0, path);
             
             LOGGER.log(Level.INFO, stmt.toString());
             ResultSet rs = stmt.executeQuery();
@@ -443,7 +436,7 @@ public class JDBCResourceStore implements ResourceStore {
             } else {
                 sql = "WITH RECURSIVE path(oid, name, parent, depth) AS (\n    SELECT oid, name, parent, 0 FROM resource WHERE oid=?\n  UNION ALL\n    SELECT cur.oid, cur.name, cur.parent, rec.depth+1\n      FROM resource AS cur, path AS rec\n      WHERE cur.oid=rec.parent\n  )\nSELECT oid, name FROM path;";
             }
-            PreparedStatement stmt = c.prepareStatement(sql);
+            PreparedStatement stmt = dialect.getPathToQuery(c, oid);
             stmt.setInt(1, oid);
             LOGGER.log(Level.INFO, "Looking up path: {0}", stmt);
             ResultSet rs = stmt.executeQuery();

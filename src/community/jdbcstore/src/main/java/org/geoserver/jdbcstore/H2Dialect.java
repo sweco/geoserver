@@ -12,7 +12,7 @@ import org.geoserver.platform.resource.Paths;
 import org.h2.tools.SimpleResultSet;
 
 /**
- * Utility methods for working with H2
+ * Dialect support for H2
  * 
  * @author Kevin Smith, Boundless
  *
@@ -76,6 +76,15 @@ public class H2Dialect implements Dialect{
         } finally {
             stmt.close();
         }
+    }
+    
+    @Override
+    public PreparedStatement getFindByPathQuery(Connection conn, int oid, String path) throws SQLException {
+         PreparedStatement stmt = conn.prepareStatement("CALL path_to(?, ?)");
+         stmt.setInt(1, oid);
+         stmt.setString(2, path);
+         
+         return stmt;
     }
     
     /**
