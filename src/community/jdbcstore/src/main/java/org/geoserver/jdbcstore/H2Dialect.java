@@ -15,12 +15,21 @@ import org.h2.tools.SimpleResultSet;
  * @author Kevin Smith, Boundless
  *
  */
-public class H2Support {
+public class H2Dialect implements Dialect{
 
     static class Node {
         int oid;
         String name;
     }
+    
+    @Override
+    public PreparedStatement getPathToQuery(Connection conn, int oid) throws SQLException {
+        PreparedStatement stmt = conn.prepareStatement("CALL path_to(?)");
+        stmt.setInt(1, oid);
+        
+        return stmt;
+    }
+    
     public static ResultSet pathTo(Connection conn, int oid) throws SQLException {
         SimpleResultSet resultRs = new SimpleResultSet();
         resultRs.addColumn("oid", Types.INTEGER, 10, 0);
