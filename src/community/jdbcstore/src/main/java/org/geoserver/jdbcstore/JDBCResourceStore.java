@@ -430,14 +430,7 @@ public class JDBCResourceStore implements ResourceStore {
             throw new IllegalArgumentException("Could not connect to DataSource.",ex);
         } 
         try {
-            String sql;
-            if (true) {
-                sql = "CALL path_to(?);";
-            } else {
-                sql = "WITH RECURSIVE path(oid, name, parent, depth) AS (\n    SELECT oid, name, parent, 0 FROM resource WHERE oid=?\n  UNION ALL\n    SELECT cur.oid, cur.name, cur.parent, rec.depth+1\n      FROM resource AS cur, path AS rec\n      WHERE cur.oid=rec.parent\n  )\nSELECT oid, name FROM path;";
-            }
             PreparedStatement stmt = dialect.getPathToQuery(c, oid);
-            stmt.setInt(1, oid);
             LOGGER.log(Level.INFO, "Looking up path: {0}", stmt);
             ResultSet rs = stmt.executeQuery();
             

@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.*;
 import static org.easymock.classextension.EasyMock.*;
 import static org.geoserver.platform.resource.ResourceMatchers.*;
 
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -320,6 +321,52 @@ public class H2JDBCResourceStoreTest {
             assertThat(r, not(nullValue()));
             
             assertThat(r, resource());
+        } finally {
+            conn.close();
+        }
+        
+    }
+    @Test
+    public void testBasicRead() throws Exception {
+        JdbcDataSource ds = new JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test");
+        Connection conn = ds.getConnection();
+        NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(ds);
+        
+        Util.runScript(JDBCResourceStore.class.getResource("init.h2.sql"), template.getJdbcOperations(), null);
+        
+        PreparedStatement insert = conn.prepareStatement("INSERT INTO resource (name, parent, content) VALUES (?, ?, ?)");
+        
+        try{
+            addFile("FileA", 0, "FileA Contents".getBytes(), insert);
+            addFile("FileB", 0, "FileB Contents".getBytes(), insert);
+            int c = addDir("DirC", 0, insert);
+            addFile("FileD", c, "FileD Contents".getBytes(), insert);
+            addDir("DirE", 0, insert);
+        } finally {
+            insert.close();
+        }
+        
+        JDBCResourceStoreProperties config = mockConfig(true, false);
+        replay(config);
+        
+        try {
+            ResourceStore store = new JDBCResourceStore(ds, config);
+            
+            Resource r = store.get("FileA");
+            
+            byte[] expected = "FileA Contents".getBytes();
+            
+            InputStream in = r.in();
+            try {
+                byte[] result = new byte[expected.length];
+                assertThat(in.read(result), describedAs("file contents same length",equalTo(expected.length)));
+                assertThat(result, equalTo(expected));
+                assertThat(in.read(), describedAs("stream is empty",equalTo(-1)));
+            } finally {
+                in.close();
+            }
+            
         } finally {
             conn.close();
         }

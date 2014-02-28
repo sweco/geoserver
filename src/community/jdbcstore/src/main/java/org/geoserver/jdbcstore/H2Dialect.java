@@ -80,7 +80,7 @@ public class H2Dialect implements Dialect{
     
     @Override
     public PreparedStatement getFindByPathQuery(Connection conn, int oid, String path) throws SQLException {
-         PreparedStatement stmt = conn.prepareStatement("CALL path_to(?, ?)");
+         PreparedStatement stmt = conn.prepareStatement("CALL find_by_path(?, ?)");
          stmt.setInt(1, oid);
          stmt.setString(2, path);
          
