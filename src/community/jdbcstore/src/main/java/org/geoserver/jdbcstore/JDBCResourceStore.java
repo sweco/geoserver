@@ -11,6 +11,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -83,25 +84,68 @@ public class JDBCResourceStore implements ResourceStore {
     
     @Override
     public Resource get(String path) {
-        
         List<String> namesList = Paths.names(path);
-        String[] names = namesList.toArray(new String[namesList.size()]);
-        Selector sel = new PathSelector(0, names);
         
-        String name = names[names.length-1];
-        
-        Object[] results = query(sel, Field.OID, Field.DIRECTORY, Field.PARENT);
-        if(results==null) {
-            int parent = 0;
-            if(names.length>1){
-                names = Arrays.copyOf(names, names.length-1);
-                sel = new PathSelector(0, names);
-                results = query(sel, Field.OID, Field.DIRECTORY, Field.PARENT);
-                parent= (Integer)results[0];
+        Connection c;
+        try {
+            c = ds.getConnection();
+        } catch (SQLException ex) {
+            throw new IllegalArgumentException("Could not connect to DataSource.",ex);
+        } 
+        try {
+            PreparedStatement stmt;
+            if(true) {
+                String sql = "CALL find_by_path(?, ?)";
+                stmt = c.prepareStatement(sql);
+                stmt.setInt(1, 0);
+                stmt.setString(2, path);
+            } else {
+                String sql = "WITH RECURSIVE path(oid, name, parent, depth, directory) AS ( SELECT oid, name, parent, 0, true FROM resource WHERE oid=? UNION ALL SELECT cur.oid, cur.name, cur.parent, rec.depth+1, content IS NULL FROM resource AS cur, path AS rec WHERE cur.parent=rec.oid AND cur.name=?[depth+1]) SELECT name,oid,parent,depth,directory FROM path ORDER BY depth DESC LIMIT 1;";
+                stmt = c.prepareStatement(sql);
+                stmt.setInt(1, 0);
+                Array names = c.createArrayOf("VARCHAR", namesList.toArray());
+                stmt.setArray(2, names);
             }
-            return new JDBCResource(-1, Type.UNDEFINED, name, parent);
-        } else {
-            return new JDBCResource((Integer)results[0], ((Boolean)results[1])?Type.DIRECTORY:Type.RESOURCE, name, (Integer)results[2]);
+            
+            LOGGER.log(Level.INFO, stmt.toString());
+            ResultSet rs = stmt.executeQuery();
+            
+            if(rs.next()) {
+                // Found something
+                
+                // Should only have found one entry
+                assert(rs.isLast()); 
+                
+                int depth = rs.getInt("depth");
+                
+                if(depth==namesList.size()) {
+                    // Found the node
+                    String name = (String) Field.NAME.getValue(rs);
+                    int oid = (Integer) Field.OID.getValue(rs);
+                    int parent = (Integer) Field.PARENT.getValue(rs);
+                    boolean directory= (Boolean) Field.DIRECTORY.getValue(rs);
+                    
+                    return new JDBCResource(oid, directory?Type.DIRECTORY:Type.RESOURCE, name, parent);
+                } else if (depth==namesList.size()-1) {
+                    // Found the immediate parent
+                    int parent = (Integer) Field.OID.getValue(rs);
+                    String name = namesList.get(namesList.size()-1);
+                    return new JDBCResource(-1, Type.UNDEFINED, name, parent);
+                } else {
+                    throw new NotImplementedException("Adding non-existing intermediate directories not supported");
+                }
+            } else {
+                throw new IllegalStateException("Could not find a node along path "+path+" from root.  This should not happen as the root should always exist.");
+            }
+        } catch (SQLException ex) {
+            throw new IllegalStateException(ex);
+        }
+        finally {
+            try {
+                c.close();
+            } catch (SQLException ex) {
+                throw new IllegalArgumentException("Error while closing connection.",ex);
+            }
         }
     }
     Resource get(int oid) {
@@ -109,7 +153,17 @@ public class JDBCResourceStore implements ResourceStore {
         if(results==null) {
             return null;
         } else {
-            return new JDBCResource((Integer)results[0], ((Boolean)results[1])?Type.DIRECTORY:Type.RESOURCE, (String)results[2], (Integer)results[3]);
+            int foundOid = (Integer)results[0];
+            assert foundOid == oid;
+            Type type = ((Boolean)results[1])?Type.DIRECTORY:Type.RESOURCE;
+            String name = (String)results[2];
+            int parent;
+            if(results[3]==null) {
+                parent = -1;
+            } else {
+                parent = (Integer)results[3];
+            }
+            return new JDBCResource(oid, type, name, parent);
         }
     }
     
@@ -200,7 +254,17 @@ public class JDBCResourceStore implements ResourceStore {
 
         @Override
         public Resource parent() {
-            int parent = (Integer) query(new OIDSelector(oid), Field.PARENT)[0];
+            Object[] result = query(new OIDSelector(oid), Field.PARENT);
+            if (result == null) {
+                assert type==Type.UNDEFINED;
+                // use the stored parent
+            } else if(result[0]==null) {
+                assert oid==0;
+                assert parent==-1;
+                return null;
+            } else {
+                parent = (Integer) result[0];
+            }
             return JDBCResourceStore.this.get(parent);
         }
 
@@ -409,7 +473,7 @@ public class JDBCResourceStore implements ResourceStore {
         }
 
     }
-    
+
     Object[] query(Selector sel, Field... fields) {
         StringBuilder builder = new StringBuilder();
         
@@ -468,32 +532,5 @@ public class JDBCResourceStore implements ResourceStore {
     private void initEmptyDB(DataSource ds) throws IOException {
         
         Util.runScript(config.getInitScript(), template.getJdbcOperations(), null);
-    }
-    
-    String[] path_to(Connection conn, int oid) throws SQLException {
-        LinkedList<String> result = new LinkedList<String>();
-        PreparedStatement stmt = conn.prepareStatement("SELECT parent, oid, name FROM resource WHERE oid = ?;");
-        try {
-            Integer foundParent=oid; // Pretend there was some child of the target node
-            String foundName;
-            while(true){
-                stmt.setInt(0, foundParent);
-                ResultSet rs = stmt.executeQuery();
-                if(!rs.next()) {
-                    throw new SQLException("Could not find resource "+foundParent+" while generating path of resource "+oid);
-                }
-                
-                foundParent = rs.getInt("parent");
-                if(rs.wasNull()) foundParent=null;
-                foundName = rs.getString("name");
-                
-                result.addFirst(foundName);
-                
-                if(foundParent==null) break;
-            }
-            return result.toArray(new String[result.size()]);
-        } finally {
-            stmt.close();
-        }
     }
 }

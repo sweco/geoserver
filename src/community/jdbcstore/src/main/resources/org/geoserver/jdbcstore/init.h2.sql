@@ -22,3 +22,6 @@ ALTER TABLE resource ALTER COLUMN oid RESTART WITH 1;
 
 -- Function to get a path from an OID
 CREATE ALIAS path_to FOR "org.geoserver.jdbcstore.H2Support.pathTo";
+
+-- Function to traverse a path to a node
+CREATE ALIAS find_by_path FOR "org.geoserver.jdbcstore.H2Support.findByPath";
