@@ -1,6 +1,8 @@
 package org.geoserver.jdbcstore;
 
 import static org.easymock.classextension.EasyMock.*;
+import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.*;
 
 import java.io.File;
 import java.sql.Connection;
@@ -97,6 +99,22 @@ public class H2JDBCResourceTheoryTest extends ResourceTheoryTest {
     @After
     public void tearDown() throws Exception {
         conn.close();
+        
+        JdbcDataSource ds = new JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test");
+        conn = ds.getConnection();
+        try {
+            ResultSet rs = conn.getMetaData().getTables(null, null, null, new String[]{"TABLE"});
+            
+            boolean result = false;
+            while(rs.next()) {
+                result=true;
+                System.out.printf("%s\n", rs.getString("TABLE_NAME"));
+            }
+            assertThat(result, describedAs("connection closed", is(false)));
+        } finally {
+            conn.close();
+        }
     }
 
     void printTable() throws Exception{

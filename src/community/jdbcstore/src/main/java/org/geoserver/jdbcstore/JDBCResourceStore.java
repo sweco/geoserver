@@ -4,6 +4,7 @@
  */
 package org.geoserver.jdbcstore;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.sql.Array;
+import java.sql.Blob;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -21,6 +23,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Level;
@@ -28,6 +31,8 @@ import java.util.logging.Logger;
 
 import javax.sql.DataSource;
 
+import org.apache.commons.io.input.ProxyInputStream;
+import org.apache.commons.io.output.ProxyOutputStream;
 import org.apache.commons.lang.NotImplementedException;
 import org.geoserver.jdbcconfig.internal.Util;
 import org.geoserver.platform.resource.Paths;
@@ -214,17 +219,112 @@ public class JDBCResourceStore implements ResourceStore {
             
             return name;
         }
+        
+        @SuppressWarnings({ "unchecked", "resource" })
+        private <T extends Closeable> T getStream(Class<T> clazz) {
+            assert(clazz==InputStream.class || clazz==OutputStream.class);
+            
+            Connection c;
+            try {
+                c = ds.getConnection();
+            } catch (SQLException ex) {
+                throw new IllegalArgumentException("Could not connect to DataSource.",ex);
+            }
+            try {
+                PreparedStatement stmt = c.prepareStatement("SELECT content FROM resource WHERE oid=?;");
+                stmt.setInt(1, oid);
+                LOGGER.log(Level.INFO, stmt.toString());
+                ResultSet rs = stmt.executeQuery();
+                
+                if(rs.next()) {
+                    // Found something
+                    
+                    // Should only have found one entry
+                    assert(rs.isLast()); 
+                } else {
+                    throw new IllegalStateException("Could not find resource "+oid);
+                }
+                Blob content = rs.getBlob("content");
+                
+                T stream;
+                if(clazz==InputStream.class) {
+                    stream = (T) new InputStreamWrapper(content.getBinaryStream(), c);
+                } else {
+                    stream = (T) new OutputStreamWrapper(content.setBinaryStream(1), c);
+                }
+                
+                return stream;
+            } 
+            // Want to be sure that either the wrapped stream is returned, or the connection is
+            // closed, but not both
+            catch (Error er) {
+                try {
+                    c.close();
+                } catch (SQLException ex) {
+                    LOGGER.log(Level.SEVERE, "Exception while closing connection after error", ex);
+                }
+                throw er;
+            } catch (SQLException ex) {
+                try {
+                    c.close();
+                } catch (SQLException ex2) {
+                    LOGGER.log(Level.SEVERE, "Exception while closing connection after exception", ex2);
+                }
+                throw new IllegalStateException("Could not get stream for resource", ex);
+            } catch (RuntimeException ex) {
+                try {
+                    c.close();
+                } catch (SQLException ex2) {
+                    LOGGER.log(Level.SEVERE, "Exception while closing connection after exception", ex2);
+                }
+                throw ex;
+            }
 
+        }
+        
+        private void makeResource() {
+            if(type==Type.RESOURCE) return;
+            if(type==Type.DIRECTORY) throw new IllegalStateException("Directory when resource expected.");
+            try {
+                Connection c;
+                try {
+                    c = ds.getConnection();
+                } catch (SQLException ex) {
+                    throw new IllegalArgumentException("Could not connect to DataSource.",ex);
+                }
+                try {
+                    PreparedStatement stmt = c.prepareStatement("INSERT INTO resource (name, parent, content) VALUES (?, ?, ?);");
+                    stmt.setString(1,name);
+                    stmt.setInt(2, parent);
+                    Blob content = c.createBlob();
+                    stmt.setBlob(3,content);
+                    stmt.execute();
+                    
+                    ResultSet rs = stmt.getGeneratedKeys();
+                    if(rs.next()) {
+                        oid = rs.getInt(1);
+                        type = Type.RESOURCE;
+                    } else {
+                        throw new IllegalStateException("Did not get OID for new resource");
+                    }
+                } finally {
+                    c.close();
+                }
+            } catch (SQLException ex) {
+                throw new IllegalArgumentException("Could not create resource "+name+" in "+parent, ex);
+            }
+        }
+        
         @Override
         public InputStream in() {
-            // TODO Auto-generated method stub
-            throw new NotImplementedException();
+            makeResource();
+            return getStream(InputStream.class);
         }
 
         @Override
         public OutputStream out() {
-            // TODO Auto-generated method stub
-            throw new NotImplementedException();
+            makeResource();
+            return getStream(OutputStream.class);
         }
 
         @Override
@@ -313,6 +413,51 @@ public class JDBCResourceStore implements ResourceStore {
         
     }
     
+    class InputStreamWrapper extends ProxyInputStream {
+        AutoCloseable[] otherCloseables;
+        public InputStreamWrapper(InputStream proxy, AutoCloseable... otherCloseables) {
+            super(proxy);
+            this.otherCloseables = otherCloseables;
+        }
+        
+        @Override
+        public void close() throws IOException {
+            super.close();
+            boolean error=false;
+            for(AutoCloseable toClose: otherCloseables) {
+                try {
+                    toClose.close();
+                } catch (Exception ex) {
+                    error = true;
+                    LOGGER.log(Level.SEVERE, "Error while closing related resources", ex);
+                }
+            }
+            if(error) throw new IOException("Error(s) while closing related resource, see log.");
+        }
+    }
+    class OutputStreamWrapper extends ProxyOutputStream {
+    AutoCloseable[] otherCloseables;
+        public OutputStreamWrapper(OutputStream proxy, AutoCloseable... otherCloseables) {
+            super(proxy);
+            this.otherCloseables = otherCloseables;
+        }
+        
+        @Override
+        public void close() throws IOException {
+            super.close();
+            boolean error=false;
+            for(AutoCloseable toClose: otherCloseables) {
+                try {
+                    toClose.close();
+                } catch (Exception ex) {
+                    error = true;
+                    LOGGER.log(Level.SEVERE, "Error while closing related resources", ex);
+                }
+            }
+            if(error) throw new IOException("Error(s) while closing related resource, see log.");
+        }
+    }
+    
     enum Field {
         OID("oid","oid") {
             @Override
@@ -345,13 +490,7 @@ public class JDBCResourceStore implements ResourceStore {
             Object getValue(ResultSet rs) throws SQLException {
                 return rs.getBoolean(fieldName);
             }
-        },
-        CONTENT("content","content") {
-            @Override
-            Object getValue(ResultSet rs) throws SQLException {
-                return rs.getBlob(fieldName);
-            }
-        },
+        }
        ;
         final String fieldName;
         final String fieldExpression;
@@ -421,6 +560,8 @@ public class JDBCResourceStore implements ResourceStore {
         }
         
     }
+    
+    
     
     List<String> findPath(int oid) {
         Connection c;
