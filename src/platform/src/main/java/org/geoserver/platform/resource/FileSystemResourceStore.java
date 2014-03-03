@@ -275,7 +275,7 @@ public class FileSystemResourceStore implements ResourceStore {
 
         @Override
         public String toString() {
-            return path;
+            return file.getAbsolutePath();
         }
         
     }

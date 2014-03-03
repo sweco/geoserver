@@ -79,8 +79,8 @@ public class Resources {
      * @return Existing file, or null
      */
     public static File file( Resource resource ){
-        if( resource != null && resource.getType() == Type.DIRECTORY ){
-            return resource.dir();
+        if( resource != null && resource.getType() == Type.RESOURCE ){
+            return resource.file();
         }
         else {
             return null;
@@ -88,7 +88,7 @@ public class Resources {
     }
     
     /**
-     * Create a new firectory for the provided resource (this will only work for {@link Resource.Type#UNDEFINED}).
+     * Create a new directory for the provided resource (this will only work for {@link Resource.Type#UNDEFINED}).
      * 
      * This approach is a reproduction of GeoServerResourceLoader createNewDirectory logic.
      * 

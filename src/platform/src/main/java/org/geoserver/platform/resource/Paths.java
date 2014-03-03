@@ -87,8 +87,8 @@ public class Paths {
     /**
      * Path construction.
      * 
-     * @param path items
-     * @return path
+     * @param path Items defining a Path
+     * @return path Path used to identify a Resource
      */
     public static String path( String... path ){
         if( path == null || (path.length == 1 && path[0] == null)){
@@ -98,13 +98,16 @@ public class Paths {
         for( String item : path ){
             names.addAll( names( item ) );
         }
-        
+        return toPath(names);
+    }
+    
+    private static String toPath(List<String> names) {
         StringBuilder buf = new StringBuilder();
         final int LIMIT = names.size();
         for( int i=0; i<LIMIT; i++) {
             String item = names.get(i);
             if( INVALID.contains(item)){
-                throw new IllegalArgumentException( "Contains invalid "+ item + " path: "+path);
+                throw new IllegalArgumentException( "Contains invalid "+ item + " path: "+buf.toString());
             }
             if( item != null ){
                 buf.append(item);
@@ -116,6 +119,41 @@ public class Paths {
         return buf.toString();
     }
     static final Set<String> INVALID = new HashSet<String>(Arrays.asList(new String[]{"..","."}));
+    
+    /**
+     * Path construction relative to directory.
+     * 
+     * @param directory Directory Path
+     * @param path items
+     * @return path
+     */
+//    public static String relative( String directory, String... path ){
+//        ArrayList<String> names = new ArrayList<String>();
+//        if( directory != null ){
+//            names.addAll( names(directory));
+//        }
+//        if( path != null ){
+//            for( String item : path ){
+//                names.addAll( names( item ) );
+//            }
+//        }        
+//        ArrayList<String> resolvedPath = new ArrayList<String>( names.size());
+//        for( String item : names ){
+//            if( item == null ) continue;
+//            if( item.equals(".")) continue;
+//            if( item.equals("..")){
+//                if( !resolvedPath.isEmpty() ){
+//                    resolvedPath.remove( resolvedPath.size()-1);
+//                    continue;
+//                }
+//                else {
+//                    throw new IllegalStateException("Path location "+item+" outside of "+directory);
+//                }
+//            }
+//            resolvedPath.add(item);
+//        }
+//        return toPath( resolvedPath );
+//    }
     
     public static List<String> names(String path){
         if( path == null || path.length()==0){
@@ -209,7 +247,7 @@ public class Paths {
            }
            resolvedPath.add(item);
         }
-        return path( resolvedPath.toArray(new String[resolvedPath.size()]) );
+        return toPath( resolvedPath );
     }
     
     /**
@@ -245,7 +283,7 @@ public class Paths {
            }
            resolvedPath.add(item);
         }
-        return path( resolvedPath.toArray(new String[resolvedPath.size()]) );
+        return toPath( resolvedPath );
     }
     
     /**
@@ -272,5 +310,42 @@ public class Paths {
             return filePath.replace(File.separatorChar, '/');
         }
     }
-
+    
+    /**
+     * Convert a filePath to resource path (starting from the provided path). Absolute file paths are not supported, and the final resource must still
+     * be within the data directory.
+     * 
+     * This method converts file paths (using {@link File#separator}) to the URL style paths used for {@link ResourceStore#get(String)}.
+     * 
+     * @param path Initial path used resolve relative reference lookup
+     * @param filePath File path using {@link File#separator}
+     * @return Resource path suitable for use with {@link ResourceStore#get(String)} or null for absolute path
+     */
+    public static String convert( String path, String filename ){        
+        if (path == null) {
+            throw new NullPointerException("Initial path required to handle relative filenames");
+        }
+        List<String> folderPath = names(path);
+        List<String> filePath = names(convert(filename));
+        
+        List<String> resolvedPath = new ArrayList<String>( folderPath.size()+filePath.size() );
+        resolvedPath.addAll(folderPath);
+        
+        for( String item : filePath ){
+           if( item == null ) continue;
+           if( item.equals(".")) continue;
+           if( item.equals("..")){
+               if( !resolvedPath.isEmpty() ){
+                   resolvedPath.remove( resolvedPath.size()-1);
+                   continue;
+               }
+               else {
+                   throw new IllegalStateException("File location "+filename+" outside of "+path);
+               }
+           }
+           resolvedPath.add(item);
+        }
+        return toPath( resolvedPath );
+    }
+    
 }
