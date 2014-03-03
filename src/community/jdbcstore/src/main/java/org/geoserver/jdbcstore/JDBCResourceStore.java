@@ -413,48 +413,45 @@ public class JDBCResourceStore implements ResourceStore {
         
     }
     
-    class InputStreamWrapper extends ProxyInputStream {
-        AutoCloseable[] otherCloseables;
-        public InputStreamWrapper(InputStream proxy, AutoCloseable... otherCloseables) {
+    static class InputStreamWrapper extends ProxyInputStream {
+        Connection conn;
+        public InputStreamWrapper(InputStream proxy, Connection conn) {
             super(proxy);
-            this.otherCloseables = otherCloseables;
+            this.conn = conn;
         }
         
         @Override
         public void close() throws IOException {
-            super.close();
-            boolean error=false;
-            for(AutoCloseable toClose: otherCloseables) {
+            try {
+                super.close();
+            } finally {
                 try {
-                    toClose.close();
-                } catch (Exception ex) {
-                    error = true;
-                    LOGGER.log(Level.SEVERE, "Error while closing related resources", ex);
+                    conn.close();
+                } catch (SQLException ex) {
+                    throw new IOException("Exception while closing connection",ex);
                 }
             }
-            if(error) throw new IOException("Error(s) while closing related resource, see log.");
         }
     }
-    class OutputStreamWrapper extends ProxyOutputStream {
-    AutoCloseable[] otherCloseables;
-        public OutputStreamWrapper(OutputStream proxy, AutoCloseable... otherCloseables) {
+    
+    static class OutputStreamWrapper extends ProxyOutputStream {
+    Connection conn;
+        public OutputStreamWrapper(OutputStream proxy, Connection conn) {
             super(proxy);
-            this.otherCloseables = otherCloseables;
+            this.conn = conn;
         }
         
         @Override
         public void close() throws IOException {
-            super.close();
-            boolean error=false;
-            for(AutoCloseable toClose: otherCloseables) {
+            try {
+                super.close();
+            } finally {
                 try {
-                    toClose.close();
-                } catch (Exception ex) {
-                    error = true;
-                    LOGGER.log(Level.SEVERE, "Error while closing related resources", ex);
+                    conn.close();
+                } catch (SQLException ex) {
+                    throw new IOException("Exception while closing connection",ex);
                 }
             }
-            if(error) throw new IOException("Error(s) while closing related resource, see log.");
         }
     }
     
