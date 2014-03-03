@@ -187,7 +187,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      */
     public File find( String location ) throws IOException {
         Resource resource = get( Paths.convert(location) );
-        return Resources.findFile( resource );
+        return Resources.find( resource );
     }
     
     /**
@@ -209,7 +209,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
         }
         String path = Paths.convert(getBaseDirectory(), parentFile, location );
         Resource resource = get( path);
-        return Resources.findFile( resource );
+        return Resources.find( resource );
     }
 
     
@@ -230,7 +230,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      */
     public File find( String... location ) throws IOException {        
         Resource resource = get( Paths.path(location) );
-        return Resources.findFile( resource );
+        return Resources.find( resource );
     }
 
     /**
@@ -252,7 +252,7 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
     public File find( File parentFile, String... location ) throws IOException {
         String path = Paths.convert(getBaseDirectory(), parentFile, location);
         Resource resource = get(path);
-        return Resources.findFile(resource);
+        return Resources.find(resource);
     }
 
     /**

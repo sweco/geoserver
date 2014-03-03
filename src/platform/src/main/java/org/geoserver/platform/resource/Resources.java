@@ -31,7 +31,7 @@ public class Resources {
      * @param resource
      * @return Existing file, or null for {@link Resource.Type#UNDEFINED}.
      */
-    public static File findFile( Resource resource ){
+    public static File find( Resource resource ){
         if( resource == null ){
             return null;
         }

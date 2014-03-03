@@ -120,7 +120,7 @@ public class GeoServerDataDirectory implements ResourceStore {
      */
     public File findFile(String... location) throws IOException {
         String path = Paths.path(location);
-        return Resources.findFile(get(path));
+        return Resources.find(get(path));
     }
 
     /**
