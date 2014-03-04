@@ -29,6 +29,8 @@ public class H2JDBCResourceStoreTest {
         expect(config.isEnabled()).andStubReturn(enabled);
         expect(config.isImport()).andStubReturn(init);
         expect(config.getJndiName()).andStubReturn(Optional.<String>absent());
+        expect(config.getProperty(eq("driverClassName"))).andStubReturn("org.h2.Driver");
+        expect(config.getProperty(eq("driverClassName"), (String)anyObject())).andStubReturn("org.postgresql.Driver");
         
         return config;
     }

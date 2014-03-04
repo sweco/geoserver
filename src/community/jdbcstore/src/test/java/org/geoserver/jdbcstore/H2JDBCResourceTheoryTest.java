@@ -92,7 +92,10 @@ public class H2JDBCResourceTheoryTest extends ResourceTheoryTest {
         expect(config.isEnabled()).andStubReturn(true);
         expect(config.isImport()).andStubReturn(false);
         expect(config.getJndiName()).andStubReturn(Optional.<String>absent());
-        
+        expect(config.getProperty(eq("driverClassName"))).andStubReturn("org.h2.Driver");
+        expect(config.getProperty(eq("driverClassName"), (String)anyObject())).andStubReturn("org.postgresql.Driver");
+        replay(config);
+       
         store = new JDBCResourceStore(ds, config);
     }
     

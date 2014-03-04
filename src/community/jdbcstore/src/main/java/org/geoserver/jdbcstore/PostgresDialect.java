@@ -4,9 +4,12 @@ import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 
 import org.geoserver.platform.resource.Paths;
+
+import com.google.common.base.Joiner;
 
 /**
  * Dialect support for Postgres
@@ -28,11 +31,15 @@ public class PostgresDialect implements Dialect {
     public PreparedStatement getFindByPathQuery(Connection conn, int oid,
             String path) throws SQLException {
         List<String> namesList = Paths.names(path);
-        String sql = "WITH RECURSIVE path(oid, name, parent, depth, directory) AS ( SELECT oid, name, parent, 0, true FROM resource WHERE oid=? UNION ALL SELECT cur.oid, cur.name, cur.parent, rec.depth+1, content IS NULL FROM resource AS cur, path AS rec WHERE cur.parent=rec.oid AND cur.name=?[depth+1]) SELECT name,oid,parent,depth,directory FROM path ORDER BY depth DESC LIMIT 1;";
+        String sql = "WITH RECURSIVE path(oid, name, parent, depth, directory) AS ( SELECT oid, name, parent, 0, true FROM resource WHERE oid=? UNION ALL SELECT cur.oid, cur.name, cur.parent, rec.depth+1, content IS NULL FROM resource AS cur, path AS rec WHERE cur.parent=rec.oid AND cur.name=(string_to_array(?, '/'))[depth+1]) SELECT name,oid,parent,depth,directory FROM path ORDER BY depth DESC LIMIT 1;";
         PreparedStatement stmt = conn.prepareStatement(sql);
         stmt.setInt(1, 0);
-        Array names = conn.createArrayOf("VARCHAR", namesList.toArray());
-        stmt.setArray(2, names);
+        String normalizedPath = Joiner.on('/').join(namesList);
+        
+        
+        //Array names = conn.createArrayOf("varchar", namesList.toArray());
+        //stmt.setArray(2, names);
+        stmt.setString(2, normalizedPath);
         
         return stmt;
     }

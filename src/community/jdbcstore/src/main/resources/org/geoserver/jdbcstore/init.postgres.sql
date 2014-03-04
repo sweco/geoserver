@@ -15,3 +15,6 @@ CREATE TABLE resource
 
 CREATE INDEX resource_parent_name_idx
   ON resource (parent NULLS FIRST, name NULLS FIRST);
+
+INSERT INTO resource (oid, name, parent, content) VALUES (0, '', NULL, NULL);
+

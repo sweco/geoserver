@@ -66,7 +66,11 @@ public class JDBCResourceStore implements ResourceStore {
         template = new NamedParameterJdbcTemplate(ds);
         
         // TODO: need to set this properly
-        dialect = new H2Dialect();
+        if("org.h2.Driver".equals(config.getProperty("driverClassName"))){
+            dialect = new H2Dialect();
+        } else {
+            dialect = new PostgresDialect();
+        }
         
         Connection c;
         try {
