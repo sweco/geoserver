@@ -47,8 +47,6 @@ import org.springframework.web.context.WebApplicationContext;
  * <code>
  * File dataDirectory = ...
  * GeoServerResourceLoader loader = new GeoServerResourceLoader( dataDirectory );
- * loader.addSearchLocation( new File( "/WEB-INF/" ) );
- * loader.addSearchLocation( new File( "/data" ) );
  * ...
  * Resource catalog = loader.get("catalog.xml");
  * File log = loader.find("logs/geoserver.log");
@@ -60,7 +58,7 @@ import org.springframework.web.context.WebApplicationContext;
  * @author Justin Deoliveira, The Open Planning Project, jdeolive@openplans.org
  * 
  */
-public class GeoServerResourceLoader extends DefaultResourceLoader implements ApplicationContextAware, ResourceStore {
+public class GeoServerResourceLoader extends DefaultResourceLoader implements ResourceStore {
     private static final Logger LOGGER = org.geotools.util.logging.Logging.getLogger("org.vfny.geoserver.global");
     static {
         LOGGER.setLevel(Level.FINER);
@@ -86,7 +84,6 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
      * </p>
      */
     public GeoServerResourceLoader() {
-        //searchLocations = new TreeSet<File>();
         baseDirectory = null;
         resources = Resources.EMPTY;
     }
@@ -101,24 +98,35 @@ public class GeoServerResourceLoader extends DefaultResourceLoader implements Ap
         this.resources = new FileSystemResourceStore( baseDirectory );
     }
     
-    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
-        if (baseDirectory == null) {
-            //lookup the data directory
-            if (applicationContext instanceof WebApplicationContext) {
-                String data = lookupGeoServerDataDirectory(
-                        ((WebApplicationContext)applicationContext).getServletContext());
-                if (data != null) {
-                    setBaseDirectory(new File(data)); 
-                }
-            }
-        }
-        if( resources == Resources.EMPTY ){
-            // lookup the configuration resources
-            if( baseDirectory != null ){
-                resources = new FileSystemResourceStore( baseDirectory );
-            }
-        }
+    /**
+     * Creates a new resource loader.
+     *
+     * @param baseDirectory The directory in which
+     */
+    public GeoServerResourceLoader(ResourceStore resourceStore) {
+        this.baseDirectory = resourceStore.get(Paths.BASE).dir();
+        this.resources = resourceStore;
     }
+    
+    
+// public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+//        if (baseDirectory == null) {
+//            //lookup the data directory
+//            if (applicationContext instanceof WebApplicationContext) {
+//                String data = lookupGeoServerDataDirectory(
+//                        ((WebApplicationContext)applicationContext).getServletContext());
+//                if (data != null) {
+//                    setBaseDirectory(new File(data)); 
+//                }
+//            }
+//        }
+//        if( resources == Resources.EMPTY ){
+//            // lookup the configuration resources
+//            if( baseDirectory != null ){
+//                resources = new FileSystemResourceStore( baseDirectory );
+//            }
+//        }
+//    }
     
     /**
      * Adds a location to the path used for resource lookups.

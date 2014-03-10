@@ -15,8 +15,11 @@ import java.util.List;
  */
 public class FileSystemResourceStore implements ResourceStore {
     
-    private File baseDirectory;
+    protected File baseDirectory;
 
+    protected FileSystemResourceStore(){
+    }
+    
     public FileSystemResourceStore(File resourceDirectory) {
         if (resourceDirectory == null) {
             throw new NullPointerException("root resource directory required");
