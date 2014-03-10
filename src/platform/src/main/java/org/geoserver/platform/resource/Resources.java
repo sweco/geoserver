@@ -20,6 +20,17 @@ import org.geoserver.platform.resource.Resource.Type;
 public class Resources {
     
     /**
+     * Test if the file or directory denoted by this resource exists.
+     * 
+     * @see File#exists()
+     * @param resource
+     * @return true if file or directory exists
+     */
+    public static boolean exists( Resource resource ){
+        return resource != null && resource.getType() != Resource.Type.UNDEFINED;
+    }
+    
+    /**
      * Checks {@link Resource#getType()} and returns existing file() or dir()
      * as appropriate, or null for {@link Resource.Type#UNDEFINED}.
      * 
