@@ -6,101 +6,48 @@ import static org.easymock.classextension.EasyMock.*;
 import static org.geoserver.platform.resource.ResourceMatchers.*;
 
 import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 
-import javax.sql.DataSource;
-
-import org.geoserver.jdbcconfig.internal.Util;
 import org.geoserver.platform.resource.Resource;
 import org.geoserver.platform.resource.ResourceStore;
-import org.h2.jdbcx.JdbcDataSource;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.postgresql.ds.PGSimpleDataSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-
-import com.google.common.base.Optional;
 
 public class PostgresJDBCResourceStoreTest {
     
-    JDBCResourceStoreProperties mockConfig(boolean enabled, boolean init) {
-        JDBCResourceStoreProperties config = createMock(JDBCResourceStoreProperties.class);
-        expect(config.getInitScript()).andStubReturn(JDBCResourceStore.class.getResource("init.postgres.sql"));
-        expect(config.getJdbcUrl()).andStubReturn(Optional.of("jdbc:postgresql://localhost:5432/jdbcstoretest"));
-        expect(config.isInitDb()).andStubReturn(init);
-        expect(config.isEnabled()).andStubReturn(enabled);
-        expect(config.isImport()).andStubReturn(init);
-        expect(config.getJndiName()).andStubReturn(Optional.<String>absent());
-        expect(config.getProperty(eq("username"))).andStubReturn("jdbcstore");
-        expect(config.getProperty(eq("username"), (String)anyObject())).andStubReturn("jdbcstore");
-        expect(config.getProperty(eq("password"))).andStubReturn("jdbcstore");
-        expect(config.getProperty(eq("password"), (String)anyObject())).andStubReturn("jdbcstore");
-        expect(config.getProperty(eq("driverClassName"))).andStubReturn("org.postgresql.Driver");
-        expect(config.getProperty(eq("driverClassName"), (String)anyObject())).andStubReturn("org.postgresql.Driver");
-        
-        return config;
-    }
-    
-    DataSource testDataSource() throws Exception {
-        PGSimpleDataSource ds = new PGSimpleDataSource();
-        ds.setServerName("localhost");
-        ds.setDatabaseName("jdbcstoretest");
-        ds.setPortNumber(5432);
-        ds.setUser("jdbcstore");
-        ds.setPassword("jdbcstore");
-        
-        // Ensure the database is empty
-        Connection conn = ds.getConnection();
-        try {
-            Statement stmt = conn.createStatement();
-            stmt.execute("DROP SCHEMA IF EXISTS public CASCADE;");
-            stmt.execute("CREATE SCHEMA public;");
-            stmt.execute("GRANT ALL ON SCHEMA public TO postgres;");
-            stmt.execute("GRANT ALL ON SCHEMA public TO public;");
-            stmt.execute("COMMENT ON SCHEMA public IS 'standard public schema';");
-        } finally {
-            conn.close();
-        }
-        
-        return ds;
-    }
-    
-    
-    DataSource ds;
-    Connection conn;
-    PreparedStatement insert;
+    PostgresTestSupport support;
     
     @Before
     public void setUp() throws Exception {
-        ds = testDataSource();
-        conn = ds.getConnection();
-        insert = conn.prepareStatement("INSERT INTO resource (name, parent, content) VALUES (?, ?, ?) RETURNING oid;");
+        support = new PostgresTestSupport();
     }
     
     @After
     public void cleanUp() throws Exception {
-        try{
-            insert.close();
-        } finally {
-            conn.close();
-        }
+        support.close();
+    }
+    
+    JDBCResourceStoreProperties getConfig(boolean enabled, boolean init) {
+        JDBCResourceStoreProperties config = createMock(JDBCResourceStoreProperties.class);
+        expect(config.isInitDb()).andStubReturn(init);
+        expect(config.isEnabled()).andStubReturn(enabled);
+        expect(config.isImport()).andStubReturn(init);
+        support.stubConfig(config);
+        replay(config);
+        return config;
     }
     
     @Test
     public void testInitializeEmptyDB() throws Exception {
-        JDBCResourceStoreProperties config = mockConfig(true, true);
-        replay(config);
+        JDBCResourceStoreProperties config = getConfig(true, true);
         
         @SuppressWarnings("unused")
-        ResourceStore store = new JDBCResourceStore(ds, config);
+        ResourceStore store = new JDBCResourceStore(support.getDataSource(), config);
         
         // Check that the database has a resource table with a root record
         
-        ResultSet rs = conn.createStatement().executeQuery("SELECT * from resource where oid = 0");
+        ResultSet rs = support.getConnection().createStatement().executeQuery("SELECT * from resource where oid = 0");
         
         assertThat(rs.next(), describedAs("found root record",is(true)));
         assertThat(rs.getString("name"), equalTo(""));
@@ -110,61 +57,31 @@ public class PostgresJDBCResourceStoreTest {
         assertThat(rs.next(), describedAs("only one root",is(false)));
     }
     
-    private int addFile(String name, int parent, byte[] content) throws Exception {
-        insert.setString(1, name);
-        insert.setInt(2, parent);
-        insert.setBytes(3, content);
-        ResultSet rs = insert.executeQuery();
-        if(rs.next()) {
-            return rs.getInt("oid");
-        } else {
-            throw new IllegalStateException("Could not add test file "+name);
-        }
-    }
-    private int addDir(String name, int parent) throws Exception  {
-        insert.setString(1, name);
-        insert.setInt(2, parent);
-        insert.setBytes(3, null);
-        ResultSet rs = insert.executeQuery();
-        if(rs.next()) {
-            return rs.getInt("oid");
-        } else {
-            throw new IllegalStateException("Could not add test directory "+name);
-        }
-    }
-    
-    void preInit() throws Exception {
-        NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(ds);
-        
-        Util.runScript(JDBCResourceStore.class.getResource("init.postgres.sql"), template.getJdbcOperations(), null);
-    }
-    
     void standardData() throws Exception {
-        preInit();
+        support.initialize();
         
-        addFile("FileA", 0, "FileA Contents".getBytes());
-        addFile("FileB", 0, "FileB Contents".getBytes());
-        int c = addDir("DirC", 0);
-        addFile("FileD", c, "FileD Contents".getBytes());
-        addDir("DirE", 0);
-        int f = addDir("DirF", c);
-        int g = addDir("DirG", f);
-        addFile("FileH", g, "FileH Contents".getBytes());
+        support.addFile("FileA", 0, "FileA Contents".getBytes());
+        support.addFile("FileB", 0, "FileB Contents".getBytes());
+        int c = support.addDir("DirC", 0);
+        support.addFile("FileD", c, "FileD Contents".getBytes());
+        support.addDir("DirE", 0);
+        int f = support.addDir("DirF", c);
+        int g = support.addDir("DirG", f);
+        support.addFile("FileH", g, "FileH Contents".getBytes());
     }
     
     @Test
     public void testAcceptInitializedDB() throws Exception {
         standardData();
         
-        JDBCResourceStoreProperties config = mockConfig(true, false);
-        replay(config);
+        JDBCResourceStoreProperties config = getConfig(true, false);
         
         @SuppressWarnings("unused")
-        ResourceStore store = new JDBCResourceStore(ds, config);
+        ResourceStore store = new JDBCResourceStore(support.getDataSource(), config);
         {
             // Check that the database has a resource table with a root record
             
-            ResultSet rs = conn.createStatement().executeQuery("SELECT * from resource where oid = 0");
+            ResultSet rs = support.getConnection().createStatement().executeQuery("SELECT * from resource where oid = 0");
             
             assertThat(rs.next(), describedAs("found root record",is(true)));
             assertThat(rs.getString("name"), equalTo(""));
@@ -176,7 +93,7 @@ public class PostgresJDBCResourceStoreTest {
         {
             // Check that the database has one of the child nodes
             
-            ResultSet rs = conn.createStatement().executeQuery("SELECT * from resource where parent = 0 and name='FileA'");
+            ResultSet rs = support.getConnection().createStatement().executeQuery("SELECT * from resource where parent = 0 and name='FileA'");
             
             assertThat(rs.next(), describedAs("found child FileA",is(true)));
             assertThat(rs.getString("name"), equalTo("FileA"));
@@ -189,17 +106,16 @@ public class PostgresJDBCResourceStoreTest {
     
     @Test
     public void testInitializeDatabaseWithIrrelevantTable() throws Exception {
-        conn.createStatement().execute("CREATE TABLE foo (oid INTEGER PRIMARY KEY);");
+        support.getConnection().createStatement().execute("CREATE TABLE foo (oid INTEGER PRIMARY KEY);");
 
-        JDBCResourceStoreProperties config = mockConfig(true, true);
-        replay(config);
+        JDBCResourceStoreProperties config = getConfig(true, true);
         
         @SuppressWarnings("unused")
-        ResourceStore store = new JDBCResourceStore(ds, config);
+        ResourceStore store = new JDBCResourceStore(support.getDataSource(), config);
         {
             // Check that the database has a resource table with a root record
             
-            ResultSet rs = conn.createStatement().executeQuery("SELECT * from resource where oid = 0");
+            ResultSet rs = support.getConnection().createStatement().executeQuery("SELECT * from resource where oid = 0");
             
             assertThat(rs.next(), describedAs("found root record",is(true)));
             assertThat(rs.getString("name"), equalTo(""));
@@ -215,10 +131,9 @@ public class PostgresJDBCResourceStoreTest {
     public void testBasicResourceQuery() throws Exception {
         standardData();
         
-        JDBCResourceStoreProperties config = mockConfig(true, false);
-        replay(config);
+        JDBCResourceStoreProperties config = getConfig(true, false);
         
-        ResourceStore store = new JDBCResourceStore(ds, config);
+        ResourceStore store = new JDBCResourceStore(support.getDataSource(), config);
         
         Resource r = store.get("FileA");
         
@@ -231,10 +146,9 @@ public class PostgresJDBCResourceStoreTest {
     public void testBasicDirectoryQuery() throws Exception {
         standardData();
         
-        JDBCResourceStoreProperties config = mockConfig(true, false);
-        replay(config);
+        JDBCResourceStoreProperties config = getConfig(true, false);
         
-        ResourceStore store = new JDBCResourceStore(ds, config);
+        ResourceStore store = new JDBCResourceStore(support.getDataSource(), config);
         
         Resource r = store.get("DirE");
         
@@ -248,10 +162,9 @@ public class PostgresJDBCResourceStoreTest {
     public void testBasicUndefinedQuery() throws Exception {
         standardData();
         
-        JDBCResourceStoreProperties config = mockConfig(true, false);
-        replay(config);
+        JDBCResourceStoreProperties config = getConfig(true, false);
         
-        ResourceStore store = new JDBCResourceStore(ds, config);
+        ResourceStore store = new JDBCResourceStore(support.getDataSource(), config);
         
         Resource r = store.get("DoesntExist");
         
@@ -265,10 +178,9 @@ public class PostgresJDBCResourceStoreTest {
     public void testLongQuery() throws Exception {
         standardData();
         
-        JDBCResourceStoreProperties config = mockConfig(true, false);
-        replay(config);
+        JDBCResourceStoreProperties config = getConfig(true, false);
         
-        ResourceStore store = new JDBCResourceStore(ds, config);
+        ResourceStore store = new JDBCResourceStore(support.getDataSource(), config);
         
         Resource r = store.get("DirC/DirF/DirG/FileH");
         
@@ -281,10 +193,9 @@ public class PostgresJDBCResourceStoreTest {
     public void testBasicRead() throws Exception {
         standardData();
         
-        JDBCResourceStoreProperties config = mockConfig(true, false);
-        replay(config);
+        JDBCResourceStoreProperties config = getConfig(true, false);
         
-        ResourceStore store = new JDBCResourceStore(ds, config);
+        ResourceStore store = new JDBCResourceStore(support.getDataSource(), config);
         
         Resource r = store.get("FileA");
         
