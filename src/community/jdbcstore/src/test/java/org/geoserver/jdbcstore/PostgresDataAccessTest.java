@@ -26,13 +26,13 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import com.google.common.base.Optional;
 
-//TODO Experimenting with reading/writing content in H2. Delete this when done.
-public class H2DataAccessTest {
+// TODO Experimenting with reading/writing content in Postgres. Delete this when done.
+public class PostgresDataAccessTest {
     DatabaseTestSupport support;
     
     @Before
     public void setUp() throws Exception {
-        support = new H2TestSupport();
+        support = new PostgresTestSupport();
     }
     @After
     public void tearDown() throws Exception {
@@ -43,20 +43,42 @@ public class H2DataAccessTest {
         Connection conn = support.getConnection();
         Statement stmt = conn.createStatement();
         try {
-            stmt.execute("CREATE TABLE resource\n(\n  oid integer AUTO_INCREMENT NOT NULL,\n  name character varying NOT NULL,\n  parent integer,\n  last_modified timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  content "+type+",\n  CONSTRAINT resource_pkey PRIMARY KEY (oid),\n  CONSTRAINT resource_parent_fkey FOREIGN KEY (parent)\n      REFERENCES resource (oid)\n      ON UPDATE RESTRICT ON DELETE CASCADE,\n  CONSTRAINT resource_parent_name_key UNIQUE (parent, name),\n  CONSTRAINT resource_only_one_root_check CHECK (parent IS NOT NULL OR oid = 0)\n);");
+            /* -- Make new Postgres servers play nicely with the old JDBC driver
+             * 
+             * ALTER DATABASE jdbcstoretest SET bytea_output = escape;
+             * 
+             * 
+             */
+            /*
+            CREATE TABLE resource
+            (
+                    oid serial NOT NULL,
+                    name character varying NOT NULL,
+                    parent integer,
+                    last_modified timestamp without time zone NOT NULL DEFAULT timezone('UTC'::text, now()),
+                    content bytea,
+                    CONSTRAINT resource_pkey PRIMARY KEY (oid),
+                    CONSTRAINT resource_parent_fkey FOREIGN KEY (parent)
+                        REFERENCES resource (oid)
+                        ON UPDATE RESTRICT ON DELETE CASCADE,
+                    CONSTRAINT resource_parent_name_key UNIQUE (parent, name),
+                    CONSTRAINT resource_only_one_root_check CHECK (parent IS NOT NULL OR oid = 0)
+                  );
+                  
+                  */
+            stmt.execute("CREATE TABLE resource\n            (\n                    oid serial NOT NULL,\n                    name character varying NOT NULL,\n                    parent integer,\n                    last_modified timestamp without time zone NOT NULL DEFAULT timezone('UTC'::text, now()),\n                    content "+type+",\n                    CONSTRAINT resource_pkey PRIMARY KEY (oid),\n                    CONSTRAINT resource_parent_fkey FOREIGN KEY (parent)\n                        REFERENCES resource (oid)\n                        ON UPDATE RESTRICT ON DELETE CASCADE,\n                    CONSTRAINT resource_parent_name_key UNIQUE (parent, name),\n                    CONSTRAINT resource_only_one_root_check CHECK (parent IS NOT NULL OR oid = 0)\n                  );");
             stmt.execute("CREATE INDEX resource_parent_name_idx ON resource (parent NULLS FIRST, name NULLS FIRST);");
-
+            
             stmt.execute("INSERT INTO resource (oid, name, parent, content) VALUES (0, '', NULL, NULL);");
-
-            stmt.execute("ALTER TABLE resource ALTER COLUMN oid RESTART WITH 1;");
         } finally {
             stmt.close();
         }
     }
     
+
     @Test 
-    public void testTypeBinaryGetAsBinaryStream() throws Exception {
-        init("BINARY");
+    public void testTypeBinaryPutGetAsBinaryStream() throws Exception {
+        init("bytea");
         
         Connection conn = support.getConnection();
         
@@ -64,54 +86,7 @@ public class H2DataAccessTest {
         {
             Statement stmt = conn.createStatement();
             try {
-                stmt.execute("INSERT INTO resource(name, parent, content) VALUES ('test', 0, X'01FF');");
-                ResultSet rs = stmt.getGeneratedKeys();
-                try {
-                    assertTrue(rs.next());
-                    oid=rs.getInt(1);
-                    assertFalse(rs.wasNull());
-                } finally {
-                    rs.close();
-                }
-            } finally {
-                stmt.close();
-            }
-        }
-        
-        {
-            Statement stmt = conn.createStatement();
-            try {
-                ResultSet rs = stmt.executeQuery("SELECT content FROM resource WHERE oid = "+oid+";");
-                
-                assertTrue(rs.next());
-                InputStream is = rs.getBinaryStream(1);
-                assertThat(is, notNullValue());
-                
-                byte[] expected = {0x01,(byte) 0xFF};
-                try {
-                    assertTrue(streamContains(is, expected));
-                } finally {
-                    is.close();
-                }
-                
-            } finally {
-                stmt.close();
-            }
-        }
-        
-    }
-    @Test 
-    public void testTypeBinaryPutAsBinaryStream() throws Exception {
-        init("BINARY");
-        
-        Connection conn = support.getConnection();
-        
-        int oid;
-        {
-            Statement stmt = conn.createStatement();
-            try {
-                stmt.execute("INSERT INTO resource(name, parent, content) VALUES ('test', 0, X'01FF');");
-                ResultSet rs = stmt.getGeneratedKeys();
+                ResultSet rs = stmt.executeQuery("INSERT INTO resource(name, parent, content) VALUES ('test', 0, null) RETURNING oid;");
                 try {
                     assertTrue(rs.next());
                     oid=rs.getInt(1);
@@ -130,7 +105,7 @@ public class H2DataAccessTest {
             PreparedStatement stmt = conn.prepareStatement("UPDATE resource SET content = ? WHERE oid = ?;");
             try {
                 InputStream is = new ByteArrayInputStream(expected);
-                stmt.setBinaryStream(1, is);
+                stmt.setBinaryStream(1, is, expected.length);
                 stmt.setInt(2, oid);
                 stmt.execute();
             } finally {

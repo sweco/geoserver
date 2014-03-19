@@ -1,6 +1,9 @@
 package org.geoserver.jdbcstore;
 
 import static org.easymock.classextension.EasyMock.*;
+import static org.hamcrest.Matchers.describedAs;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -26,11 +29,6 @@ public class H2TestSupport implements DatabaseTestSupport {
         ds = new JdbcDataSource();
         ds.setURL("jdbc:h2:mem:test");
         conn = ds.getConnection();
-        try {
-            insert = conn.prepareStatement("INSERT INTO resource (name, parent, content) VALUES (?, ?, ?)");
-        } finally {
-            if(insert==null) conn.close();
-        }
     }
     
     @Override
@@ -39,7 +37,7 @@ public class H2TestSupport implements DatabaseTestSupport {
         expect(config.getJdbcUrl()).andStubReturn(Optional.of("jdbc:h2:mem:test"));
         expect(config.getJndiName()).andStubReturn(Optional.<String>absent());
         expect(config.getProperty(eq("driverClassName"))).andStubReturn("org.h2.Driver");
-        expect(config.getProperty(eq("driverClassName"), (String)anyObject())).andStubReturn("org.postgresql.Driver");
+        expect(config.getProperty(eq("driverClassName"), (String)anyObject())).andStubReturn("org.h2.Driver");
     }
     
     @Override
@@ -50,15 +48,22 @@ public class H2TestSupport implements DatabaseTestSupport {
 
     }
     
+    private PreparedStatement getInsert() throws SQLException {
+        if(insert==null) {
+            insert = conn.prepareStatement("INSERT INTO resource (name, parent, content) VALUES (?, ?, ?)");
+        }
+        return insert;
+    }
+    
     @Override
     public int addFile(String name, int parent, byte[] content) throws SQLException  {
-        insert.setString(1, name);
-        insert.setInt(2, parent);
-        insert.setBytes(3, content);
-        insert.execute();
-        ResultSet rs = insert.getGeneratedKeys();
+        getInsert().setString(1, name);
+        getInsert().setInt(2, parent);
+        getInsert().setBytes(3, content);
+        getInsert().execute();
+        ResultSet rs = getInsert().getGeneratedKeys();
         if(rs.next()) {
-            return rs.getInt("oid");
+            return rs.getInt(1);
         } else {
             throw new IllegalStateException("Could not add test file "+name);
         }
@@ -66,13 +71,13 @@ public class H2TestSupport implements DatabaseTestSupport {
     
     @Override
     public int addDir(String name, int parent) throws SQLException  {
-        insert.setString(1, name);
-        insert.setInt(2, parent);
-        insert.setBytes(3, null);
-        insert.execute();
-        ResultSet rs = insert.getGeneratedKeys();
+        getInsert().setString(1, name);
+        getInsert().setInt(2, parent);
+        getInsert().setBytes(3, null);
+        getInsert().execute();
+        ResultSet rs = getInsert().getGeneratedKeys();
         if(rs.next()) {
-            return rs.getInt("oid");
+            return rs.getInt(1);
         } else {
             throw new IllegalStateException("Could not add test directory "+name);
         }
@@ -96,6 +101,24 @@ public class H2TestSupport implements DatabaseTestSupport {
     @Override
     public void close() throws SQLException {
         conn.close();
+        
+        // Verify that all the connections are closed by opening a new one and checking if the 
+        // database is empty.
+        JdbcDataSource ds = new JdbcDataSource();
+        ds.setURL("jdbc:h2:mem:test");
+        conn = ds.getConnection();
+        try {
+            ResultSet rs = conn.getMetaData().getTables(null, null, null, new String[]{"TABLE"});
+            
+            boolean result = false;
+            while(rs.next()) {
+                result=true;
+                System.out.printf("%s\n", rs.getString("TABLE_NAME"));
+            }
+            assertThat(result, describedAs("connection closed", is(false)));
+        } finally {
+            conn.close();
+        }
     }
 
 }
