@@ -413,6 +413,12 @@ public class JDBCResourceStore implements ResourceStore {
         private JDBCResourceStore getOuterType() {
             return JDBCResourceStore.this;
         }
+
+        @Override
+        public Lock lock() {
+            // FIXME
+            throw new UnsupportedOperationException();
+        }
         
         
     }
