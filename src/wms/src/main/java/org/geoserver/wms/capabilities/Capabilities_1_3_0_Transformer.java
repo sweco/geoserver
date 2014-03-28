@@ -1285,7 +1285,10 @@ public class Capabilities_1_3_0_Transformer extends TransformerBase {
                 attrs.clear();
                 attrs.addAttribute("", "xmlns:xlink", "xmlns:xlink", "", XLINK_NS);
                 attrs.addAttribute(XLINK_NS, "type", "xlink:type", "", "simple");
-                attrs.addAttribute(XLINK_NS, "href", "xlink:href", "", legend.getOnlineResource());
+                
+                String legendUrl = buildURL(request.getBaseUrl(), "styles/"+legend.getOnlineResource(), null, URLType.RESOURCE);
+                attrs.addAttribute(XLINK_NS, "href", "xlink:href", "", legendUrl);               
+                //attrs.addAttribute(XLINK_NS, "href", "xlink:href", "", legend.getOnlineResource());
 
                 element("OnlineResource", null, attrs);
 
