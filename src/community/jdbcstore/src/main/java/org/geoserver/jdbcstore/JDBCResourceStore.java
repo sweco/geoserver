@@ -248,13 +248,13 @@ public class JDBCResourceStore implements ResourceStore {
                 } else {
                     throw new IllegalStateException("Could not find resource "+oid);
                 }
-                Blob content = rs.getBlob("content");
                 
                 T stream;
                 if(clazz==InputStream.class) {
-                    stream = (T) new InputStreamWrapper(content.getBinaryStream(), c);
+                    stream = (T) new InputStreamWrapper(rs.getBinaryStream("content"), c);
                 } else {
-                    stream = (T) new OutputStreamWrapper(content.setBinaryStream(1), c);
+                    // TODO
+                    throw new UnsupportedOperationException();
                 }
                 
                 return stream;

@@ -4,7 +4,7 @@ CREATE TABLE resource
   name character varying NOT NULL,
   parent integer,
   last_modified timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  content blob,
+  content binary,
   CONSTRAINT resource_pkey PRIMARY KEY (oid),
   CONSTRAINT resource_parent_fkey FOREIGN KEY (parent)
       REFERENCES resource (oid)

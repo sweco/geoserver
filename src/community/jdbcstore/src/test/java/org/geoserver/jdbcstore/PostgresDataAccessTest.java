@@ -99,7 +99,7 @@ public class PostgresDataAccessTest {
             }
         }
         
-        byte[] expected = {42, 24, 64, 90};
+        byte[] expected = {0x42, 0x24, 0x64};
         
         {
             PreparedStatement stmt = conn.prepareStatement("UPDATE resource SET content = ? WHERE oid = ?;");
@@ -119,7 +119,91 @@ public class PostgresDataAccessTest {
                 ResultSet rs = stmt.executeQuery("SELECT content FROM resource WHERE oid = "+oid+";");
                 
                 assertTrue(rs.next());
-                InputStream is = rs.getBinaryStream(1);
+                InputStream is = rs.getBinaryStream("content");
+                assertThat(is, notNullValue());
+                
+                try {
+                    assertTrue(streamContains(is, expected));
+                } finally {
+                    is.close();
+                }
+                
+            } finally {
+                stmt.close();
+            }
+        }
+
+    }
+    @Test 
+    public void testTypeBinaryGetNullAsBinaryStream() throws Exception {
+        init("bytea");
+        
+        Connection conn = support.getConnection();
+        
+        int oid;
+        {
+            Statement stmt = conn.createStatement();
+            try {
+                ResultSet rs = stmt.executeQuery("INSERT INTO resource(name, parent, content) VALUES ('test', 0, null) RETURNING oid;");
+                try {
+                    assertTrue(rs.next());
+                    oid=rs.getInt(1);
+                    assertFalse(rs.wasNull());
+                } finally {
+                    rs.close();
+                }
+            } finally {
+                stmt.close();
+            }
+        }
+        
+        {
+            Statement stmt = conn.createStatement();
+            try {
+                ResultSet rs = stmt.executeQuery("SELECT content FROM resource WHERE oid = "+oid+";");
+                
+                assertTrue(rs.next());
+                InputStream is = rs.getBinaryStream("content");
+                assertThat(is, nullValue());
+                
+            } finally {
+                stmt.close();
+            }
+        }
+
+    }
+    @Test 
+    public void testTypeBinaryGetAsBinaryStream() throws Exception {
+        init("bytea");
+        
+        Connection conn = support.getConnection();
+        
+        int oid;
+        {
+            Statement stmt = conn.createStatement();
+            try {
+                ResultSet rs = stmt.executeQuery("INSERT INTO resource(name, parent, content) VALUES ('test', 0, decode('422464', 'hex')) RETURNING oid;");
+                try {
+                    assertTrue(rs.next());
+                    oid=rs.getInt(1);
+                    assertFalse(rs.wasNull());
+                } finally {
+                    rs.close();
+                }
+            } finally {
+                stmt.close();
+            }
+        }
+        byte[] expected = {0x42, 0x24, 0x64};
+       
+        {
+            Statement stmt = conn.createStatement();
+            try {
+                ResultSet rs = stmt.executeQuery("SELECT content FROM resource WHERE oid = "+oid+";");
+                
+                assertTrue(rs.next());
+                InputStream is = rs.getBinaryStream("content");
+                byte[] bytes = rs.getBytes("content");
                 assertThat(is, notNullValue());
                 
                 try {
