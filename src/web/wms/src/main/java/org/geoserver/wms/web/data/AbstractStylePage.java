@@ -14,14 +14,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import javax.imageio.ImageIO;
-
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
@@ -43,7 +36,6 @@ import org.apache.wicket.markup.html.form.upload.FileUploadField;
 import org.apache.wicket.markup.html.image.Image;
 import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.model.CompoundPropertyModel;
-import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.util.lang.Bytes;
@@ -68,11 +60,6 @@ import org.geoserver.wms.GetLegendGraphicRequest;
 import org.geoserver.wms.legendgraphic.BufferedImageLegendGraphicBuilder;
 import org.geoserver.wms.web.publish.StyleChoiceRenderer;
 import org.geoserver.wms.web.publish.StylesModel;
-import org.geotools.styling.NamedLayer;
-import org.geotools.styling.Style;
-import org.geotools.styling.StyledLayer;
-import org.geotools.styling.StyledLayerDescriptor;
-import org.geotools.styling.UserLayer;
 import org.xml.sax.SAXParseException;
 
 /**
@@ -117,12 +104,14 @@ public abstract class AbstractStylePage extends GeoServerSecuredPage {
         initUI(style);
     }
 
-    protected void initUI(final StyleInfo style) {
-        IModel<StyleInfo> styleModel = new CompoundPropertyModel(style != null ? 
+    protected void initUI(StyleInfo style) {
+        CompoundPropertyModel<StyleInfo> styleModel = new CompoundPropertyModel(style != null ? 
             new StyleDetachableModel(style) : getCatalog().getFactory().createStyle());
         
-        format = style != null ? style.getFormat() : getCatalog().getFactory().createStyle()
-                .getFormat();
+        // Make sure the legend object isn't null
+        if (null == styleModel.getObject().getLegend()) {
+            styleModel.getObject().setLegend(getCatalog().getFactory().createLegend());
+        }
 
         styleForm = new Form("form", styleModel) {
             @Override
@@ -179,6 +168,10 @@ public abstract class AbstractStylePage extends GeoServerSecuredPage {
         editor.setOutputMarkupId(true);
         editor.setRequired(true);
         styleForm.add(editor);
+
+        // add the Legend fields        
+        ExternalGraphicPanel legend = new ExternalGraphicPanel("legend", styleModel, styleForm);
+        styleForm.add(legend);
 
         if (style != null) {
             try {

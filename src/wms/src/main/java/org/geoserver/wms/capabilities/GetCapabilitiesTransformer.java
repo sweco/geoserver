@@ -29,11 +29,9 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
-
 import org.apache.commons.lang.StringUtils;
 import org.geoserver.catalog.AttributionInfo;
 import org.geoserver.catalog.AuthorityURLInfo;
@@ -79,7 +77,6 @@ import org.vfny.geoserver.util.ResponseUtils;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.helpers.AttributesImpl;
-
 import com.google.common.collect.Iterables;
 import com.vividsolutions.jts.geom.Envelope;
 import org.geoserver.catalog.DataLinkInfo;
@@ -955,7 +952,7 @@ public class GetCapabilitiesTransformer extends TransformerBase {
                 element("Name", defaultStyle.getName());
                 element("Title", ftStyle.getTitle());
                 element("Abstract", ftStyle.getAbstract());
-                handleLegendURL(layer, layer.getLegend(), null ,layer.getDefaultStyle());
+                handleLegendURL(layer.getName(), defaultStyle.getLegend(), null);
                 end("Style");
 
                 Set<StyleInfo> styles = layer.getStyles();
@@ -970,7 +967,7 @@ public class GetCapabilitiesTransformer extends TransformerBase {
                     element("Name", styleInfo.getName());
                     element("Title", ftStyle.getTitle());
                     element("Abstract", ftStyle.getAbstract());
-                    handleLegendURL(layer, null, styleInfo, styleInfo);
+                    handleLegendURL(layer.getName(), styleInfo.getLegend(), styleInfo);
                     end("Style");
                 }
             }

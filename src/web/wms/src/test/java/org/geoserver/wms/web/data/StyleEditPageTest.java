@@ -13,7 +13,6 @@ import java.io.ByteArrayInputStream;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-
 import org.apache.wicket.markup.html.form.TextArea;
 import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.util.tester.FormTester;
@@ -24,6 +23,7 @@ import org.geoserver.platform.GeoServerResourceLoader;
 import org.geoserver.platform.resource.Paths;
 import org.geoserver.platform.resource.Resource;
 import org.geoserver.web.GeoServerWicketTestSupport;
+import org.geoserver.web.wicket.GeoServerAjaxFormLink;
 import org.junit.Before;
 import org.junit.Test;
 import org.w3c.dom.Document;
@@ -57,6 +57,11 @@ public class StyleEditPageTest extends GeoServerWicketTestSupport {
         tester.debugComponentTrees();
         tester.assertComponent("form:name", TextField.class);
         tester.assertComponent("form:styleEditor:editorContainer:editorParent:editor", TextArea.class);
+        
+        tester.assertComponent("form:onlineResource", TextField.class);
+        tester.assertComponent("form:width", TextField.class);
+        tester.assertComponent("form:height", TextField.class);
+        tester.assertComponent("form:verifyImage", GeoServerAjaxFormLink.class);
         
         tester.assertModelValue("form:name", "Buildings");
         

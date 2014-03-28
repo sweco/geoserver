@@ -13,9 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
-
 import javax.xml.namespace.QName;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.log4j.Level;
@@ -27,6 +25,7 @@ import org.geoserver.catalog.DataStoreInfo;
 import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.Keyword;
 import org.geoserver.catalog.LayerInfo;
+import org.geoserver.catalog.LegendInfo;
 import org.geoserver.catalog.NamespaceInfo;
 import org.geoserver.catalog.ProjectionPolicy;
 import org.geoserver.catalog.StyleInfo;
@@ -51,8 +50,8 @@ import org.geoserver.ows.util.OwsUtils;
 import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.platform.GeoServerResourceLoader;
 import org.geoserver.test.GeoServerSystemTestSupport;
-import org.geotools.coverage.grid.io.GridCoverage2DReader;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
+import org.geotools.coverage.grid.io.GridCoverage2DReader;
 import org.geotools.coverage.grid.io.GridFormatFinder;
 import org.geotools.coverage.grid.io.StructuredGridCoverage2DReader;
 import org.geotools.data.DataUtilities;
@@ -403,14 +402,24 @@ public class SystemTestData extends CiteTestData {
      * @param scope Class from which to load sld resource from.
      */
     public void addStyle(WorkspaceInfo ws, String name, String filename, Class scope, Catalog catalog) throws IOException {
-        GeoServerDataDirectory dd = new GeoServerDataDirectory(catalog.getResourceLoader());
-        File styles;
-        if(ws==null) {
-            styles=dd.findOrCreateStyleDir();
-        } else {
-            styles = new File(dd.findOrCreateWorkspaceDir(ws), "styles");
-            styles.mkdir();
-        }
+        addStyle(ws, name, filename, scope, catalog, null);
+    }
+    
+    /**
+     * Adds a style to the test setup.
+     * <p>
+     * To set up the style a file named <tt>filename</tt> is copied from the classpath relative
+     * to the <tt>scope</tt> parameter.
+     * </p>
+     * @param ws The workspace to include the style in.
+     * @param name The name of the style.
+     * @param filename The filename to copy from classpath.
+     * @param scope Class from which to load sld resource.
+     * @param legend The legend for the style.
+     */
+    public void addStyle(WorkspaceInfo ws, String name, String filename, Class scope, Catalog catalog,
+            LegendInfo legend) throws IOException {
+        File styles = catalog.getResourceLoader().findOrCreateDirectory(data, "styles");
         String target = new File( filename ).getName();
         
         catalog.getResourceLoader().copyFromClassPath(filename, new File(styles, target ), scope);
@@ -421,7 +430,8 @@ public class SystemTestData extends CiteTestData {
             style.setName(name);
             style.setWorkspace(ws);
         }
-        style.setFilename(target);
+        style.setFilename(filename);
+        style.setLegend(legend);
         if (style.getId() == null) {
             catalog.add(style);
         }
