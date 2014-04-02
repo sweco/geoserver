@@ -35,10 +35,12 @@ import org.apache.commons.io.input.ProxyInputStream;
 import org.apache.commons.io.output.ProxyOutputStream;
 import org.apache.commons.lang.NotImplementedException;
 import org.geoserver.jdbcconfig.internal.Util;
+import org.geoserver.platform.GeoServerResourceLoader;
 import org.geoserver.platform.resource.Paths;
 import org.geoserver.platform.resource.Resource;
 import org.geoserver.platform.resource.ResourceStore;
 import org.geoserver.platform.resource.Resource.Type;
+import org.h2.util.IOUtils;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
@@ -60,6 +62,13 @@ public class JDBCResourceStore implements ResourceStore {
     
     private Dialect dialect;
     
+    private ResourceCache cache;
+    
+    public void setCache(ResourceCache cache) {
+        this.cache = cache;
+    }
+
+
     public JDBCResourceStore(DataSource ds, JDBCResourceStoreProperties config) {
         this.ds = ds;
         this.config = config;
@@ -225,9 +234,7 @@ public class JDBCResourceStore implements ResourceStore {
         }
         
         @SuppressWarnings({ "unchecked", "resource" })
-        private <T extends Closeable> T getStream(Class<T> clazz) {
-            assert(clazz==InputStream.class || clazz==OutputStream.class);
-            
+        private InputStream getIStream() {
             Connection c;
             try {
                 c = ds.getConnection();
@@ -249,14 +256,7 @@ public class JDBCResourceStore implements ResourceStore {
                     throw new IllegalStateException("Could not find resource "+oid);
                 }
                 
-                T stream;
-                if(clazz==InputStream.class) {
-                    stream = (T) new InputStreamWrapper(rs.getBinaryStream("content"), c);
-                } else {
-                    // TODO
-                    throw new UnsupportedOperationException();
-                }
-                
+                InputStream stream = new InputStreamWrapper(rs.getBinaryStream("content"), c);
                 return stream;
             } 
             // Want to be sure that either the wrapped stream is returned, or the connection is
@@ -322,25 +322,35 @@ public class JDBCResourceStore implements ResourceStore {
         @Override
         public InputStream in() {
             makeResource();
-            return getStream(InputStream.class);
+            return getIStream();
         }
 
         @Override
         public OutputStream out() {
             makeResource();
-            return getStream(OutputStream.class);
+            try {
+                return new OutputStreamWrapper(this.oid, cache.cache(this));
+            } catch (IOException ex) {
+                throw new IllegalStateException(ex); 
+            }
         }
 
         @Override
         public File file() {
-            // TODO Auto-generated method stub
-            throw new NotImplementedException();
+            try {
+                return cache.cache(this);
+            } catch(IOException ex) {
+                throw new IllegalStateException(ex);
+            }
         }
 
         @Override
         public File dir() {
-            // TODO Auto-generated method stub
-            throw new NotImplementedException();
+            try {
+                return cache.cache(this);
+            } catch(IOException ex) {
+                throw new IllegalStateException(ex);
+            }
         }
 
         @Override
@@ -444,23 +454,41 @@ public class JDBCResourceStore implements ResourceStore {
         }
     }
     
-    static class OutputStreamWrapper extends ProxyOutputStream {
-    Connection conn;
-        public OutputStreamWrapper(OutputStream proxy, Connection conn) {
-            super(proxy);
-            this.conn = conn;
+    class OutputStreamWrapper extends ProxyOutputStream {
+        File cached;
+        int oid;
+        
+        public OutputStreamWrapper(int oid, File cached) throws IOException {
+            super(new FileOutputStream(cached));
+            this.cached = cached;
+            this.oid = oid;
         }
         
         @Override
         public void close() throws IOException {
             try {
                 super.close();
-            } finally {
+                Connection conn = ds.getConnection();
                 try {
+                    InputStream in = new FileInputStream(cached);
+                    try {
+                        PreparedStatement stmt = conn.prepareStatement("UPDATE resource SET content = ? WHERE oid = ?;");
+                        try {
+                            stmt.setBinaryStream(1, in);
+                            stmt.setInt(2, oid);
+                            
+                            stmt.executeUpdate();
+                        } finally {
+                            stmt.close();
+                        }
+                    } finally {
+                        in.close();
+                    }
+                } finally {
                     conn.close();
-                } catch (SQLException ex) {
-                    throw new IOException("Exception while closing connection",ex);
                 }
+            } catch(SQLException ex) {
+                throw new IOException("Error occured while communicating with database", ex);
             }
         }
     }

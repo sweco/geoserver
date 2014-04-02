@@ -33,6 +33,9 @@ public class H2JDBCResourceTheoryTest extends AbstractJDBCResourceTheoryTest {
         return store.get(path);
     }
     
+    @Rule
+    public TemporaryFolder folder= new TemporaryFolder();
+    
     @Before
     public void setUp() throws Exception {
         support = new H2TestSupport();
@@ -43,6 +46,7 @@ public class H2JDBCResourceTheoryTest extends AbstractJDBCResourceTheoryTest {
         replay(config);
         
         store = new JDBCResourceStore(support.getDataSource(), config);
+        store.setCache(new SimpleResourceCache(folder.getRoot()));
     }
 
 }
