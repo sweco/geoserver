@@ -35,6 +35,9 @@ import org.geotools.data.Query;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.gml2.SrsSyntax;
+import org.geotools.gml2.bindings.GML2EncodingUtils;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.NamedIdentifier;
 import org.opengis.feature.Feature;
 import org.opengis.feature.simple.SimpleFeature;
@@ -43,6 +46,7 @@ import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.FeatureType;
 import org.opengis.feature.type.GeometryDescriptor;
 import org.opengis.filter.Filter;
+import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.ReferenceIdentifier;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import javax.xml.namespace.QName;
@@ -237,29 +241,29 @@ public class GeoJSONGetFeatureResponse extends WFSGetFeatureOutputFormat {
             }
             jsonWriter.endArray(); // end features
 
-            // Coordinate Referense System, currently only if the namespace is
-            // EPSG
-            if (crs != null) {
-                Set<ReferenceIdentifier> ids = crs.getIdentifiers();
-                // WKT defined crs might not have identifiers at all
-                if (ids != null && ids.size() > 0) {
-                    NamedIdentifier namedIdent = (NamedIdentifier) ids.iterator().next();
-                    String csStr = namedIdent.getCodeSpace().toUpperCase();
-
-                    if (csStr.equals("EPSG")) {
-                        jsonWriter.key("crs");
-                        jsonWriter.object();
-                        jsonWriter.key("type").value(csStr);
-                        jsonWriter.key("properties");
-                        jsonWriter.object();
-                        jsonWriter.key("code");
-                        jsonWriter.value(namedIdent.getCode());
-                        jsonWriter.endObject(); // end properties
-                        jsonWriter.endObject(); // end crs
+            // Coordinate Referense System
+            try {
+                if (crs != null) {
+                    String identifier = CRS.lookupIdentifier(crs, true);
+                    // If we get a plain EPSG code, generate a URI as the GeoJSON spec says to 
+                    // prefer them.
+                    if(identifier.startsWith("EPSG:")) {
+                        identifier = GML2EncodingUtils.toURI(crs, SrsSyntax.OGC_URN);
                     }
+                    jsonWriter.key("crs");
+                    jsonWriter.object();
+                    jsonWriter.key("type").value("name");
+                    jsonWriter.key("properties");
+                    jsonWriter.object();
+                    jsonWriter.key("name");
+                    jsonWriter.value(identifier);
+                    jsonWriter.endObject(); // end properties
+                    jsonWriter.endObject(); // end crs
                 }
+            } catch (FactoryException e) {
+                throw (IOException) new IOException("Error looking up crs identifier").initCause(e);
             }
-
+            
             // Bounding box for featurecollection
             if (hasGeom && featureBounding) {
                 ReferencedEnvelope e = null;
