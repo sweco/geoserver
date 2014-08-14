@@ -25,9 +25,18 @@ import org.geoserver.rest.format.DataFormat;
 import org.geotools.data.DataAccess;
 import org.geotools.data.DataStore;
 import org.geotools.data.FeatureSource;
+import org.geotools.data.Transaction;
+import org.geotools.data.simple.SimpleFeatureSource;
+import org.geotools.data.store.ContentDataStore;
+import org.geotools.data.store.ContentEntry;
+import org.geotools.data.store.ContentFeatureSource;
+import org.geotools.data.store.ContentState;
 import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.opengis.feature.Feature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.FeatureType;
+import org.opengis.feature.type.Name;
 import org.restlet.Context;
 import org.restlet.data.Method;
 import org.restlet.data.Request;
@@ -133,15 +142,25 @@ public class FeatureTypeResource extends AbstractCatalogResource {
             boolean virtual = mdm != null && mdm.containsKey(FeatureTypeInfo.JDBC_VIRTUAL_TABLE);
 
             if(!virtual && !typeExists) {
-                gtds.createSchema(buildFeatureType(featureType));
-                // the attributes created might not match up 1-1 with the actual spec due to
-                // limitations of the data store, have it re-compute them
-                featureType.getAttributes().clear();
-                List<String> typeNames = Arrays.asList(gtds.getTypeNames());
-                // handle Oracle oddities
-                // TODO: use the incoming store capabilites API to better handle the name transformation
-                if(!typeNames.contains(typeName) && typeNames.contains(typeName.toUpperCase())) {
-                    featureType.setNativeName(featureType.getName().toLowerCase());
+                if( typeExists ){
+                    if( gtds instanceof ContentDataStore){
+                        // flush schema information to force refresh from database or header
+                        ContentDataStore contentDataStore = (ContentDataStore) gtds;
+                        ContentFeatureSource featureSource = contentDataStore.getFeatureSource(typeName,  Transaction.AUTO_COMMIT);
+                        featureSource.getState().flush(); // clear cached Feature type
+                    }                    
+                }
+                else {
+                    gtds.createSchema(buildFeatureType(featureType));
+                    // the attributes created might not match up 1-1 with the actual spec due to
+                    // limitations of the data store, have it re-compute them
+                    featureType.getAttributes().clear();
+                    List<String> typeNames = Arrays.asList(gtds.getTypeNames());
+                    // handle Oracle oddities
+                    // TODO: use the incoming store capabilites API to better handle the name transformation
+                    if(!typeNames.contains(typeName) && typeNames.contains(typeName.toUpperCase())) {
+                        featureType.setNativeName(featureType.getName().toLowerCase());
+                    }
                 }
             }
         }
@@ -297,6 +316,27 @@ public class FeatureTypeResource extends AbstractCatalogResource {
         if( siblings.size() == 0 ){
             // clean up cached DataAccess if no longer in use
             catalog.getResourcePool().clear(ds);
+        }
+        else {
+            boolean flush = false;
+            try {
+                DataAccess<?,?> dataStore = catalog.getResourcePool().getDataStore( ds );
+                if( dataStore instanceof ContentDataStore ){
+                    // ask JDBC DataStore to forget cached column information
+                    Name name = ft.getQualifiedNativeName();
+                    ContentDataStore contentDataStore = (ContentDataStore) dataStore;
+                    ContentFeatureSource featureSource = contentDataStore.getFeatureSource(name,Transaction.AUTO_COMMIT);
+                    featureSource.getState().flush();
+                    flush = true;
+                }
+            } catch( Exception e ) {
+                LOGGER.warning( "Unable to flush '" + ft.getQualifiedNativeName() );
+                LOGGER.log(Level.FINE, "", e );
+            }
+            if( !flush ){
+                 // Original heavy handed way to force "flush"? seems a bad idea
+                 catalog.getResourcePool().clear(ds);     
+            }
         }
         LOGGER.info( "DELETE feature type" + datastore + "," + featuretype );
     }
