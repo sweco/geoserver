@@ -62,12 +62,15 @@ import org.geotools.data.DataUtilities;
 import org.geotools.data.FeatureSource;
 import org.geotools.data.Join;
 import org.geotools.data.Repository;
+import org.geotools.data.Transaction;
 import org.geotools.data.ows.HTTPClient;
 import org.geotools.data.ows.Layer;
 import org.geotools.data.ows.MultithreadedHttpClient;
 import org.geotools.data.ows.SimpleHttpClient;
 import org.geotools.data.ows.WMSCapabilities;
 import org.geotools.data.simple.SimpleFeatureSource;
+import org.geotools.data.store.ContentDataStore;
+import org.geotools.data.store.ContentFeatureSource;
 import org.geotools.data.wms.WebMapServer;
 import org.geotools.factory.Hints;
 import org.geotools.feature.AttributeTypeBuilder;
@@ -91,6 +94,7 @@ import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.FeatureType;
 import org.opengis.feature.type.GeometryDescriptor;
+import org.opengis.feature.type.Name;
 import org.opengis.feature.type.PropertyDescriptor;
 import org.opengis.filter.Filter;
 import org.opengis.referencing.FactoryException;
@@ -1944,7 +1948,12 @@ public class ResourcePool {
         }
 
         public void handleRemoveEvent(CatalogRemoveEvent event) {
-            event.getSource().accept( this );
+            CatalogInfo source = event.getSource();
+            source.accept( this );
+            
+            if(source instanceof FeatureTypeInfo) {
+                flushDataStore((FeatureTypeInfo) source);
+            }
         }
 
         public void reloaded() {
@@ -1973,6 +1982,42 @@ public class ResourcePool {
         @Override
         public void visit(StyleInfo style) {
             clear(style);
+        }
+        
+        /**
+         * Flush the data store associated with a feature type in case the underlying schema has
+         * changed.
+         * @param ft
+         */
+        protected void flushDataStore(FeatureTypeInfo ft){
+            DataStoreInfo ds = ft.getStore();
+            
+            List<FeatureTypeInfo> siblings = catalog.getFeatureTypesByDataStore(ds);
+            if( siblings.size() == 0 ){
+                // clean up cached DataAccess if no longer in use
+                catalog.getResourcePool().clear(ds);
+            }
+            else {
+                boolean flush = false;
+                try {
+                    DataAccess<?,?> dataStore = catalog.getResourcePool().getDataStore( ds );
+                    if( dataStore instanceof ContentDataStore ){
+                        // ask JDBC DataStore to forget cached column information
+                        Name name = ft.getQualifiedNativeName();
+                        ContentDataStore contentDataStore = (ContentDataStore) dataStore;
+                        ContentFeatureSource featureSource = contentDataStore.getFeatureSource(name,Transaction.AUTO_COMMIT);
+                        featureSource.getState().flush();
+                        flush = true;
+                    }
+                } catch( Exception e ) {
+                    LOGGER.warning( "Unable to flush '" + ft.getQualifiedNativeName() );
+                    LOGGER.log(Level.FINE, "", e );
+                }
+                if( !flush ){
+                     // Original heavy handed way to force "flush"? seems a bad idea
+                     catalog.getResourcePool().clear(ds);     
+                }
+            }
         }
     }
     /**
