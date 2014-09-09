@@ -834,6 +834,18 @@ public class ResourcePool {
     }
     
     FeatureType getFeatureType( FeatureTypeInfo info, boolean handleProjectionPolicy ) throws IOException {
+        try {
+            return tryGetFeatureType( info, handleProjectionPolicy );
+        } catch (IOException ex) {
+            LOGGER.log(Level.WARNING, "Error while getting feature type, flushing cache and retrying: {0}", ex.getMessage());
+            LOGGER.log(Level.FINE, "", ex);
+            this.clear(info);
+            this.flushDataStore(info);
+            return tryGetFeatureType( info, handleProjectionPolicy );
+        }
+    }
+    
+    FeatureType tryGetFeatureType( FeatureTypeInfo info, boolean handleProjectionPolicy ) throws IOException {
         boolean cacheable = isCacheable(info);
         String key = getFeatureTypeInfoKey(info, handleProjectionPolicy);
         FeatureType ft = (FeatureType) featureTypeCache.get(key);
@@ -893,46 +905,8 @@ public class ResourcePool {
                     
                     // TODO: support reprojection for non-simple FeatureType
                     if (ft instanceof SimpleFeatureType) {
-                        SimpleFeatureType sft = (SimpleFeatureType) ft;
-                        //create the feature type so it lines up with the "declared" schema
-                        SimpleFeatureTypeBuilder tb = new SimpleFeatureTypeBuilder();
-                        tb.setName( info.getName() );
-                        tb.setNamespaceURI( info.getNamespace().getURI() );
-
-                        if ( info.getAttributes() == null || info.getAttributes().isEmpty() ) {
-                            //take this to mean just load all native
-                            for ( PropertyDescriptor pd : ft.getDescriptors() ) {
-                                if ( !( pd instanceof AttributeDescriptor ) ) {
-                                    continue;
-                                }
-                                
-                                AttributeDescriptor ad = (AttributeDescriptor) pd;
-                                if(handleProjectionPolicy) {
-                                    ad = handleDescriptor(ad, info);
-                                }
-                                tb.add( ad );
-                            }
-                        }
-                        else {
-                            //only load native attributes configured
-                            for ( AttributeTypeInfo att : info.getAttributes() ) {
-                                String attName = att.getName();
-                                
-                                //load the actual underlying attribute type
-                                PropertyDescriptor pd = ft.getDescriptor( attName );
-                                if ( pd == null || !( pd instanceof AttributeDescriptor) ) {
-                                    throw new IOException("the SimpleFeatureType " + info.getPrefixedName()
-                                            + " does not contains the configured attribute " + attName
-                                            + ". Check your schema configuration");
-                                }
-                            
-                                AttributeDescriptor ad = (AttributeDescriptor) pd;
-                                ad = handleDescriptor(ad, info);
-                                tb.add( (AttributeDescriptor) ad );
-                            }
-                        }
-                        ft = tb.buildFeatureType();
-                    } // end special case for SimpleFeatureType
+                        ft = getFeatureTypeWhenSimple(info, handleProjectionPolicy, ft);
+                    }
                     
                     if(cacheable) {
                         featureTypeCache.put(key, ft );
@@ -944,6 +918,50 @@ public class ResourcePool {
             }
         }
         
+        return ft;
+    }
+
+    protected FeatureType getFeatureTypeWhenSimple(FeatureTypeInfo info,
+            boolean handleProjectionPolicy, FeatureType ft) throws IOException {
+        SimpleFeatureType sft = (SimpleFeatureType) ft;
+        //create the feature type so it lines up with the "declared" schema
+        SimpleFeatureTypeBuilder tb = new SimpleFeatureTypeBuilder();
+        tb.setName( info.getName() );
+        tb.setNamespaceURI( info.getNamespace().getURI() );
+
+        if ( info.getAttributes() == null || info.getAttributes().isEmpty() ) {
+            //take this to mean just load all native
+            for ( PropertyDescriptor pd : ft.getDescriptors() ) {
+                if ( !( pd instanceof AttributeDescriptor ) ) {
+                    continue;
+                }
+                
+                AttributeDescriptor ad = (AttributeDescriptor) pd;
+                if(handleProjectionPolicy) {
+                    ad = handleDescriptor(ad, info);
+                }
+                tb.add( ad );
+            }
+        }
+        else {
+            //only load native attributes configured
+            for ( AttributeTypeInfo att : info.getAttributes() ) {
+                String attName = att.getName();
+                
+                //load the actual underlying attribute type
+                PropertyDescriptor pd = ft.getDescriptor( attName );
+                if ( pd == null || !( pd instanceof AttributeDescriptor) ) {
+                    throw new IOException("the SimpleFeatureType " + info.getPrefixedName()
+                            + " does not contains the configured attribute " + attName
+                            + ". Check your schema configuration");
+                }
+            
+                AttributeDescriptor ad = (AttributeDescriptor) pd;
+                ad = handleDescriptor(ad, info);
+                tb.add( (AttributeDescriptor) ad );
+            }
+        }
+        ft = tb.buildFeatureType();
         return ft;
     }
 
