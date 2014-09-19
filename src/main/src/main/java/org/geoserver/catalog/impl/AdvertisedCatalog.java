@@ -184,6 +184,10 @@ public class AdvertisedCatalog extends AbstractFilteredCatalog {
             return filter;
         }
 
+        if (!isOgcCapabilitiesRequest()) {
+            return filter;
+        }
+
         org.opengis.filter.expression.Function visible = new InternalVolatileFunction() {
             /**
              * Returns {@code false} if the catalog info shall be hidden, {@code true} otherwise.
