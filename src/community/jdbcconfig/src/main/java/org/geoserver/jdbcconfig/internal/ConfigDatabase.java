@@ -831,6 +831,7 @@ public class ConfigDatabase {
 
     private <T extends ServiceInfo> void resolveTransient(T real) {
         real = ModificationProxy.unwrap(real);
+        OwsUtils.resolveCollections(real);
         real.setGeoServer(getGeoServer());
     }
 
