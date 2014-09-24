@@ -2015,6 +2015,7 @@ public class ResourcePool {
             List<FeatureTypeInfo> siblings = catalog.getFeatureTypesByDataStore(ds);
             if( siblings.size() == 0 ){
                 // clean up cached DataAccess if no longer in use
+                LOGGER.log(Level.INFO, "Feature Type {0} cleared: Disposing DataStore {1} - {2}", new String[]{ft.getName(), ds.getName(), "Last Feature Type Disposed"});
                 catalog.getResourcePool().clear(ds);
             }
             else {
@@ -2034,8 +2035,11 @@ public class ResourcePool {
                     LOGGER.log(Level.FINE, "", e );
                 }
                 if( !flush ){
-                     // Original heavy handed way to force "flush"? seems a bad idea
-                     catalog.getResourcePool().clear(ds);     
+                    // Original heavy handed way to force "flush"? seems a bad idea
+                    LOGGER.log(Level.INFO, "Feature Type {0} cleared: Disposing DataStore {1} - {2}", new String[]{ft.getName(), ds.getName(), " Was unable to flush"});
+                    catalog.getResourcePool().clear(ds);     
+                } else {
+                    LOGGER.log(Level.INFO, "Feature Type {0} cleared: Flushed DataStore {1}", new String[]{ft.getName(), ds.getName()});
                 }
             }
         }
