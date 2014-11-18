@@ -2013,33 +2013,38 @@ public class ResourcePool {
         DataStoreInfo ds = ft.getStore();
         if( ds != null) {
             List<FeatureTypeInfo> siblings = catalog.getFeatureTypesByDataStore(ds);
-            if( siblings.size() == 0 ){
+            if( siblings.isEmpty() ){
                 // clean up cached DataAccess if no longer in use
                 LOGGER.log(Level.INFO, "Feature Type {0} cleared: Disposing DataStore {1} - {2}", new String[]{ft.getName(), ds.getName(), "Last Feature Type Disposed"});
-                catalog.getResourcePool().clear(ds);
-            }
-            else {
-                boolean flush = false;
+                clear(ds);
+            } else {
+                boolean flush = true;
                 try {
-                    DataAccess<?,?> dataStore = catalog.getResourcePool().getDataStore( ds );
-                    if( dataStore instanceof ContentDataStore ){
+                    DataAccess<?, ?> dataStore = getDataStore(ds);
+                    if (dataStore instanceof ContentDataStore) {
                         // ask JDBC DataStore to forget cached column information
-                        Name name = ft.getQualifiedNativeName();
-                        ContentDataStore contentDataStore = (ContentDataStore) dataStore;
-                        ContentFeatureSource featureSource = contentDataStore.getFeatureSource(name,Transaction.AUTO_COMMIT);
-                        featureSource.getState().flush();
-                        flush = true;
+                        String nativeName = ft.getNativeName();
+                        if (nativeName != null) {
+                            ContentDataStore contentDataStore = (ContentDataStore) dataStore;
+                            ContentFeatureSource featureSource;
+                            featureSource = contentDataStore.getFeatureSource(nativeName);
+                            featureSource.getState().flush();
+                            flush = false;
+                        }
                     }
-                } catch( Exception e ) {
-                    LOGGER.warning( "Unable to flush '" + ft.getQualifiedNativeName() );
-                    LOGGER.log(Level.FINE, "", e );
+                } catch (Exception e) {
+                    LOGGER.warning("Unable to flush '" + ft.getQualifiedNativeName());
+                    LOGGER.log(Level.WARNING, "", e);
                 }
-                if( !flush ){
+                if (flush) {
                     // Original heavy handed way to force "flush"? seems a bad idea
-                    LOGGER.log(Level.INFO, "Feature Type {0} cleared: Disposing DataStore {1} - {2}", new String[]{ft.getName(), ds.getName(), " Was unable to flush"});
-                    catalog.getResourcePool().clear(ds);     
+                    LOGGER.log(Level.INFO,
+                            "Feature Type {0} cleared: Disposing DataStore {1} - {2}",
+                            new String[] { ft.getName(), ds.getName(), " Was unable to flush" });
+                    clear(ds);
                 } else {
-                    LOGGER.log(Level.INFO, "Feature Type {0} cleared: Flushed DataStore {1}", new String[]{ft.getName(), ds.getName()});
+                    LOGGER.log(Level.INFO, "Feature Type {0} cleared: Flushed DataStore {1}",
+                            new String[] { ft.getName(), ds.getName() });
                 }
             }
         }
