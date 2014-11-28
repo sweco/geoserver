@@ -62,7 +62,6 @@ import org.geotools.data.DataUtilities;
 import org.geotools.data.FeatureSource;
 import org.geotools.data.Join;
 import org.geotools.data.Repository;
-import org.geotools.data.Transaction;
 import org.geotools.data.ows.HTTPClient;
 import org.geotools.data.ows.Layer;
 import org.geotools.data.ows.MultithreadedHttpClient;
@@ -71,6 +70,7 @@ import org.geotools.data.ows.WMSCapabilities;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.data.store.ContentDataStore;
 import org.geotools.data.store.ContentFeatureSource;
+import org.geotools.data.store.ContentState;
 import org.geotools.data.wms.WebMapServer;
 import org.geotools.factory.Hints;
 import org.geotools.feature.AttributeTypeBuilder;
@@ -94,7 +94,6 @@ import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.FeatureType;
 import org.opengis.feature.type.GeometryDescriptor;
-import org.opengis.feature.type.Name;
 import org.opengis.feature.type.PropertyDescriptor;
 import org.opengis.filter.Filter;
 import org.opengis.referencing.FactoryException;
@@ -836,7 +835,7 @@ public class ResourcePool {
     FeatureType getFeatureType( FeatureTypeInfo info, boolean handleProjectionPolicy ) throws IOException {
         try {
             return tryGetFeatureType( info, handleProjectionPolicy );
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Error while getting feature type, flushing cache and retrying: {0}", ex.getMessage());
             LOGGER.log(Level.FINE, "", ex);
             this.clear(info);
@@ -1795,8 +1794,12 @@ public class ResourcePool {
             String id = key.substring(0, key.indexOf(PROJECTION_POLICY_SEPARATOR));
         	FeatureTypeInfo info = catalog.getFeatureType(id);
             if(info != null){
-                LOGGER.info( "Disposing feature type '" + info.getName() + "'");
+                LOGGER.info( "Disposing feature type '" + info.getName() + "'/" + id);
                 fireDisposed(info, featureType);
+                if (null != featureTypeAttributeCache.remove(id)) {
+                    LOGGER.info("AttributeType cache cleared for feature type '" + info.getName()
+                            + "'/" + id + " as a side effect of its cache disposal");
+                }
             }
         }
     }
@@ -2005,51 +2008,76 @@ public class ResourcePool {
     }
     
     /**
-     * Flush the data store associated with a feature type in case the underlying schema has
-     * changed.
-     * @param ft
+     * Flush the feature type held by the data store associated with a FeatureTypeInfo to be safe
+     * in case the underlying schema has changed.
+     * 
+     * <p>
+     * Implementation note: so far this method only works with {@link ContentDataStore} instances
+     * (i.e. all JDBC ones and others, but not all). This is to avoid calling
+     * {@link DataStore#dispose()} as other threads may be using it and has proved to result in
+     * unpredictable errors. Instead, we're calling the datastore feature type's
+     * {@link ContentState#flush()} method which forces re-loading the native type when next used.
      */
     protected void flushDataStore(FeatureTypeInfo ft){
         DataStoreInfo ds = ft.getStore();
-        if( ds != null) {
-            List<FeatureTypeInfo> siblings = catalog.getFeatureTypesByDataStore(ds);
-            if( siblings.isEmpty() ){
-                // clean up cached DataAccess if no longer in use
-                LOGGER.log(Level.INFO, "Feature Type {0} cleared: Disposing DataStore {1} - {2}", new String[]{ft.getName(), ds.getName(), "Last Feature Type Disposed"});
-                clear(ds);
-            } else {
-                boolean flush = true;
+        if( ds == null) {
+            return;
+        }
+        if (!dataStoreCache.containsKey(ds.getId())) {
+            // don't bother if DataStore not cached
+            return;
+        }
+        DataAccess<?, ?> dataStore;
+        try {
+            dataStore = getDataStore(ds);
+        } catch (IOException e) {
+            LOGGER.warning("Unable to obtain data store for '" + ft.getQualifiedNativeName());
+            LOGGER.log(Level.WARNING, "", e);
+            return;
+        }
+        final int dsFtCount = countFeatureTypesOf(ds);
+        if (dsFtCount == 0) {
+            // clean up cached DataAccess if no longer in use
+            LOGGER.log(Level.INFO, "Feature Type {0} cleared: Disposing DataStore {1} - {2}",
+                    new String[] { ft.getName(), ds.getName(), "Last Feature Type Disposed" });
+            clear(ds);
+        } else {
+            if (dataStore instanceof ContentDataStore) {
+                ContentDataStore contentDataStore = (ContentDataStore) dataStore;
                 try {
-                    DataAccess<?, ?> dataStore = getDataStore(ds);
-                    if (dataStore instanceof ContentDataStore) {
-                        // ask JDBC DataStore to forget cached column information
-                        String nativeName = ft.getNativeName();
-                        if (nativeName != null) {
-                            ContentDataStore contentDataStore = (ContentDataStore) dataStore;
-                            ContentFeatureSource featureSource;
-                            featureSource = contentDataStore.getFeatureSource(nativeName);
-                            featureSource.getState().flush();
-                            flush = false;
-                        }
+                    // ask ContentDataStore to forget cached column information
+                    String nativeName = ft.getNativeName();
+                    if (nativeName != null) {
+                        flushState(contentDataStore, nativeName);
+                        LOGGER.log(Level.INFO, "Feature Type {0} cleared from ContentDataStore {1}",
+                                new String[] { ft.getName(), ds.getName() });
                     }
                 } catch (Exception e) {
                     LOGGER.warning("Unable to flush '" + ft.getQualifiedNativeName());
                     LOGGER.log(Level.WARNING, "", e);
                 }
-                if (flush) {
-                    // Original heavy handed way to force "flush"? seems a bad idea
-                    LOGGER.log(Level.INFO,
-                            "Feature Type {0} cleared: Disposing DataStore {1} - {2}",
-                            new String[] { ft.getName(), ds.getName(), " Was unable to flush" });
-                    clear(ds);
-                } else {
-                    LOGGER.log(Level.INFO, "Feature Type {0} cleared: Flushed DataStore {1}",
-                            new String[] { ft.getName(), ds.getName() });
-                }
+            }else{
+                LOGGER.log(
+                        Level.INFO,
+                        "Unable to clean up cached feature type {0} in data store {1}. Not a ContentDataStore",
+                        new String[] { ft.getName(), ds.getName() });
             }
         }
     }
     
+    private int countFeatureTypesOf(DataStoreInfo ds) {
+        Filter filter = Predicates.equal("store.id", ds.getId());
+        int dsTypeCount = catalog.count(FeatureTypeInfo.class, filter);
+        return dsTypeCount;
+    }
+
+    private void flushState(ContentDataStore contentDataStore, String nativeName)
+            throws IOException {
+        ContentFeatureSource featureSource;
+        featureSource = contentDataStore.getFeatureSource(nativeName);
+        featureSource.getState().flush();
+    }
+
     /**
      * Used to clean up any outstanding data store listeners.
      * <p>
