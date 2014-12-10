@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wcs.response;
@@ -12,6 +13,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collections;
 
 import javax.xml.transform.TransformerException;
 
@@ -22,15 +24,16 @@ import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.config.GeoServer;
 import org.geoserver.ows.Response;
 import org.geoserver.ows.URLMangler.URLType;
+import org.geoserver.platform.GeoServerResourceLoader;
 import org.geoserver.platform.Operation;
 import org.geoserver.platform.ServiceException;
+import org.geoserver.platform.resource.Resource;
 import org.geoserver.wcs.WCSInfo;
+import org.geoserver.wcs.responses.CoverageResponseDelegate;
+import org.geoserver.wcs.responses.CoverageResponseDelegateFinder;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.opengis.coverage.grid.GridCoverage;
-import org.vfny.geoserver.global.GeoserverDataDirectory;
 import org.vfny.geoserver.wcs.WcsException;
-import org.vfny.geoserver.wcs.responses.CoverageResponseDelegate;
-import org.vfny.geoserver.wcs.responses.CoverageResponseDelegateFactory;
 
 /**
  * Response object for the store=true path, that is, one that stores the coverage
@@ -41,11 +44,13 @@ public class WCSGetCoverageStoreResponse extends Response {
     
     GeoServer geoServer;
     Catalog catalog;
+    CoverageResponseDelegateFinder responseFactory;
     
-    public WCSGetCoverageStoreResponse(GeoServer gs) {
+    public WCSGetCoverageStoreResponse(GeoServer gs, CoverageResponseDelegateFinder responseFactory) {
         super(GridCoverage[].class);
         this.geoServer = gs;
         this.catalog = gs.getCatalog();
+        this.responseFactory = responseFactory;
     }
 
     @Override
@@ -71,8 +76,7 @@ public class WCSGetCoverageStoreResponse extends Response {
         // grab the delegate for coverage encoding
         GetCoverageType request = (GetCoverageType) operation.getParameters()[0];
         String outputFormat = request.getOutput().getFormat();
-        CoverageResponseDelegate delegate = CoverageResponseDelegateFactory
-                .encoderFor(outputFormat);
+        CoverageResponseDelegate delegate = responseFactory.encoderFor(outputFormat);
         if (delegate == null)
             throw new WcsException("Could not find encoder for output format " + outputFormat);
 
@@ -83,10 +87,13 @@ public class WCSGetCoverageStoreResponse extends Response {
         // write the coverage to temporary storage in the data dir
         File wcsStore = null;
         try {
-            File temp = GeoserverDataDirectory.findCreateConfigDir("temp");
-            wcsStore = new File(temp, "wcs");
-            if(!wcsStore.exists())
-                wcsStore.mkdir();
+            GeoServerResourceLoader loader = geoServer.getCatalog().getResourceLoader();
+            Resource wcs = loader.get("temp/wcs");
+            wcsStore = wcs.dir();
+//            File temp = GeoserverDataDirectory.findCreateConfigDir("temp");
+//            wcsStore = new File(temp, "wcs");
+//            if(!wcsStore.exists())
+//                wcsStore.mkdir();
         } catch(Exception e) {
             throw new WcsException("Could not create the temporary storage directory for WCS");
         }
@@ -96,7 +103,7 @@ public class WCSGetCoverageStoreResponse extends Response {
         File coverageFile = null;
         while(true) {
             // TODO: find a way to get good extensions
-            coverageFile = new File(wcsStore, coverageInfo.getName().replace(':', '_') + "_" + System.nanoTime() + "." + delegate.getFileExtension());
+            coverageFile = new File(wcsStore, coverageInfo.getName().replace(':', '_') + "_" + System.nanoTime() + "." + delegate.getFileExtension(outputFormat));
             if(!coverageFile.exists())
                 break;
         }
@@ -105,8 +112,7 @@ public class WCSGetCoverageStoreResponse extends Response {
         OutputStream os = null;
         try {
             os = new BufferedOutputStream(new FileOutputStream(coverageFile));
-            delegate.prepare(outputFormat, coverage);
-            delegate.encode(os);
+            delegate.encode(coverage, outputFormat,Collections.EMPTY_MAP, os);
             os.flush();
         } finally {
             if(os != null) os.close();

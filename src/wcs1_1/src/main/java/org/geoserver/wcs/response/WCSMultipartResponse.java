@@ -1,11 +1,14 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wcs.response;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collections;
+import java.util.HashMap;
 
 import javax.activation.DataHandler;
 import javax.mail.BodyPart;
@@ -23,11 +26,12 @@ import org.geoserver.ows.Response;
 import org.geoserver.platform.Operation;
 import org.geoserver.platform.ServiceException;
 import org.geoserver.wcs.response.CoveragesHandler.CoveragesData;
+import org.geoserver.wcs.responses.CoverageEncoder;
+import org.geoserver.wcs.responses.CoverageResponseDelegate;
+import org.geoserver.wcs.responses.CoverageResponseDelegateFinder;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.opengis.coverage.grid.GridCoverage;
 import org.vfny.geoserver.wcs.WcsException;
-import org.vfny.geoserver.wcs.responses.CoverageResponseDelegate;
-import org.vfny.geoserver.wcs.responses.CoverageResponseDelegateFactory;
 
 public class WCSMultipartResponse extends Response {
 
@@ -35,33 +39,31 @@ public class WCSMultipartResponse extends Response {
 
     Catalog catalog;
 
-    public WCSMultipartResponse(Catalog catalog) {
+    CoverageResponseDelegateFinder responseFactory;
+
+    public WCSMultipartResponse(Catalog catalog, CoverageResponseDelegateFinder responseFactory) {
         super(GridCoverage[].class);
         this.catalog = catalog;
         this.multipart = new MimeMultipart();
+        this.responseFactory = responseFactory;
     }
 
     @Override
     public String getMimeType(Object value, Operation operation) throws ServiceException {
         // javamail outputs multipart/mixed, but in our case we're producing multipart/related
-        return multipart.getContentType().replace("mixed", "related");
+        return multipart.getContentType().replace("mixed", "related").replace("\n", "").replace("\r", "");
     }
 
     @Override
-    public String[][] getHeaders(Object value, Operation operation) throws ServiceException {
+    public String getPreferredDisposition(Object value, Operation operation) {
+        return DISPOSITION_ATTACH;
+    }
+    
+    public String getAttachmentFileName(Object value, Operation operation) {
         final GetCoverageType request = (GetCoverageType) operation.getParameters()[0];
         final String identifier = request.getIdentifier().getValue();
-        return new String[][] { { "Content-Disposition",
-                "attachment;filename=\"" + identifier.replace(':', '_') + ".eml\"" } };
-    }
-
-    /**
-     * Disable Dispatcher managed content-disposition handling - not sure if quoted
-     * filenames (see getHeaders above) were necessary for something.
-     */
-    @Override
-    public String getAttachmentFileName(Object value, Operation operation) {
-        return null;
+        return identifier.replace(':', '_') + ".eml";
+        
     }
     
     @Override
@@ -82,8 +84,7 @@ public class WCSMultipartResponse extends Response {
         // grab the delegate for coverage encoding
         GetCoverageType request = (GetCoverageType) operation.getParameters()[0];
         String outputFormat = request.getOutput().getFormat();
-        CoverageResponseDelegate delegate = CoverageResponseDelegateFactory
-                .encoderFor(outputFormat);
+        CoverageResponseDelegate delegate = responseFactory.encoderFor(outputFormat);
         if (delegate == null)
             throw new WcsException("Could not find encoder for output format " + outputFormat);
 
@@ -98,17 +99,17 @@ public class WCSMultipartResponse extends Response {
             // the data handlers kills some of them)
             BodyPart coveragesPart = new MimeBodyPart();
             final CoveragesData coveragesData = new CoveragesData(coverageInfo, request);
-            coveragesPart.setDataHandler(new DataHandler(coveragesData, "geoserver/coverages"));
+            coveragesPart.setDataHandler(new DataHandler(coveragesData, "geoserver/coverages11"));
             coveragesPart.setHeader("Content-ID", "<urn:ogc:wcs:1.1:coverages>");
             coveragesPart.setHeader("Content-Type", "text/xml");
             multipart.addBodyPart(coveragesPart);
 
             // the actual coverage
             BodyPart coveragePart = new MimeBodyPart();
-            delegate.prepare(outputFormat, coverage);
-            coveragePart.setDataHandler(new DataHandler(delegate, "geoserver/coverageDelegate"));
+            CoverageEncoder encoder = new CoverageEncoder(delegate, coverage, outputFormat, new HashMap<String, String>());
+            coveragePart.setDataHandler(new DataHandler(encoder, "geoserver/coverageDelegate"));
             coveragePart.setHeader("Content-ID", "<theCoverage>");
-            coveragePart.setHeader("Content-Type", delegate.getContentType());
+            coveragePart.setHeader("Content-Type", delegate.getMimeType(outputFormat));
             coveragePart.setHeader("Content-Transfer-Encoding", "base64");
             multipart.addBodyPart(coveragePart);
 

@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wms.decoration;
 
 import java.awt.BasicStroke;
@@ -85,7 +90,7 @@ public class TextDecoration implements MapDecoration {
         }
         if (options.get("font-color") != null) {
             try {
-                this.fontColor = LegendDecoration.parseColor(options.get("font-color"));
+                this.fontColor = MapDecorationLayout.parseColor(options.get("font-color"));
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "'font-color' must be a color in #RRGGBB[AA] format.", e);
             }
@@ -103,7 +108,7 @@ public class TextDecoration implements MapDecoration {
         }
         if (options.get("halo-color") != null) {
             try {
-                this.haloColor = LegendDecoration.parseColor(options.get("halo-color"));
+                this.haloColor = MapDecorationLayout.parseColor(options.get("halo-color"));
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "'halo-color' must be a color in #RRGGBB[AA] format.", e);
             }

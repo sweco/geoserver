@@ -1,12 +1,15 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog.rest;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 
 import org.geoserver.catalog.AttributeTypeInfo;
@@ -17,24 +20,32 @@ import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.MetadataMap;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.NamespaceInfo;
-import org.geoserver.catalog.event.CatalogListener;
 import org.geoserver.config.util.XStreamPersister;
 import org.geoserver.rest.RestletException;
 import org.geoserver.rest.format.DataFormat;
 import org.geotools.data.DataAccess;
 import org.geotools.data.DataStore;
 import org.geotools.data.FeatureSource;
+import org.geotools.data.Transaction;
+import org.geotools.data.simple.SimpleFeatureSource;
+import org.geotools.data.store.ContentDataStore;
+import org.geotools.data.store.ContentEntry;
+import org.geotools.data.store.ContentFeatureSource;
+import org.geotools.data.store.ContentState;
 import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.opengis.feature.Feature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.FeatureType;
+import org.opengis.feature.type.Name;
 import org.restlet.Context;
+import org.restlet.data.Method;
 import org.restlet.data.Request;
 import org.restlet.data.Response;
 import org.restlet.data.Status;
 
 import com.thoughtworks.xstream.converters.MarshallingContext;
 import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
-import com.vividsolutions.jts.geom.Geometry;
 
 public class FeatureTypeResource extends AbstractCatalogResource {
 
@@ -53,21 +64,26 @@ public class FeatureTypeResource extends AbstractCatalogResource {
         String datastore = getAttribute( "datastore");
         String featureType = getAttribute( "featuretype" );
 
-        if ( datastore == null ) {
+        FeatureTypeInfo ftInfo;
+        
+        if (datastore == null) {
             LOGGER.fine( "GET feature type" + workspace + "," + featureType );
             
             //grab the corresponding namespace for this workspace
             NamespaceInfo ns = catalog.getNamespaceByPrefix( workspace );
             if ( ns != null ) {
-                return catalog.getFeatureTypeByName(ns,featureType);
+                ftInfo = catalog.getFeatureTypeByName(ns,featureType);
+            } else {
+                String message = "No feature found in workspace '" + workspace
+                        + "' with name '" + featureType + "'";
+                throw new RestletException(message, Status.CLIENT_ERROR_NOT_FOUND);
             }
-
-            throw new RestletException( "", Status.CLIENT_ERROR_NOT_FOUND );
+        } else { // datastore != null
+            LOGGER.fine("GET feature type" + datastore + "," + featureType);
+            DataStoreInfo dsInfo = catalog.getDataStoreByName(workspace, datastore);
+            ftInfo = catalog.getFeatureTypeByDataStore(dsInfo, featureType);
         }
-
-        LOGGER.fine( "GET feature type" + datastore + "," + featureType );
-        DataStoreInfo ds = catalog.getDataStoreByName(workspace, datastore);
-        return catalog.getFeatureTypeByDataStore( ds, featureType );
+        return ftInfo;
     }
 
     @Override
@@ -176,6 +192,7 @@ public class FeatureTypeResource extends AbstractCatalogResource {
         }
         
         featureType.setEnabled(true);
+        catalog.validate(featureType, true).throwIfInvalid();
         catalog.add( featureType );
         
         //create a layer for the feature type
@@ -225,20 +242,34 @@ public class FeatureTypeResource extends AbstractCatalogResource {
 
     @Override
     protected void handleObjectPut(Object object) throws Exception {
-        FeatureTypeInfo ft = (FeatureTypeInfo) object;
+        FeatureTypeInfo featureTypeUpdate = (FeatureTypeInfo) object;
         
         String workspace = getAttribute("workspace");
         String datastore = getAttribute("datastore");
         String featuretype = getAttribute("featuretype");
         
         DataStoreInfo ds = catalog.getDataStoreByName(workspace, datastore);
-        FeatureTypeInfo original = catalog.getFeatureTypeByDataStore( ds,  featuretype );
-        new CatalogBuilder(catalog).updateFeatureType(original,ft);
-        catalog.save( original );
+        FeatureTypeInfo featureTypeInfo = catalog.getFeatureTypeByDataStore( ds,  featuretype );
+        Map<String, Serializable> parametersCheck = featureTypeInfo.getStore().getConnectionParameters();
         
-        clear(original);
+        CatalogBuilder helper = new CatalogBuilder(catalog);
+        helper.updateFeatureType(featureTypeInfo,featureTypeUpdate);
+        calculateOptionalFields(featureTypeUpdate, featureTypeInfo);
+        catalog.validate(featureTypeInfo, false).throwIfInvalid();
+        catalog.save( featureTypeInfo );
+        catalog.getResourcePool().clear(featureTypeInfo);
         
-        LOGGER.info( "PUT feature type" + datastore + "," + featuretype );
+        Map<String, Serializable> parameters = featureTypeInfo.getStore().getConnectionParameters();
+        MetadataMap mdm = featureTypeInfo.getMetadata();
+        boolean virtual = mdm != null && mdm.containsKey(FeatureTypeInfo.JDBC_VIRTUAL_TABLE);
+        
+        if( !virtual && parameters.equals(parametersCheck)){
+            LOGGER.info( "PUT FeatureType" + datastore + "," + featuretype + " updated metadata only");
+        }
+        else {
+            LOGGER.info( "PUT featureType" + datastore + "," + featuretype + " updated metadata and data access" );
+            catalog.getResourcePool().clear(featureTypeInfo.getStore());
+        }
     }
     
     @Override
@@ -271,22 +302,46 @@ public class FeatureTypeResource extends AbstractCatalogResource {
         }
         
         catalog.remove( ft );
-        clear(ft);
         
+        // clear from resource pool
+        catalog.getResourcePool().clear(ft);        
+        List<FeatureTypeInfo> siblings = catalog.getFeatureTypesByDataStore(ds);
+        if( siblings.size() == 0 ){
+            // clean up cached DataAccess if no longer in use
+            catalog.getResourcePool().clear(ds);
+        }
+        else {
+            boolean flush = false;
+            try {
+                DataAccess<?,?> dataStore = catalog.getResourcePool().getDataStore( ds );
+                if( dataStore instanceof ContentDataStore ){
+                    // ask JDBC DataStore to forget cached column information
+                    Name name = ft.getQualifiedNativeName();
+                    ContentDataStore contentDataStore = (ContentDataStore) dataStore;
+                    ContentFeatureSource featureSource = contentDataStore.getFeatureSource(name,Transaction.AUTO_COMMIT);
+                    featureSource.getState().flush();
+                    flush = true;
+                }
+            } catch( Exception e ) {
+                LOGGER.warning( "Unable to flush '" + ft.getQualifiedNativeName() );
+                LOGGER.log(Level.FINE, "", e );
+            }
+            if( !flush ){
+                 // Original heavy handed way to force "flush"? seems a bad idea
+                 catalog.getResourcePool().clear(ds);     
+            }
+        }
         LOGGER.info( "DELETE feature type" + datastore + "," + featuretype );
-    }
-    
-    void clear(FeatureTypeInfo info) {
-        catalog.getResourcePool().clear(info);
-        catalog.getResourcePool().clear(info.getStore());
     }
 
     @Override
     protected void configurePersister(XStreamPersister persister, DataFormat format) {
-        persister.setHideFeatureTypeAttributes();
+        if(getRequest().getMethod() == Method.GET) {
+            persister.setHideFeatureTypeAttributes();
+        }
         persister.setCallback( new XStreamPersister.Callback() {
             @Override
-            protected void postEncodeReference(Object obj, String ref,
+            protected void postEncodeReference(Object obj, String ref, String prefix,
                     HierarchicalStreamWriter writer, MarshallingContext context) {
                 if ( obj instanceof NamespaceInfo ) {
                     NamespaceInfo ns = (NamespaceInfo) obj;

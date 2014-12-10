@@ -3,7 +3,9 @@
 Community
 =========
 
-This section is devoted to GeoServer community modules. Community modules are considered "pending" in that they are not officially part of the GeoServer releases. They are however built along with the `nightly builds <http://gridlock.opengeo.org/geoserver/>`_, so you can download and play with them.
+This section is devoted to GeoServer community modules. Community modules are considered "pending" in that they are not
+officially part of the GeoServer releases. They are however built along with the
+`nightly builds <http://ares.boundlessgeo.com/geoserver/>`_, so you can download and play with them.
 
 .. warning::
 
@@ -11,15 +13,23 @@ This section is devoted to GeoServer community modules. Community modules are co
 
 
 .. toctree::
-   :maxdepth: 1 
+   :maxdepth: 1
 
-   controlflow/index
-   css/index
-   dxf/index
+   authkey/index
    dds/index
-   inspire/index
-   monitoring/index
-   printing/index
+   netcdf/netcdf
    python/index
+   scripting/index
    spatialite/index
-   teradata/index
+   netcdf-out/index
+   colormap/index
+   jdbcconfig/index
+   importer/index
+   mbtiles/index
+   geopkg/index
+   grib/grib
+   rest/index
+   pgraster/pgraster
+   wps-download/index
+   jms-cluster/index
+   solr/index

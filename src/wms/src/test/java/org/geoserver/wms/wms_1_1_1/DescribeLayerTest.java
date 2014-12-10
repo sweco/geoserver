@@ -1,37 +1,40 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.wms_1_1_1;
 
-import java.util.logging.Level;
+import static org.junit.Assert.*;
 
-import junit.framework.Test;
+import java.util.logging.Level;
 
 import org.geoserver.config.GeoServerInfo;
 import org.geoserver.data.test.MockData;
+import org.geoserver.data.test.SystemTestData;
 import org.geoserver.wms.WMSTestSupport;
 import org.geotools.util.logging.Logging;
+import org.junit.Test;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 public class DescribeLayerTest extends WMSTestSupport {
     
-    /**
-     * This is a READ ONLY TEST so we can use one time setup
-     */
-    public static Test suite() {
-        return new OneTimeTestSetup(new DescribeLayerTest());
-    }
+ 
     
     @Override
-    protected void oneTimeSetUp() throws Exception {
-        super.oneTimeSetUp();
+    protected void onSetUp(SystemTestData testData) throws Exception {
+        super.onSetUp(testData);
+        
         Logging.getLogger("org.geoserver.ows").setLevel(Level.OFF);
         GeoServerInfo global = getGeoServer().getGlobal();
-        global.setProxyBaseUrl("src/test/resources/geoserver");
+        global.getSettings().setProxyBaseUrl("src/test/resources/geoserver");
         getGeoServer().save(global);
+        
     }
-
+    
+  
+    @Test
     public void testDescribeLayerVersion111() throws Exception {
         String layer = MockData.FORESTS.getPrefix() + ":" + MockData.FORESTS.getLocalPart();
         String request = "wms?service=wms&version=1.1.1&request=DescribeLayer&layers=" + layer;
@@ -41,6 +44,7 @@ public class DescribeLayerTest extends WMSTestSupport {
         assertEquals("1.1.1", dom.getDocumentElement().getAttributes().getNamedItem("version").getNodeValue());
     }
     
+//    @Test
 //    public void testDescribeLayerVersion110() throws Exception {
 //        String layer = MockData.FORESTS.getPrefix() + ":" + MockData.FORESTS.getLocalPart();
 //        String request = "wms?service=wms&version=1.1.0&request=DescribeLayer&layers=" + layer;
@@ -48,6 +52,7 @@ public class DescribeLayerTest extends WMSTestSupport {
 //        assertEquals("1.1.0", dom.getDocumentElement().getAttributes().getNamedItem("version").getNodeValue());
 //    }
     
+    @Test 
     public void testWorkspaceQualified() throws Exception {
         Document dom = getAsDOM("cite/wms?service=wms&version=1.1.1&request=DescribeLayer" +
             "&layers=PrimitiveGeoFeature", true);
@@ -55,7 +60,11 @@ public class DescribeLayerTest extends WMSTestSupport {
         
         dom = getAsDOM("sf/wms?service=wms&version=1.1.1&request=DescribeLayer" +
                 "&layers=PrimitiveGeoFeature", true);
+        print(dom);
         assertEquals("WMS_DescribeLayerResponse", dom.getDocumentElement().getNodeName());
-        
+
+        Element e = (Element) dom.getElementsByTagName("LayerDescription").item(0);
+        String attribute = e.getAttribute("owsURL");
+        assertTrue(attribute.contains("sf/wfs"));
     }
 }

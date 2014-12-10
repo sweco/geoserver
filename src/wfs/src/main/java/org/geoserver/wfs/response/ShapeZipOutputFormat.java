@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.response;
@@ -46,7 +47,8 @@ import org.geoserver.data.util.IOUtils;
 import org.geoserver.feature.RetypingFeatureCollection;
 import org.geoserver.ows.Dispatcher;
 import org.geoserver.ows.Request;
-import org.geoserver.ows.util.OwsUtils;
+import org.geoserver.ows.URLMangler.URLType;
+import org.geoserver.ows.util.ResponseUtils;
 import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.platform.GeoServerResourceLoader;
 import org.geoserver.platform.Operation;
@@ -296,8 +298,14 @@ public class ShapeZipOutputFormat extends WFSGetFeatureOutputFormat implements A
         try {
             if(request.isGet()) {
                 final HttpServletRequest httpRequest = request.getHttpRequest();
-                String url = httpRequest.getRequestURL().append("?").append(httpRequest.getQueryString()).toString();
-                FileUtils.writeStringToFile(target, url);
+                String baseUrl = ResponseUtils.baseURL(httpRequest);
+                String path = request.getPath();
+                //encode proxy url if existing
+                String mangledUrl = ResponseUtils.buildURL(baseUrl, path, null, URLType.SERVICE);
+                StringBuilder url = new StringBuilder();
+                String parameters = httpRequest.getQueryString();
+				url.append(mangledUrl).append("?").append(parameters);
+                FileUtils.writeStringToFile(target, url.toString());
             } else {
                 org.geotools.xml.Configuration cfg = null;
                 QName elementName = null;
@@ -467,7 +475,14 @@ public class ShapeZipOutputFormat extends WFSGetFeatureOutputFormat implements A
 
         if (file != null && file.exists()) {
             Properties properties = new Properties();
-            properties.load(new FileInputStream(file));
+            FileInputStream fis = null;
+            try {
+            	fis = new FileInputStream(file);
+            	properties.load(fis);
+            } finally {
+            	org.apache.commons.io.IOUtils.closeQuietly(fis);
+            }
+			
 
             String data = (String) properties.get(epsgCode.toString());
 
@@ -764,7 +779,7 @@ public class ShapeZipOutputFormat extends WFSGetFeatureOutputFormat implements A
         // handle shapefile encoding
         // and dump the charset into a .cst file, for debugging and control purposes
         // (.cst is not a standard extension)
-        sfds.setStringCharset(charset);
+        sfds.setCharset(charset);
         File charsetFile = new File(tempDir, schema.getTypeName()+ ".cst");
         PrintWriter pw = null;
         try {

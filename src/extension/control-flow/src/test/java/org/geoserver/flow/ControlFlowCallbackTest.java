@@ -1,22 +1,31 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.flow;
+
+import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.geoserver.ows.HttpErrorCodeException;
 import org.geoserver.ows.Request;
+import org.junit.Test;
 
-public class ControlFlowCallbackTest extends TestCase {
+import com.mockrunner.mock.web.MockHttpServletResponse;
 
+public class ControlFlowCallbackTest {
+
+    @Test
     public void testBasicFunctionality() {
         ControlFlowCallback callback = new ControlFlowCallback();
         TestingConfigurator tc = new TestingConfigurator();
         CountingController controller = new CountingController(1, 0);
         tc.controllers.add(controller);
-        callback.configurator = tc;
+        callback.provider = new DefaultFlowControllerProvider(tc);
         
         callback.operationDispatched(null, null);
         assertEquals(1, controller.requestIncomingCalls);
@@ -27,6 +36,7 @@ public class ControlFlowCallbackTest extends TestCase {
         assertEquals(1, controller.requestCompleteCalls);
     }
     
+    @Test
     public void testTimeout() {
         ControlFlowCallback callback = new ControlFlowCallback();
         TestingConfigurator tc = new TestingConfigurator();
@@ -35,7 +45,7 @@ public class ControlFlowCallbackTest extends TestCase {
         CountingController c2 = new CountingController(1, 200);
         tc.controllers.add(c1);
         tc.controllers.add(c2);
-        callback.configurator = tc;
+        callback.provider = new DefaultFlowControllerProvider(tc);
         
         try {
             callback.operationDispatched(null, null);
@@ -49,6 +59,37 @@ public class ControlFlowCallbackTest extends TestCase {
         assertEquals(0, c1.requestCompleteCalls);
         callback.finished(null);
     }
+    
+    @Test
+    public void testDelayHeader() {
+        ControlFlowCallback callback = new ControlFlowCallback();
+        TestingConfigurator tc = new TestingConfigurator();
+        tc.timeout = Integer.MAX_VALUE;
+        CountingController cc = new CountingController(2, 50);
+        tc.controllers.add(cc);
+        callback.provider = new DefaultFlowControllerProvider(tc);
+
+        Request request = new Request();
+        MockHttpServletResponse httpResponse = new MockHttpServletResponse();
+        request.setHttpResponse(httpResponse);
+
+        callback.operationDispatched(request, null);
+        callback.finished(null);
+
+        String delayHeader = httpResponse.getHeader(ControlFlowCallback.X_RATELIMIT_DELAY);
+        assertNotNull(delayHeader);
+        long delay = Long.parseLong(delayHeader);
+        assertTrue("Delay should be greater than 50 " + delay, delay >= 50);
+    }
+
+    @Test
+    public void testFailBeforeOperationDispatch() {
+        ControlFlowCallback callback = new ControlFlowCallback();
+        callback.init(null);
+        callback.finished(null);
+        assertEquals(0, callback.getRunningRequests());
+        assertEquals(0, callback.getBlockedRequests());
+    }
 
     /**
      * A wide open configurator to be used for testing
@@ -59,6 +100,7 @@ public class ControlFlowCallbackTest extends TestCase {
         boolean stale = true;
 
         public Collection<FlowController> buildFlowControllers() throws Exception {
+            stale = false;
             return controllers;
         }
 
@@ -67,11 +109,7 @@ public class ControlFlowCallbackTest extends TestCase {
         }
 
         public boolean isStale() {
-            if(stale) {
-                stale = false;
-                return true;
-            }
-            return false;
+            return stale;
         }
 
     }

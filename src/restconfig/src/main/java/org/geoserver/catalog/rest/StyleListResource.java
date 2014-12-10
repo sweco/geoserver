@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog.rest;
@@ -7,6 +8,7 @@ package org.geoserver.catalog.rest;
 import java.util.Collection;
 
 import org.geoserver.catalog.Catalog;
+import org.geoserver.catalog.CatalogFacade;
 import org.geoserver.catalog.StyleInfo;
 import org.restlet.Context;
 import org.restlet.data.Request;
@@ -22,14 +24,21 @@ public class StyleListResource extends AbstractCatalogListResource {
 
     @Override
     protected Collection handleListGet() throws Exception {
+        String workspace = getAttribute("workspace");
         String layer = getAttribute("layer");
         if ( layer != null ) {
             LOGGER.fine( "GET styles for layer " + layer );
             return catalog.getLayerByName( layer ).getStyles();
         }
-        
+        else if (workspace != null) {
+            LOGGER.fine( "GET styles for workspace " + workspace );
+            return catalog.getStylesByWorkspace(workspace);
+        }
         LOGGER.fine( "GET styles" );
-        return catalog.getStyles();
+        //JD:NO_WORKSPACE here is a pretty big hack... figure out how to expose global layer groups
+        // through the catalog api in a consistent way
+        return catalog.getStylesByWorkspace(CatalogFacade.NO_WORKSPACE);
+        //return catalog.getStyles();
     }
 
 }

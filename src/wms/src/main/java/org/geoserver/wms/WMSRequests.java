@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
@@ -8,19 +9,22 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLEncoder;
+import java.net.URLDecoder;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.geoserver.config.GeoServer;
+import org.geoserver.ows.KvpParser;
 import org.geoserver.ows.URLMangler.URLType;
 import org.geoserver.ows.util.KvpUtils;
 import org.geoserver.ows.util.ResponseUtils;
-import org.geoserver.platform.ServiceException;
+import org.geoserver.platform.GeoServerExtensions;
 import org.geotools.map.Layer;
+import org.geotools.map.MapLayer;
 import org.geotools.styling.Style;
 import org.vfny.geoserver.util.Requests;
 
@@ -30,6 +34,7 @@ import com.vividsolutions.jts.geom.Envelope;
  * Utility class for creating wms requests.
  * 
  * @author Justin Deoliveira, The Open Planning Project, jdeolive@openplans.org
+ * @author Carlo Cancellieri - Geo-Solutions SAS
  * @see Requests
  */
 public class WMSRequests {
@@ -156,7 +161,7 @@ public class WMSRequests {
         String layerName = layer != null ? layer.getTitle() : null;
         String style = layer != null ? layer.getStyle().getName() : null;
 
-        HashMap<String,String> params = getGetMapParams(req, layerName, layerIndex, style, bbox, kvp);
+        LinkedHashMap<String,String> params = getGetMapParams(req, layerName, layerIndex, style, bbox, kvp);
         return ResponseUtils.buildURL(req.getBaseUrl(), "wms", params, URLType.SERVICE);
     }
 
@@ -208,7 +213,7 @@ public class WMSRequests {
      * 
      * @return The full url for a getMap request.
      */
-    public static String getGetLegendGraphicUrl(WMSRequest req, Layer layer, String[] kvp) {
+    public static String getGetLegendGraphicUrl(WMSRequest req, Layer[] layers, String[] kvp) {
         // parameters
         HashMap<String,String> params = new HashMap<String,String>();
 
@@ -216,8 +221,8 @@ public class WMSRequests {
         params.put("request", "GetLegendGraphic");
         params.put("version", "1.1.1");
         params.put("format", "image/png");
-        params.put("layer", layer.getTitle());
-        params.put("style", layer.getStyle().getName());
+        params.put("layer", getLayerTitles(layers));
+        params.put("style", getLayerStyles(layers));
         params.put("height", "20");
         params.put("width", "20");
 
@@ -229,14 +234,33 @@ public class WMSRequests {
         return ResponseUtils.buildURL(req.getBaseUrl(), "wms", params, URLType.SERVICE);
     }
 
+    private static String getLayerTitles(Layer[] layers) {
+        StringBuilder sb = new StringBuilder();
+        for (Layer layer : layers) {
+            if(layer != null && layer.getTitle() != null) {
+                sb.append(layer.getTitle());  
+            }
+            sb.append(",");
+        }
+        return sb.substring(0, sb.length() - 1);
+    }
+    
+    private static String getLayerStyles(Layer[] layers) {
+        StringBuilder sb = new StringBuilder();
+        for (Layer layer : layers) {
+            sb.append(layer.getStyle().getName()).append(",");
+        }
+        return sb.substring(0, sb.length() - 1);
+    }
+
     /**
      * Helper method for encoding GetMap request parameters.
      * 
      */
-    static HashMap<String,String> getGetMapParams(GetMapRequest req, String layer, int layerIndex,
+    static LinkedHashMap<String,String> getGetMapParams(GetMapRequest req, String layer, int layerIndex,
             String style, Envelope bbox, String[] kvp) {
         // parameters
-        HashMap<String,String> params = new HashMap<String,String>();
+        LinkedHashMap<String,String> params = new LinkedHashMap<String,String>();
 
         params.put("service", "wms");
         params.put("request", "GetMap");
@@ -323,6 +347,15 @@ public class WMSRequests {
                 // semantics of feature id slightly different, replicate entire value
                 params.put("featureid", req.getRawKvp().get("featureid"));
             }
+            // Jira: #GEOS-6411: adding time and elevation support in case of a timeserie layer
+            if (req.getRawKvp().get("time") != null) {
+              // semantics of feature id slightly different, replicate entire value
+              params.put("time", req.getRawKvp().get("time"));
+            } 
+            if (req.getRawKvp().get("elevation") != null) {
+              // semantics of feature id slightly different, replicate entire value
+              params.put("elevation", req.getRawKvp().get("elevation"));
+            }
 
         } else {
             // include all
@@ -360,6 +393,54 @@ public class WMSRequests {
         if (req.getViewParams() != null && !req.getViewParams().isEmpty()) {
             params.put("viewParams", encodeFormatOptions(req.getViewParams()));
         }
+        
+        Map<String,String> kvpMap=req.getRawKvp();
+        String propertyName=kvpMap.get("propertyName");
+        if (propertyName != null && !propertyName.isEmpty()) {
+            params.put("propertyName", propertyName);
+        }
+        
+        if (req.getSld() != null) {
+            // the request encoder will url-encode the url, if it has already url encoded
+            // chars, the will be encoded twice
+            try {
+                String sld = URLDecoder.decode(req.getSld().toExternalForm(), "UTF-8");
+                params.put("sld", sld);
+            } catch (UnsupportedEncodingException e) {
+                // this should really never happen
+                throw new RuntimeException(e);
+            }
+        }
+        
+        if (req.getSldBody() != null) {
+            params.put("sld_body", req.getSldBody());
+        }
+        
+        if (req.getEnv() != null && !req.getEnv().isEmpty()) {
+            params.put("env", encodeFormatOptions(req.getEnv()));
+        }
+        
+        String tilesOrigin=kvpMap.get("tilesorigin");
+        if (tilesOrigin != null && !tilesOrigin.isEmpty()) {
+            params.put("tilesorigin", tilesOrigin);
+        }
+        
+        if (req.isTiled()) {
+            params.put("tiled", req.isTiled()?"true":"false");
+        }
+        
+        String palette=kvpMap.get("palette");
+        if (palette!= null && !palette.isEmpty()) {
+            params.put("palette", palette);
+        }
+
+        if (req.getBuffer()>0){
+            params.put("buffer", Integer.toString(req.getBuffer()));
+        }
+        
+        if (Double.compare(req.getAngle(),0.0)!=0){
+            params.put("angle", Double.toString(req.getAngle()));
+        }
 
         // overrides / additions
         for (int i = 0; (kvp != null) && (i < kvp.length); i += 2) {
@@ -367,6 +448,43 @@ public class WMSRequests {
         }
 
         return params;
+    }
+
+
+    /**
+     * Copy the Entry matching the key from the kvp map and put it into the formatOptions map. If a parameter is already present in formatOption map
+     * its value will be preserved.
+     * 
+     * @param kvp
+     * @param formatOptions
+     * @param key the key to parse
+     * @throws Exception - In the event of an unsuccesful parse.
+     */
+    public static void mergeEntry(Map<String, String> kvp, Map<String, Object> formatOptions,
+            final String key) throws Exception {
+        // look up parser objects
+        List<KvpParser> parsers = GeoServerExtensions.extensions(KvpParser.class);
+
+        // strip out parsers which do not match current service/request/version
+        String service = KvpUtils.getSingleValue(kvp, "service");
+        String version = KvpUtils.getSingleValue(kvp, "version");
+        String request = KvpUtils.getSingleValue(kvp, "request");
+
+        KvpUtils.purgeParsers(parsers, service, version, request);
+
+        String val = null;
+        if ((val = kvp.get(key)) != null) {
+            Object foValue = formatOptions.get(key);
+            // if not found in format option
+            if (foValue == null) {
+                Object parsed = KvpUtils.parseKey(key, val, service, request, version, parsers);
+                if (parsed != null) {
+                    formatOptions.put(key, parsed);
+                } else {
+                    formatOptions.put(key, val);
+                }
+            }
+        }
     }
 
     /**
@@ -411,7 +529,9 @@ public class WMSRequests {
             sb.append(";");
         }
 
-        sb.setLength(sb.length());
+        if(sb.length() > 0) {
+            sb.setLength(sb.length() - 1);
+        }
     }
 
     /**

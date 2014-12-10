@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.ows;
@@ -18,9 +19,13 @@ import org.xml.sax.InputSource;
 
 public class MessageXmlParser extends XmlRequestReader {
     public MessageXmlParser() {
-        super(new QName(null, "Hello"), new Version("1.0.0"), "hello");
+        this(null, new Version("1.0.0"));
     }
 
+    public MessageXmlParser(String namespace, Version ver) {
+        super(new QName(namespace, "Hello"), ver, "hello");
+    }
+    
     public Object read(Object request, Reader reader, Map kvp) throws Exception {
         DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 

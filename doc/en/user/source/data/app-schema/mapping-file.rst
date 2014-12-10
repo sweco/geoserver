@@ -128,6 +128,7 @@ The ``typeMappings`` section is the heart of the app-schema module. It defines t
             <sourceDataStore>datastore</sourceDataStore>
             <sourceType>mappedfeature</sourceType>
             <targetElement>gsml:MappedFeature</targetElement>
+            <isDenormalised>true</isDenormalised>
             <attributeMappings>
                 <AttributeMapping>
                     ...
@@ -141,6 +142,7 @@ The ``typeMappings`` section is the heart of the app-schema module. It defines t
 
 * ``targetElement`` is the the element name in the target application schema. This is the same as the WFS feature type name.
 
+* ``isDenormalised`` is an optional tag (default true) to indicate whether this type contains denormalised data or not. If data is not denormalised, then app-schema will build a more efficient query to apply the global feature limit.  When combined with a low global feature limit (via `Services --> WFS`), setting this option to false can prevent unnecessary processing and database lookups from taking place.
 
 attributeMappings and AttributeMapping
 ``````````````````````````````````````
@@ -171,12 +173,19 @@ Multivalued attributes resulting from :ref:`app-schema.denormalised-sources` are
 The reserved name ``FEATURE_LINK`` is used to map data that is not encoded in XML but is required for use in :ref:`app-schema.feature-chaining`.
 
 
-idExpression
-````````````
+idExpression (optional)
+```````````````````````
 
-A CQL expression that is used to set the ``gml:id`` of the output feature type. This could be a column in a database, the automatically generated simple feature ID obtained with ``getId()``, or some other expression.
+A CQL expression that is used to set the custom ``gml:id`` of the output feature type. This should be the name of a database column on its own. Using functions would cause an exception because it is not supported with the default joining implementation. 
+ 
+.. note:: 
+         Every feature must have a ``gml:id``. This requirement is an implementation limitation (strictly, ``gml:id`` is optional in GML). 
 
-.. note:: Every feature type must have one ``idExpression`` mapping to set its ``gml:id``. This requirement is an implementation limitation (strictly, ``gml:id`` is optional in GML).
+         * If idExpression is unspecified, ``gml:id`` will be ``<the table name>.<primary key>``, e.g. ``MAPPEDFEATURE.1``.
+      
+         * In the absence of primary keys, this will be ``<the table name>.<generated gml id>``, e.g. ``MAPPEDFEATURE.fid--46fd41b8_1407138b56f_-7fe0``. 
+         
+         * If using property files instead of database tables, the default ``gml:id`` will be the row key found before the equals ("=") in the property file, e.g. the feature with row "mf1=Mudstone|POINT(1 2)|..." will have gml:id ``mf1``.
 
 .. note:: ``gml:id`` must be an `NCName <http://www.w3.org/TR/1999/REC-xml-names-19990114/#NT-NCName>`_.
 
@@ -196,7 +205,7 @@ You can use CQL expressions to calculate the content of the element. This exampl
         <OCQL>strConCat(FIRST , strConCat(' followed by ', SECOND))</OCQL>
     </sourceExpression>
 
-You can also use CQL expressions for vocabulary translations. Read more about it in :ref:`app-schema.vocab-functions`.
+You can also use :ref:`app-schema.cql-functions` for vocabulary translations.
 
 .. warning:: Avoid use of CQL expressions for properties that users will want to query, because the current implementation cannot reverse these expressions to generate efficient SQL, and will instead read all features to calculate the property to find the features that match the filter query. Falling back to brute force search makes queries on CQL-calculated expressions very slow. If you must concatenate strings to generate content, you may find that doing this in your database is much faster.
 
@@ -270,12 +279,89 @@ E.g.::
 Note that the GML encoding rules require that complex types are never the direct property of another complex type; they are always contained in a property type to ensure that their type is encoded in a surrounding element. Encoded GML is always type/property/type/property. This is also known as the GML "striping" rule. The consequence of this for app-schema mapping files is that ``targetAttributeNode`` must be applied to the property and the type must be set to the XSD property type, not to the type of the contained attribute (``gsml:CGI_TermValuePropertyType`` not ``gsml:CGI_TermValueType``). Because the XPath refers to a property type not the encoded content, ``targetAttributeNode`` appears in a mapping with ``targetAttribute`` and no other elements when using with complex types.
 
 
+encodeIfEmpty (optional)
+````````````````````````
+
+The ``encodeIfEmpty`` element will determine if an attribute will be encoded if it contains a null or empty value. By default ``encodeIfEmpty`` is set to false therefore any attribute that does not contain a value will be skipped::
+
+	<encodeIfEmpty>true</encodeIfEmpty>
+
+``encodeIfEmpty`` can be used to bring up attributes that only contain client properties such as ``xlink:title``.
+
 isMultiple (optional)
 `````````````````````
 
-The ``isMultiple`` element states whether there might be multiple values for this attribute.Because the default value is ``false`` and it is omitted in this case, it is most usually seen as::
+The ``isMultiple`` element states whether there might be multiple values for this attribute, coming from denormalised rows. Because the default value is ``false`` and it is omitted in this case, it is most usually seen as::
 
     <isMultiple>true</isMultiple>
+
+For example, the table below is denormalised with ``NAME`` column having multiple values:
+
+======== ======================== =================================
+ID       NAME                     DESCRIPTION
+======== ======================== =================================
+gu.25678 Yaugher Volcanic Group 1 Olivine basalt, tuff, microgabbro
+gu.25678 Yaugher Volcanic Group 2 Olivine basalt, tuff, microgabbro
+======== ======================== =================================
+
+The configuration file specifies ``isMultiple`` for ``gml:name`` attribute that is mapped to the ``NAME`` column::
+
+    <AttributeMapping>
+        <targetAttribute>gml:name</targetAttribute>                       
+        <sourceExpression>
+            <OCQL>NAME</OCQL>
+	</sourceExpression>					
+	<isMultiple>true</isMultiple>
+	<ClientProperty>
+	    <name>codeSpace</name>
+	    <value>'urn:ietf:rfc:2141'</value>
+	</ClientProperty>
+    </AttributeMapping>
+
+The output produces multiple ``gml:name`` attributes for each feature grouped by the id::
+
+    <gsml:GeologicUnit gml:id="gu.25678">
+        <gml:description>Olivine basalt, tuff, microgabbro</gml:description>
+        <gml:name codeSpace="urn:ietf:rfc:2141">Yaugher Volcanic Group 1</gml:name>
+        <gml:name codeSpace="urn:ietf:rfc:2141">Yaugher Volcanic Group 2</gml:name>
+     ...
+
+isList (optional)
+`````````````````
+
+The ``isList`` element states whether there might be multiple values for this attribute, concatenated as a list. The usage is similar with ``isMultiple``, except the values appear concatenated inside a single node instead of each value encoded in a separate node. Because the default value is ``false`` and it is omitted in this case, it is most usually seen as::
+
+    <isList>true</isList>
+
+For example, the table below has multiple ``POSITION`` for each feature:
+
+===== ========
+ ID   POSITION
+===== ========
+ID1.2  1948-05
+ID1.2  1948-06
+ID1.2  1948-07
+ID1.2  1948-08
+ID1.2  1948-09
+===== ========
+
+The configuration file uses ``isList`` on ``timePositionList`` attribute mapped to ``POSITION`` column::
+
+    <AttributeMapping>
+        <targetAttribute>csml:timePositionList</targetAttribute>
+        <sourceExpression>
+	    <OCQL>POSITION</OCQL>
+        </sourceExpression>
+        <isList>true</isList>
+    </AttributeMapping>
+
+The output produced::
+
+    <csml:pointSeriesDomain>
+        <csml:TimeSeries gml:id="ID1.2">
+            <csml:timePositionList>1949-05 1949-06 1949-07 1949-08 1949-09</csml:timePositionList>
+        </csml:TimeSeries>
+    </csml:pointSeriesDomain>
 
 
 ClientProperty (optional, multivalued)
@@ -303,10 +389,14 @@ See the discussion in :ref:`app-schema.feature-chaining` for the special case in
 CQL
 ---
 
-* String literals are enclosed in single quotes, for example ``'urn:ogc:def:nil:OGC:missing'``.
-* The uDig manual contains information on CQL:
+CQL functions enable data conversion and conditional behaviour to be specified in mapping files.
 
-    * http://udig.refractions.net/confluence/display/EN/Common+Query+Language
+* See :ref:`app-schema.cql-functions` for information on additional functions provided by the app-schema plugin.
+* The uDig manual includes a list of CQL functions:
+
+    * http://udig.refractions.net/confluence/display/EN/Constraint+Query+Language
+
+* CQL string literals are enclosed in single quotes, for example ``'urn:ogc:def:nil:OGC:missing'``.
 
 
 Database identifiers

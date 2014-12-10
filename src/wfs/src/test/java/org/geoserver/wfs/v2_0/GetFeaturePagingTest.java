@@ -1,7 +1,12 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wfs.v2_0;
 
+import static org.junit.Assert.*;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -9,14 +14,12 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
-import javax.xml.parsers.ParserConfigurationException;
-
 import org.custommonkey.xmlunit.XMLAssert;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CatalogBuilder;
 import org.geoserver.catalog.DataStoreInfo;
 import org.geoserver.catalog.FeatureTypeInfo;
-import org.geoserver.data.test.MockData;
+import org.geoserver.data.test.SystemTestData;
 import org.geoserver.ows.util.KvpMap;
 import org.geotools.data.DataStore;
 import org.geotools.data.FeatureSource;
@@ -29,6 +32,7 @@ import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.filter.v2_0.FESConfiguration;
 import org.geotools.xml.Parser;
+import org.junit.Test;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.filter.Filter;
@@ -36,12 +40,11 @@ import org.opengis.filter.FilterFactory;
 import org.opengis.filter.Id;
 import org.opengis.filter.identity.Identifier;
 import org.w3c.dom.Document;
-import org.xml.sax.SAXException;
 
 public class GetFeaturePagingTest extends WFS20TestSupport {
 
     @Override
-    protected void setUpInternal() throws Exception {
+    protected void setUpInternal(SystemTestData data) throws Exception {
         //run all the tests against a store that can do native paging (h2) and one that 
         // can't (property)
         Catalog cat = getCatalog();
@@ -54,8 +57,8 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         params.put("database", getTestData().getDataDirectoryRoot().getAbsolutePath());
         cat.add(ds);
         
-        FeatureSource fs1 = getFeatureSource(MockData.FIFTEEN);
-        FeatureSource fs2 = getFeatureSource(MockData.SEVEN);
+        FeatureSource fs1 = getFeatureSource(SystemTestData.FIFTEEN);
+        FeatureSource fs2 = getFeatureSource(SystemTestData.SEVEN);
         
         DataStore store = (DataStore) ds.getDataStore(null);
         SimpleFeatureTypeBuilder tb = new SimpleFeatureTypeBuilder();
@@ -108,6 +111,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         fs.addFeatures(toAdd);
     }
     
+    @Test
     public void testSingleType() throws Exception {
         doTestSingleType("gs:Fifteen");
         doTestSingleType("cdf:Fifteen");
@@ -136,6 +140,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         XMLAssert.assertXpathEvaluatesTo("0", "count(//" + typeName + ")", doc);
     }
     
+    @Test
     public void testStartIndexSimplePOST() throws Exception {
         doTestStartIndexSimplePOST("gs:Fifteen");
         doTestStartIndexSimplePOST("cdf:Fifteen");
@@ -177,6 +182,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         return xml;
     }
     
+    @Test
     public void testStartIndexMultipleTypes() throws Exception {
         doTestStartIndexMultipleTypes("gs:Fifteen", "gs:Seven");
         doTestStartIndexMultipleTypes("cdf:Fifteen", "cdf:Seven");
@@ -212,6 +218,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         XMLAssert.assertXpathEvaluatesTo("0", "count(//" + seven + ")", doc);
     }
     
+    @Test
     public void testStartIndexMultipleTypesPOST() throws Exception {
         doTestStartIndexMultipleTypesPOST("gs:Fifteen", "gs:Seven");
         doTestStartIndexMultipleTypesPOST("cdf:Fifteen", "cdf:Seven");
@@ -256,6 +263,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         return xml;
     }
     
+    @Test
     public void testWithFilter() throws Exception {
         doTestWithFilter("gs:Fifteen");
         doTestWithFilter("cdf:Fifteen");
@@ -297,6 +305,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         XMLAssert.assertXpathEvaluatesTo("1", "count(//" + typeName + "[@gml:id='Fifteen.5'])", doc);
     }
 
+    @Test
     public void testNextPreviousGET() throws Exception {
         doTestNextPreviousGET("gs:Fifteen");
         doTestNextPreviousGET("cdf:Fifteen");
@@ -305,6 +314,13 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
     public void doTestNextPreviousGET(String typeName) throws Exception {
         Document doc = getAsDOM("/wfs?request=GetFeature&version=2.0.0&service=wfs&" +
                 "typename=" + typeName + "&count=5");
+        assertFalse(doc.getDocumentElement().hasAttribute("previous"));
+        // Without startindex, results are not sorted and next would be inconsistent,
+        // so next is not encoded. See GEOS-5085.
+        assertFalse(doc.getDocumentElement().hasAttribute("next"));
+        
+        doc = getAsDOM("/wfs?request=GetFeature&version=2.0.0&service=wfs&" +
+                "typename=" + typeName + "&startIndex=0&count=5");
         assertFalse(doc.getDocumentElement().hasAttribute("previous"));
         assertStartIndexCount(doc, "next", 5, 5);
         
@@ -328,8 +344,15 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         Document doc = getAsDOM("/wfs?request=GetFeature&version=2.0.0&service=wfs&" +
                 "typename=" + fifteen + "&count=5");
         assertFalse(doc.getDocumentElement().hasAttribute("previous"));
-        assertStartIndexCount(doc, "next", 5, 5);
+        // Without startindex, results are not sorted and next would be inconsistent,
+        // so next is not encoded. See GEOS-5085.
+        assertFalse(doc.getDocumentElement().hasAttribute("next"));
         
+        doc = getAsDOM("/wfs?request=GetFeature&version=2.0.0&service=wfs&" +
+                "typename=" + fifteen + "&startIndex=0&count=5");
+        assertFalse(doc.getDocumentElement().hasAttribute("previous"));
+        assertStartIndexCount(doc, "next", 5, 5);
+
         doc = getAsDOM("/wfs?request=GetFeature&version=2.0.0&service=wfs&" +
             "typename=" + fifteen + "&startIndex=5&count=7");
         assertStartIndexCount(doc, "previous", 0, 5);
@@ -341,6 +364,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         assertFalse(doc.getDocumentElement().hasAttribute("next"));
     }
 
+    @Test
     public void testNextPreviousPOST() throws Exception {
         doTestNextPreviousPOST("gs:Fifteen");
         doTestNextPreviousPOST("cdf:Fifteen");
@@ -349,6 +373,12 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
     public void doTestNextPreviousPOST(String typeName) throws Exception {
         
         Document doc = postAsDOM("wfs", startIndexSimpleXML(typeName, -1, 5));
+        assertFalse(doc.getDocumentElement().hasAttribute("previous"));
+        // Without startindex, results are not sorted and next would be inconsistent,
+        // so next is not encoded. See GEOS-5085.
+        assertFalse(doc.getDocumentElement().hasAttribute("next"));
+        
+        doc = postAsDOM("wfs", startIndexSimpleXML(typeName, 0, 5));
         assertFalse(doc.getDocumentElement().hasAttribute("previous"));
         assertStartIndexCount(doc, "next", 5, 5);
         
@@ -382,6 +412,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         assertEquals(count, actualCount);
     }
     
+    @Test
     public void testNextPreviousLinksPOST() throws Exception {
         doTestNextPreviousLinksPOST("gs:Fifteen");
     }
@@ -479,6 +510,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         return map;
     }
     
+    @Test
     public void testSortingGET() throws Exception {
         Document dom = getAsDOM("wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=gs:Fifteen&sortBy=num ASC&count=1");
         XMLAssert.assertXpathExists("//gs:Fifteen/gs:num[text() = '0']", dom);
@@ -487,6 +519,7 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
         XMLAssert.assertXpathExists("//gs:Fifteen/gs:num[text() = '14']", dom);
     }
 
+    @Test
     public void testNextPreviousHitsGET() throws Exception {
         doTestNextPreviousHitsGET("gs:Fifteen");
         doTestNextPreviousHitsGET("cdf:Fifteen");
@@ -495,6 +528,13 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
     public void doTestNextPreviousHitsGET(String typeName) throws Exception {
         Document doc = getAsDOM("/wfs?request=GetFeature&version=2.0.0&service=wfs&" +
                 "typename=" + typeName + "&count=5&resulttype=hits");
+        assertFalse(doc.getDocumentElement().hasAttribute("previous"));
+        // Without startindex, results are not sorted and next would be inconsistent,
+        // so next is not encoded. See GEOS-5085.
+        assertFalse(doc.getDocumentElement().hasAttribute("next"));
+        
+        doc = getAsDOM("/wfs?request=GetFeature&version=2.0.0&service=wfs&" +
+                "typename=" + typeName + "&startIndex=0&count=5&resulttype=hits");
         assertFalse(doc.getDocumentElement().hasAttribute("previous"));
         assertStartIndexCount(doc, "next", 5, 5);
         
@@ -512,6 +552,15 @@ public class GetFeaturePagingTest extends WFS20TestSupport {
                 "typename=" + typeName + "&startIndex=15&resulttype=hits");
         assertStartIndexCount(doc, "previous", 0, 15);
         assertFalse(doc.getDocumentElement().hasAttribute("next"));
+    }
+    
+    @Test
+    public void testCountZero() throws Exception {
+        Document doc = getAsDOM("/wfs?request=GetFeature&version=2.0.0&service=wfs&" +
+                "typename=gs:Fifteen&count=0");
+        XMLAssert.assertXpathExists("/wfs:FeatureCollection", doc);
+        XMLAssert.assertXpathEvaluatesTo("0", "/wfs:FeatureCollection/@numberMatched", doc);
+        XMLAssert.assertXpathEvaluatesTo("0", "/wfs:FeatureCollection/@numberReturned", doc);
     }
 
 }

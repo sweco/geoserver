@@ -38,8 +38,14 @@
 			<sourceType>MeasureTypeBindingTest</sourceType>
 			<targetElement>ex:PolymorphicFeature</targetElement>
 			<attributeMappings>
+			    <AttributeMapping>
+				    <targetAttribute>ex:PolymorphicFeature</targetAttribute>
+					<idExpression>
+						<OCQL>VALUE_ID</OCQL>
+					</idExpression>
+				</AttributeMapping>
 				<AttributeMapping>					
-					<targetAttribute>ex:firstValue</targetAttribute>
+					<targetAttribute>ex:firstValue</targetAttribute>	
 					<sourceExpression>
 						<OCQL>VALUE_ID</OCQL>
 						<linkElement>NumericType</linkElement>
@@ -81,7 +87,7 @@
 				<AttributeMapping>
 					<targetAttribute>gsml:CGI_NumericValue</targetAttribute>
 					<idExpression>
-						<OCQL>strConcat('numericvalue_', getID())</OCQL>
+						<OCQL>strConcat('numericvalue_', VALUE_ID)</OCQL>
 					</idExpression>
 				</AttributeMapping>
 				<AttributeMapping>
@@ -100,7 +106,7 @@
 			            FEATURE_LINK
   		            </targetAttribute>
 					<sourceExpression>
-						<OCQL>strTrim(getId())</OCQL>
+						<OCQL>VALUE_ID</OCQL>
 					</sourceExpression>
 				</AttributeMapping>
 			</attributeMappings>

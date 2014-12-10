@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -59,7 +60,38 @@ public interface GeoServer {
      * Sets the global configuration.
      */
     void setGlobal( GeoServerInfo global );
-    
+
+    /**
+     * Returns the global settings configuration.
+     * <p>
+     * This method will return {@link GeoServerInfo#getSettings()} unless a local workspace is 
+     * set. In that case the settings for that workspace will be checked via 
+     * {@link #getSettings(WorkspaceInfo)}, and if one exists will be returned. If local workspace
+     * settings do not exist the global settings ({@link GeoServerInfo#getSettings()}) are returned.
+     * </p>
+     */
+    SettingsInfo getSettings();
+
+    /**
+     * The settings configuration for the specified workspoace, or <code>null</code> if non exists.
+     */
+    SettingsInfo getSettings(WorkspaceInfo workspace);
+
+    /**
+     * Adds a settings configuration for the specified workspace.
+     */
+    void add(SettingsInfo settings);
+
+    /**
+     * Saves the settings configuration for the specified workspace.
+     */
+    void save(SettingsInfo settings);
+
+    /**
+     * Removes the settings configuration for the specified workspace.
+     */
+    void remove(SettingsInfo settings);
+
     /**
      * The logging configuration.
      */
@@ -106,7 +138,7 @@ public interface GeoServer {
     void save(ServiceInfo service);
 
     /**
-     * GeoServer services.
+     * GeoServer services in the local workspace, or global services if there's no local workspace.
      * 
      * @uml.property name="services"
      * @uml.associationEnd multiplicity="(0 -1)"
@@ -122,7 +154,8 @@ public interface GeoServer {
     Collection<? extends ServiceInfo> getServices(WorkspaceInfo workspace);
 
     /**
-     * GeoServer services filtered by class.
+     * GeoServer services filtered by class. In the local workspace, or global services if there's 
+     * no local workspace.
      * <p>
      * 
      * </p>
@@ -216,7 +249,16 @@ public interface GeoServer {
      * </p>
      */
     void fireGlobalModified(GeoServerInfo global, List<String> propertyNames, List oldValues, List newValues);
-    
+
+    /**
+     * Fires the event for a settings configuration being modified.
+     * <p> 
+     * This method should not be called by client code. It is meant to be called
+     * internally by the configuration subsystem.
+     * </p>
+     */
+    void fireSettingsModified(SettingsInfo global, List<String> propertyNames, List oldValues, List newValues);
+
     /**
      * Fires the event for the logging configuration being modified.
      * <p> 

@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wcs.web.data;
 
 import org.apache.wicket.Component;
@@ -8,10 +13,12 @@ import org.geoserver.wcs.web.GeoServerWicketCoverageTestSupport;
 import org.geoserver.wcs.web.publish.WCSLayerConfig;
 import org.geoserver.web.ComponentBuilder;
 import org.geoserver.web.FormTestPage;
+import org.junit.Test;
 
 public class WCSLayerConfigTest extends GeoServerWicketCoverageTestSupport{
+
+    @Test
     public void testValues() {
-        
         login();
         FormTestPage page = new FormTestPage(new ComponentBuilder() {
         

@@ -1,10 +1,14 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.map;
 
-import static org.geoserver.data.test.MockData.STREAMS;
+import static org.geoserver.data.test.SystemTestData.STREAMS;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.awt.Color;
 import java.awt.geom.NoninvertibleTransformException;
@@ -16,8 +20,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.xml.namespace.QName;
-
-import junit.framework.Test;
 
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.FeatureTypeInfo;
@@ -38,10 +40,12 @@ import org.geotools.feature.IllegalAttributeException;
 import org.geotools.filter.IllegalFilterException;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.map.FeatureLayer;
-import org.geotools.map.FeatureSourceMapLayer;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.geotools.styling.Style;
 import org.geotools.util.logging.Logging;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.operation.TransformException;
 
@@ -56,16 +60,9 @@ public class RenderedImageMapOutputFormatTest extends WMSTestSupport {
 
     private String mapFormat = "image/gif";
 
-    /**
-     * This is a READ ONLY TEST so we can use one time setup
-     */
-    public static Test suite() {
-        return new OneTimeTestSetup(new RenderedImageMapOutputFormatTest());
-    }
-
-    public void setUpInternal() throws Exception {
+    @Before
+    public void setRasterMapProducer() throws Exception {
         Logging.getLogger("org.geotools.rendering").setLevel(Level.OFF);
-        super.setUpInternal();
         this.rasterMapProducer = getProducerInstance();
     }
 
@@ -73,15 +70,16 @@ public class RenderedImageMapOutputFormatTest extends WMSTestSupport {
         return new DummyRasterMapProducer(getWMS());
     }
 
-    public void tearDownInternal() throws Exception {
+    @After
+    public void unsetRasterMapProducer() throws Exception {
         this.rasterMapProducer = null;
-        super.tearDownInternal();
     }
 
     public String getMapFormat() {
         return this.mapFormat;
     }
 
+    @Test
     public void testSimpleGetMapQuery() throws Exception {
 
         Catalog catalog = getCatalog();
@@ -112,6 +110,7 @@ public class RenderedImageMapOutputFormatTest extends WMSTestSupport {
         assertNotBlank("testSimpleGetMapQuery", image);
     }
 
+    @Test
     public void testDefaultStyle() throws Exception {
         List<org.geoserver.catalog.FeatureTypeInfo> typeInfos = getCatalog().getFeatureTypes();
 
@@ -122,6 +121,7 @@ public class RenderedImageMapOutputFormatTest extends WMSTestSupport {
         }
     }
 
+    @Test 
     public void testBlueLake() throws IOException, IllegalFilterException, Exception {
         final Catalog catalog = getCatalog();
         org.geoserver.catalog.FeatureTypeInfo typeInfo = catalog.getFeatureTypeByName(
@@ -218,6 +218,7 @@ public class RenderedImageMapOutputFormatTest extends WMSTestSupport {
      * Checks {@link RenderedImageMapOutputFormat} makes good use of {@link RenderExceptionStrategy}
      */
     @SuppressWarnings("deprecation")
+    @Test
     public void testRenderingErrorsHandling() throws Exception {
 
         // the ones that are ignorable by the renderer
@@ -289,7 +290,7 @@ public class RenderedImageMapOutputFormatTest extends WMSTestSupport {
             }
         };
 
-        StyleInfo someStyle = getCatalog().getStyles().get(0);
+        StyleInfo someStyle = getCatalog().getStyleByName("line");
         map.addLayer(new FeatureLayer(source, someStyle.getStyle()));
         request.setFormat(getMapFormat());
         RenderedImageMap imageMap = this.rasterMapProducer.produceMap(map);

@@ -1,8 +1,11 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.config;
+
+import org.geoserver.catalog.Info;
 
 /**
  * GeoServer contact information.
@@ -10,7 +13,7 @@ package org.geoserver.config;
  * @author Justin Deoliveira, The Open Planning Project
  * 
  */
-public interface ContactInfo {
+public interface ContactInfo extends Info {
 
     /**
      * Identifier.
@@ -46,6 +49,26 @@ public interface ContactInfo {
      * @uml.property name="addressCountry"
      */
     void setAddressCountry(String addressCountry);
+
+    /**
+     * @uml.property name="addressDeliveryPoint"
+     */
+    String getAddressDeliveryPoint();
+
+    /**
+     * @uml.property name="addressDeliveryPoint"
+     */
+    void setAddressDeliveryPoint(String addressDeliveryPoint);
+
+    /**
+     * @uml.property name="addressElectronicMailAddress"
+     */
+    String getAddressElectronicMailAddress();
+
+    /**
+     * @uml.property name="addressElectronicMailAddress"
+     */
+    void setAddressElectronicMailAddress(String addressElectronicMailAddress);
 
     /**
      * @uml.property name="addressPostalCode"

@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.web.data.resource;
 
 import java.io.IOException;
@@ -14,7 +19,9 @@ import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.WebPage;
 import org.apache.wicket.markup.html.basic.Label;
+import org.apache.wicket.markup.html.form.CheckBox;
 import org.apache.wicket.markup.html.form.Form;
+import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
@@ -31,6 +38,7 @@ import org.geoserver.web.data.layer.SQLViewEditPage;
 import org.geoserver.web.wicket.GeoServerAjaxFormLink;
 import org.geoserver.web.wicket.ParamResourceModel;
 import org.geotools.jdbc.VirtualTable;
+import org.geotools.measure.Measure;
 import org.geotools.util.logging.Logging;
 import org.opengis.feature.type.FeatureType;
 
@@ -42,7 +50,13 @@ public class FeatureResourceConfigurationPanel extends ResourceConfigurationPane
     
     public FeatureResourceConfigurationPanel(String id, final IModel model) {
         super(id, model);
+
+        CheckBox circularArcs = new CheckBox("circularArcPresent");
+        add(circularArcs);
         
+        TextField<Measure> tolerance = new TextField<Measure>("linearizationTolerance", Measure.class);
+        add(tolerance);
+
         final Fragment attributePanel = new Fragment("attributePanel", "attributePanelFragment", this);
         attributePanel.setOutputMarkupId(true);
         add(attributePanel);
@@ -166,7 +180,7 @@ public class FeatureResourceConfigurationPanel extends ResourceConfigurationPane
                 final ResourcePool resourcePool = catalog.getResourcePool();
                 return resourcePool.getAttributes(typeInfo);
             } catch (Exception e) {
-                LOGGER.log(Level.INFO, "Grabbing the attribute list failed", e);
+                LOGGER.log(Level.SEVERE, "Grabbing the attribute list failed", e);
                 String error = new ParamResourceModel("attributeListingFailed", FeatureResourceConfigurationPanel.this, e.getMessage()).getString();
                 FeatureResourceConfigurationPanel.this.getPage().error(error);
                 return Collections.emptyList();

@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -7,6 +8,7 @@ package org.geoserver.web.data.store;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URL;
+import java.util.Map;
 
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.panel.Panel;
@@ -56,11 +58,14 @@ public abstract class StoreEditPanel extends Panel {
         }
 
         final Param[] dsParams = dsFactory.getParametersInfo();
+        Map connParams = info.getConnectionParameters();
         for (Param p : dsParams) {
             ParamInfo paramInfo = new ParamInfo(p);
 
-            // set default value
-            applyParamDefault(paramInfo, info);
+            // set default value if not already set to some default
+            if (!connParams.containsKey(p.key) || connParams.get(p.key) == null) {
+                applyParamDefault(paramInfo, info);
+            }
         }
     }
 

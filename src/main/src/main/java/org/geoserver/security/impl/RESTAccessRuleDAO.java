@@ -1,13 +1,16 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.security.impl;
 
 import java.io.IOException;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeSet;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import org.geoserver.config.GeoServerDataDirectory;
@@ -20,10 +23,7 @@ import org.geotools.util.logging.Logging;
  *
  */
 public class RESTAccessRuleDAO extends AbstractAccessRuleDAO<String> {
-
-    static {
-       LOGGER = Logging.getLogger(RESTAccessRuleDAO.class);
-    }
+    private final static Logger LOGGER = Logging.getLogger(RESTAccessRuleDAO.class);
     
     /**
      * rule pattern
@@ -38,7 +38,7 @@ public class RESTAccessRuleDAO extends AbstractAccessRuleDAO<String> {
 
     @Override
     protected void loadRules(Properties props) {
-        rules = new TreeSet<String>();
+        rules = new LinkedHashSet<String>();
         for (Map.Entry<Object,Object> entry : props.entrySet()) {
             String key = (String) entry.getKey();
             String val = (String) entry.getValue();

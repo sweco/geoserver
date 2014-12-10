@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog.rest;
@@ -14,6 +15,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.zip.ZipEntry;
@@ -34,10 +36,12 @@ import org.geoserver.rest.util.RESTUtils;
 import org.geotools.data.DataAccessFactory;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFactorySpi;
+import org.geotools.data.DataUtilities;
 import org.geotools.data.DefaultTransaction;
 import org.geotools.data.FeatureSource;
 import org.geotools.data.DataAccessFactory.Param;
 import org.geotools.data.FeatureStore;
+import org.geotools.data.FileDataStoreFactorySpi;
 import org.geotools.data.Transaction;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.geometry.jts.ReferencedEnvelope;
@@ -52,7 +56,7 @@ import org.vfny.geoserver.util.DataStoreUtils;
 
 public class DataStoreFileResource extends StoreFileResource {
 
-    protected static HashMap<String,String> formatToDataStoreFactory = new HashMap();
+    protected static final HashMap<String,String> formatToDataStoreFactory = new HashMap();
     static {
         formatToDataStoreFactory.put( "shp", "org.geotools.data.shapefile.ShapefileDataStoreFactory");
         formatToDataStoreFactory.put( "properties", "org.geotools.data.property.PropertyDataStoreFactory");
@@ -60,7 +64,7 @@ public class DataStoreFileResource extends StoreFileResource {
         formatToDataStoreFactory.put( "spatialite", "org.geotools.data.spatialite.SpatiaLiteDataStoreFactory");
     }
     
-    protected static HashMap<String,Map> dataStoreFactoryToDefaultParams = new HashMap();
+    protected static final HashMap<String,Map> dataStoreFactoryToDefaultParams = new HashMap();
     static {
         HashMap map = new HashMap();
         map.put("database", "@DATA_DIR@/@NAME@");
@@ -76,22 +80,33 @@ public class DataStoreFileResource extends StoreFileResource {
     }
     
     public static DataStoreFactorySpi lookupDataStoreFactory(String format) {
-        String factoryClassName = formatToDataStoreFactory.get( format );
-        
-        if ( factoryClassName == null ) {
-            throw new RestletException( "Unsupported format: " + format, Status.CLIENT_ERROR_BAD_REQUEST );
+        // first try and see if we know about this format directly
+        String factoryClassName = formatToDataStoreFactory.get(format);
+        if (factoryClassName != null) {
+            try {
+                Class factoryClass = Class.forName(factoryClassName);
+                DataStoreFactorySpi factory = (DataStoreFactorySpi) factoryClass.newInstance();
+                return factory;
+            } catch (Exception e) {
+                throw new RestletException("Datastore format unavailable: " + factoryClassName,
+                        Status.SERVER_ERROR_INTERNAL);
+            }
         }
-        
-        DataStoreFactorySpi factory;
-        try {
-            Class factoryClass = Class.forName( factoryClassName );
-            factory = (DataStoreFactorySpi) factoryClass.newInstance();
+
+        // if not, let's see if we have a file data store factory that knows about the extension
+        String extension = "." + format;
+        for (DataAccessFactory dataAccessFactory : DataStoreUtils.getAvailableDataStoreFactories()) {
+            if (dataAccessFactory instanceof FileDataStoreFactorySpi) {
+                FileDataStoreFactorySpi factory = (FileDataStoreFactorySpi) dataAccessFactory;
+                for (String handledExtension : factory.getFileExtensions()) {
+                    if (extension.equalsIgnoreCase(handledExtension)) {
+                        return factory;
+                    }
+                }
+            }
         }
-        catch ( Exception e ) {
-            throw new RestletException( "Datastore format unavailable: " + factoryClassName, Status.SERVER_ERROR_INTERNAL );
-        }
-        
-        return factory;
+
+        throw new RestletException("Unsupported format: " + format, Status.CLIENT_ERROR_BAD_REQUEST);
     }
     
     public static String lookupDataStoreFactoryFormat(String type) {
@@ -127,7 +142,6 @@ public class DataStoreFileResource extends StoreFileResource {
     public void handleGet() {
         String workspace = getAttribute("workspace");
         String datastore = getAttribute("datastore");
-        String format = getAttribute("format");
 
         //find the directory from teh datastore connection parameters
         DataStoreInfo info = catalog.getDataStoreByName(workspace, datastore);
@@ -174,7 +188,14 @@ public class DataStoreFileResource extends StoreFileResource {
                 for ( File f : directory.listFiles() ) {
                     ZipEntry entry = new ZipEntry( f.getName() );
                     zout.putNextEntry(entry);
-                    IOUtils.copy( new FileInputStream( f ), zout );
+                    FileInputStream fis = null;
+                    try {
+                        fis = new FileInputStream(f);
+                        IOUtils.copy(fis, zout);
+                    } finally {
+                        IOUtils.closeQuietly(fis);
+                    }
+                    
                     zout.closeEntry();
                 }
                 zout.flush();
@@ -194,7 +215,7 @@ public class DataStoreFileResource extends StoreFileResource {
         getResponse().setStatus(Status.SUCCESS_ACCEPTED);
         Form form = getRequest().getResourceRef().getQueryAsForm();
 
-        File uploadedFile = doFileUpload(method, workspace, datastore, format);
+        File uploadedFile = doFileUpload(method, workspace, datastore, format).get(0);
         
         //look up the target datastore type specified by user
         String sourceDataStoreFormat = dataStoreFormat; 
@@ -272,10 +293,12 @@ public class DataStoreFileResource extends StoreFileResource {
         
         //add or update the datastore info
         if ( add ) {
+            catalog.validate(info, true).throwIfInvalid();
             catalog.add( info );
         }
         else {
             if (save) {
+                catalog.validate(info, false).throwIfInvalid();
                 catalog.save( info );
             }
         }
@@ -361,6 +384,11 @@ public class DataStoreFileResource extends StoreFileResource {
             
             //load the target datastore
             //DataStore ds = (DataStore) info.getDataStore(null);
+            Map<String, FeatureTypeInfo> featureTypesByNativeName =
+                new HashMap<String, FeatureTypeInfo>();
+            for (FeatureTypeInfo ftInfo : catalog.getFeatureTypesByDataStore(info)) {
+                featureTypesByNativeName.put(ftInfo.getNativeName(), ftInfo);
+            }
             
             String[] featureTypeNames = source.getTypeNames();
             for ( int i = 0; i < featureTypeNames.length; i++ ) {
@@ -371,8 +399,8 @@ public class DataStoreFileResource extends StoreFileResource {
                 }
                 
                 FeatureSource fs = ds.getFeatureSource(featureTypeNames[i]); 
-                FeatureTypeInfo ftinfo = 
-                    catalog.getFeatureTypeByDataStore(info, featureTypeNames[i] );
+                FeatureTypeInfo ftinfo = featureTypesByNativeName.get(featureTypeNames[i]);
+                
                 if ( ftinfo == null) {
                     //auto configure the feature type as well
                     ftinfo = builder.buildFeatureType(fs);
@@ -401,6 +429,7 @@ public class DataStoreFileResource extends StoreFileResource {
                         }
                         while(i < 10 && catalog.getFeatureTypeByName(namespace, ftinfo.getName()) != null);
                     }
+                    catalog.validate(ftinfo, true).throwIfInvalid();
                     catalog.add( ftinfo );
                     
                     //add a layer for the feature type as well
@@ -408,7 +437,7 @@ public class DataStoreFileResource extends StoreFileResource {
 
                     boolean valid = true;
                     try { 
-                        if (!catalog.validate(layer, true).isEmpty()) {
+                        if (!catalog.validate(layer, true).isValid()) {
                             valid = false;
                         }
                     } catch (Exception e) {
@@ -423,6 +452,7 @@ public class DataStoreFileResource extends StoreFileResource {
                 }
                 else {
                     LOGGER.info("Updated feature type " + ftinfo.getName());
+                    catalog.validate(ftinfo, false).throwIfInvalid();
                     catalog.save( ftinfo );
                 }
                 
@@ -433,23 +463,36 @@ public class DataStoreFileResource extends StoreFileResource {
         catch (Exception e) {
             //TODO: report a proper error code
             throw new RuntimeException ( e );
+        } finally {
+            //dispose the datastore
+            source.dispose();
+            
+            //clean up the files if we can
+            if (isInlineUpload(method) && canRemoveFiles) {
+        		if (uploadedFile.isFile()) uploadedFile = uploadedFile.getParentFile();
+        		try {
+        			FileUtils.deleteDirectory(uploadedFile);
+        		} 
+        		catch (IOException ie) {
+        			LOGGER.info("Unable to delete " + uploadedFile.getAbsolutePath());
+        			if (LOGGER.isLoggable(Level.FINE)) {
+        				LOGGER.log(Level.FINE, "", ie);
+        			}
+        		}
+            }        	
         }
-        
-        //dispose the datastore
-        source.dispose();
-        
-        //clean up the files if we can
-        if (isInlineUpload(method) && canRemoveFiles) {
-            if (uploadedFile.isFile()) uploadedFile = uploadedFile.getParentFile();
-            try {
-                FileUtils.deleteDirectory(uploadedFile);
-            } 
-            catch (IOException e) {
-                LOGGER.info("Unable to delete " + uploadedFile.getAbsolutePath());
-                if (LOGGER.isLoggable(Level.FINE)) {
-                    LOGGER.log(Level.FINE, "", e);
-                }
-            }
+    }
+
+    @Override
+    protected File findPrimaryFile(File directory, String format) {
+        if ("shp".equalsIgnoreCase(format)) {
+            //special case for shapefiles, since shapefile datastore can handle directories just 
+            // return the directory, this handles the case of a user uploading a zip with multiple
+            // shapefiles in it
+            return directory;
+        }
+        else {
+            return super.findPrimaryFile(directory, format);
         }
     }
     
@@ -484,13 +527,8 @@ public class DataStoreFileResource extends StoreFileResource {
                     converted = f.toURI();
                 }
                 else if ( URL.class.equals( p.type ) ) {
-                    try {
-                        converted = f.toURL();
-                    } 
-                    catch (MalformedURLException e) {
-                    }
+                    converted = DataUtilities.fileToURL(f);
                 }
-                //Converters.convert( f.getAbsolutePath(), p.type );
                 
                 if ( converted != null ) {
                     connectionParameters.put( p.key, converted );    

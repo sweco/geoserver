@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -61,11 +62,9 @@ public class WfsOnlineTestOracleSetup extends AbstractReferenceDataSetup {
     private void runSqlInsertScript() throws Exception {
         DatabaseUtil du = new DatabaseUtil();
         ArrayList<String> sqls = du.splitOracleSQLScript(script);
-        for (String sql : sqls) {
-            System.out.println(sql);
+        for (String sql : sqls) {          
             if (sql.startsWith("CALL")) {
-                String formattedSP = "{" + sql + "}";
-                System.out.println(formattedSP);
+                String formattedSP = "{" + sql + "}";            
                 this.runOracleStoreProcedure(formattedSP);
                 continue;
             }

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!-- 
+ Copyright (C) 2014 - Open Source Geospatial Foundation. All rights reserved.
+ This code is licensed under the GPL 2.0 license, available at the root
+ application directory.
+ -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+ <modelVersion>4.0.0</modelVersion>
+ <parent>
+  <groupId>org.geoserver.community</groupId>
+  <artifactId>gs-script</artifactId>
+  <version>2.7-SNAPSHOT</version>
+ </parent>
+ <groupId>org.geoserver.script</groupId>
+ <artifactId>gs-script-groovy</artifactId>
+ <packaging>jar</packaging>
+ <name>Groovy Scripting Extension</name>
+ <dependencies>
+  <dependency>
+   <groupId>org.geoserver.script</groupId>
+   <artifactId>gs-script-core</artifactId>
+   <version>${project.version}</version>
+  </dependency>
+  <dependency>
+   <groupId>org.geoscript</groupId>
+   <artifactId>geoscript-groovy</artifactId>
+   <version>1.2-SNAPSHOT</version>
+  </dependency>
+  <dependency>
+   <groupId>net.sf.json-lib</groupId>
+   <artifactId>json-lib</artifactId>
+   <classifier>jdk15</classifier>
+  </dependency>
+  <dependency>
+   <groupId>org.geoserver.script</groupId>
+   <artifactId>gs-script-core</artifactId>
+   <version>${project.version}</version>
+   <classifier>tests</classifier>
+   <scope>test</scope>
+  </dependency>
+ </dependencies>
+ <build>
+   <plugins>
+        <plugin>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-eclipse-compiler</artifactId>
+            <version>2.9.0-01-SNAPSHOT</version>
+            <extensions>true</extensions>
+        </plugin>
+		<plugin>
+			<artifactId>maven-compiler-plugin</artifactId>
+            <version>3.1</version>
+			<configuration>
+				<compilerId>groovy-eclipse-compiler</compilerId>
+                <debug>true</debug>
+                <source>1.6</source>
+                <target>1.6</target>
+                <encoding>UTF-8</encoding>
+			</configuration>
+			<dependencies>
+				<dependency>
+					<groupId>org.codehaus.groovy</groupId>
+					<artifactId>groovy-eclipse-compiler</artifactId>
+					<version>2.9.0-01-SNAPSHOT</version>
+				</dependency>
+				<dependency>
+					<groupId>org.codehaus.groovy</groupId>
+					<artifactId>groovy-eclipse-batch</artifactId>
+					<version>2.1.5-03</version>
+				</dependency>
+			</dependencies>
+		</plugin>
+        <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <executions>
+                <execution>
+                    <phase>package</phase>
+                    <configuration>
+                        <tasks>
+                            <taskdef name="Groovydoc" classname="org.codehaus.groovy.ant.Groovydoc">
+                                <classpath>
+                                    <path refid="maven.compile.classpath" />
+                                </classpath>
+                            </taskdef>
+                            <Groovydoc destdir="target/groovydoc" sourcepath="src/main/groovy" packagenames="**.*" use="true" windowtitle="GeoServer Scripting Groovy API" private="false" />
+                        </tasks>
+                    </configuration>
+                    <goals>
+                        <goal>run</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+   </plugins>
+ </build>
+ <pluginRepositories>
+      <!-- Required for groovy-eclipse-compiler snapshot --> 
+      <pluginRepository>
+          <id>nexus</id>
+          <url>http://nexus.codehaus.org/snapshots/</url>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+      </pluginRepository>
+ </pluginRepositories>
+</project>

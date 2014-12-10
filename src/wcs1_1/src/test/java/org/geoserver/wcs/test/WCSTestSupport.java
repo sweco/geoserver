@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wcs.test;
@@ -20,6 +21,7 @@ import javax.xml.validation.SchemaFactory;
 import org.custommonkey.xmlunit.SimpleNamespaceContext;
 import org.custommonkey.xmlunit.XMLUnit;
 import org.custommonkey.xmlunit.XpathEngine;
+import org.geoserver.data.test.SystemTestData;
 import org.geoserver.wcs.WCSInfo;
 
 import com.mockrunner.mock.web.MockHttpServletResponse;
@@ -38,9 +40,16 @@ public abstract class WCSTestSupport extends CoverageTestSupport {
     protected static final Schema WCS11_SCHEMA;
     
     static {
+        File wcsTestFile = new File("./schemas/wcs/1.1.1/wcsAll.xsd");
+
+        // Specific check for building from an IDE such as IntelliJ IDEA.
+        if (!wcsTestFile.exists()) {
+            wcsTestFile = new File("wcs1_1/schemas/wcs/1.1.1/wcsAll.xsd");
+        }
+
         try {
             final SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-            WCS11_SCHEMA = factory.newSchema(new File("./schemas/wcs/1.1.1/wcsAll.xsd"));
+            WCS11_SCHEMA = factory.newSchema(wcsTestFile);
         } catch(Exception e) {
             throw new RuntimeException("Could not parse the WCS 1.1.1 schemas", e);
         }
@@ -61,14 +70,15 @@ public abstract class WCSTestSupport extends CoverageTestSupport {
     }
 
     @Override
-    protected void oneTimeSetUp() throws Exception {
-        super.oneTimeSetUp();
+    protected void onSetUp(SystemTestData testData) throws Exception {
+        super.onSetUp(testData);
         
         // init xmlunit
         Map<String, String> namespaces = new HashMap<String, String>();
         namespaces.put("wcs", "http://www.opengis.net/wcs/1.1.1");
         namespaces.put("ows", "http://www.opengis.net/ows/1.1");
         namespaces.put("xlink", "http://www.w3.org/1999/xlink");
+        namespaces.put("xsi", "http://www.w3.org/2001/XMLSchema-instance");
         XMLUnit.setXpathNamespaceContext(new SimpleNamespaceContext(namespaces));
         xpath = XMLUnit.newXpathEngine();
     }

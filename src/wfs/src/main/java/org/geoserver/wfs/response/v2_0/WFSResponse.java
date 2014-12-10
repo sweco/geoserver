@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2011 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -46,7 +47,7 @@ public abstract class WFSResponse extends org.geoserver.wfs.response.WFSResponse
             ServiceException {
 
         Encoder encoder = new Encoder(new WFSConfiguration());
-        encoder.setEncoding(Charset.forName( getInfo().getGeoServer().getGlobal().getCharset()) );
+        encoder.setEncoding(Charset.forName( getInfo().getGeoServer().getSettings().getCharset()) );
         encoder.setOmitXMLDeclaration(Dispatcher.REQUEST.get().isSOAP());
 
         String baseURL = (String) EMFUtils.get((EObject)operation.getParameters()[0], "baseUrl");

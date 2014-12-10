@@ -65,28 +65,78 @@
                    <!-- Test gml:name from another table, but ClientProperty from this table -->
                    <targetAttribute>gml:name[3]</targetAttribute>
                    <sourceExpression>
-                       <OCQL>getID()</OCQL>
+                       <OCQL>ID</OCQL>
                        <linkElement>NAME_TWO</linkElement>
                        <linkField>FEATURE_LINK</linkField>
                    </sourceExpression>        
                    <isMultiple>true</isMultiple>           
                    <ClientProperty>
                        <name>codeSpace</name>
-                       <value>strConcat('some:uri:', getID())</value>
+                       <value>strConcat('some:uri:', ID)</value>
                    </ClientProperty>
                 </AttributeMapping>
                 <AttributeMapping>
                    <!-- Test xlink:href with values from another table -->
                    <targetAttribute>gml:name[4]</targetAttribute>
                    <sourceExpression>
-                       <OCQL>getID()</OCQL>
+                       <OCQL>ID</OCQL>
                        <linkElement>NAME_TWO</linkElement>
                        <linkField>FEATURE_LINK</linkField>
                    </sourceExpression>                   
                    <ClientProperty>
                        <name>xlink:href</name>
-                       <value>strConcat('some:uri:', getID())</value>
+                       <value>strConcat('some:uri:', ID)</value>
                    </ClientProperty>
+                </AttributeMapping>
+                <AttributeMapping>                    
+                    <!-- Test polymorphic geometry -->
+                    <targetAttribute>gsml:shape</targetAttribute>
+                    <sourceExpression>
+                        <OCQL>ID</OCQL>
+                        <linkElement>POINT_ATT</linkElement>
+                        <linkField>FEATURE_LINK</linkField>
+                    </sourceExpression>
+                </AttributeMapping>
+                <AttributeMapping>                    
+                    <!-- Test polymorphic geometry -->
+                    <targetAttribute>gsml:shape</targetAttribute>
+                    <sourceExpression>
+                        <OCQL>ID</OCQL>
+                        <linkElement>POLYGON_ATT</linkElement>
+                        <linkField>FEATURE_LINK</linkField>
+                    </sourceExpression>
+                </AttributeMapping>
+            </attributeMappings>
+        </FeatureTypeMapping>
+        <FeatureTypeMapping>
+            <mappingName>POINT_ATT</mappingName>
+            <sourceDataStore>MappedFeatureDataStore</sourceDataStore>
+            <sourceType>MappedFeaturePoints</sourceType>
+            <targetElement>gml:_Geometry</targetElement>
+            <attributeMappings>
+                <AttributeMapping>
+                    <targetAttribute>gml:_Geometry</targetAttribute>
+                    <sourceExpression><OCQL>GEOM</OCQL></sourceExpression>
+                </AttributeMapping>
+                <AttributeMapping>
+                   <targetAttribute>FEATURE_LINK</targetAttribute>
+                   <sourceExpression><OCQL>MF_ID</OCQL></sourceExpression>
+                </AttributeMapping>
+            </attributeMappings>
+        </FeatureTypeMapping>
+        <FeatureTypeMapping>
+            <mappingName>POLYGON_ATT</mappingName>
+            <sourceDataStore>MappedFeatureDataStore</sourceDataStore>
+            <sourceType>MappedFeaturePolygons</sourceType>
+            <targetElement>gml:_Geometry</targetElement>
+            <attributeMappings>
+                <AttributeMapping>
+                    <targetAttribute>gml:_Geometry</targetAttribute>
+                    <sourceExpression><OCQL>GEOM</OCQL></sourceExpression>
+                </AttributeMapping>
+                <AttributeMapping>
+                   <targetAttribute>FEATURE_LINK</targetAttribute>
+                   <sourceExpression><OCQL>MF_ID</OCQL></sourceExpression>
                 </AttributeMapping>
             </attributeMappings>
         </FeatureTypeMapping>
@@ -103,7 +153,7 @@
                     <ClientProperty>
                         <name>codeSpace</name>
                         <value>CODESPACE</value>
-                    </ClientProperty>                    
+                    </ClientProperty>
                 </AttributeMapping>
                 <AttributeMapping>
                    <targetAttribute>FEATURE_LINK</targetAttribute>

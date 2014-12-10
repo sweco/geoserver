@@ -1,17 +1,26 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.config;
 
+import static org.junit.Assert.*;
 import junit.framework.TestCase;
 
 import org.geoserver.config.impl.GeoServerFactoryImpl;
 import org.geoserver.config.impl.GeoServerImpl;
 import org.geoserver.config.util.LegacyConfigurationImporter;
 import org.geotools.data.DataUtilities;
+import org.junit.Before;
+import org.junit.Test;
 
-public class LegacyConfigurationImporterTest extends TestCase {
+public class LegacyConfigurationImporterTest {
 
     LegacyConfigurationImporter importer;
     
-    protected void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         GeoServer gs = new GeoServerImpl();
         gs.setFactory( new GeoServerFactoryImpl(gs) );
         
@@ -19,6 +28,7 @@ public class LegacyConfigurationImporterTest extends TestCase {
         importer.imprt(DataUtilities.urlToFile(getClass().getResource("services.xml")).getParentFile());
     }
     
+    @Test
     public void testGlobal() throws Exception {
         GeoServerInfo info = importer.getConfiguration().getGlobal();
         assertNotNull( info );

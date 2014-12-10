@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2011 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -39,7 +40,7 @@ public class HitsOutputFormat extends org.geoserver.wfs.response.HitsOutputForma
             throws IOException {
         hits.setNumberOfFeatures(BigInteger.valueOf(0));
         Encoder e = new Encoder(new WFSConfiguration());
-        e.setEncoding(Charset.forName( wfs.getGeoServer().getGlobal().getCharset()) );
+        e.setEncoding(Charset.forName( wfs.getGeoServer().getSettings().getCharset()) );
         e.setSchemaLocation(WFS.NAMESPACE,
             ResponseUtils.appendPath(wfs.getSchemaBaseURL(), "wfs/2.0/wfs.xsd"));
         

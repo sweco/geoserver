@@ -28,7 +28,7 @@ In the following table the whole set of GetLegendGraphic parameters that can be 
      - **Description**
    * - *REQUEST*
      - Required
-     - Value must be "GetLegendRequest".
+     - Value must be "GetLegendGraphic".
    * - *LAYER*
      - Required
      - Layer for which to produce legend graphic.
@@ -43,7 +43,7 @@ In the following table the whole set of GetLegendGraphic parameters that can be 
      - Rule of style to produce legend graphic for, if applicable. In the case that a style has multiple rules but no specific rule is selected, then the map server is obligated to produce a graphic that is representative of all of the rules of the style.
    * - *SCALE*
      - Optional
-     - In the case that a RULE is not specified for a style, this parameter may assist the server in selecting a more appropriate representative graphic by eliminating internal rules that are out-of-scope. This value is a standardized scale denominator, defined in Section 10.2.
+     - In the case that a RULE is not specified for a style, this parameter may assist the server in selecting a more appropriate representative graphic by eliminating internal rules that are out-of-scope. This value is a standardized scale denominator, defined in Section 10.2. Specifying the scale will also make the symbolizers using Unit Of Measure resize according to the specified scale.
    * - *SLD*
      - Optional
      - This parameter specifies a reference to an external SLD document. It works in the same way as the SLD= parameter of the WMS GetMap operation.   
@@ -62,6 +62,36 @@ In the following table the whole set of GetLegendGraphic parameters that can be 
    * - *EXCEPTIONS*
      - Optional
      - This gives the MIME type of the format in which to return exceptions. Allowed values are the same as for the EXCEPTIONS= parameter of the WMS GetMap request.
+     
+Controlling legend appearance with LEGEND_OPTIONS
+-------------------------------------------------
+
+GeoServer allows finer control over the legend appearance via the vendor parameter ``LEGEND_OPTIONS``.
+The general format of ``LEGEND_OPTIONS`` is the same as ``FORMAT_OPTIONS``, that is::
+
+  ...&LEGEND_OPTIONS=key1:v1;key2:v2;...;keyn:vn
+  
+Here is a description of the various parameters that can be used in ``LEGEND_OPTIONS``:
+
+    - **fontName (string)** the name of the font to be used when generating rule titles. The font must be available on the server
+    - **fontStyle (string)** can be set to italic or bold to control the text style. Other combination are not allowed right now but we could implement that as well.
+    - **fontSize (integer)** allows us to set the Font size for the various text elements. Notice that default size is 12.
+    - **fontColor (hex)** allows us to set the color for the text of rules and labels (see above for recommendation on how to create values). Values are expressed in ``0xRRGGBB`` format
+    - **fontAntiAliasing (true/false)** when true enables antialiasing for rule titles
+    - **bgColor (hex)** background color for the generated legend, values are expressed in ``0xRRGGBB`` format
+    - **dpi (integer)** sets the DPI for the current request, in the same way as it is supported by GetMap. Setting a DPI larger than 91 (the default) makes all fonts, symbols and line widths grow without changing the current scale, making it possible to get a high resolution version of the legend suitable for inclusion in printouts 
+    - **forceLabels** "on" means labels will always be drawn, even if only one rule is available. "off" means labels will never be drawn, even if multiple rules are available. Off by default.
+
+Here is a sample request sporting all the options::
+
+  http://localhost:8080/geoserver/wms?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&WIDTH=20&HEIGHT=20&LAYER=topp:states&legend_options=fontName:Times%20New%20Roman;fontAntiAliasing:true;fontColor:0x000033;fontSize:14;bgColor:0xFFFFEE;dpi:180
+  
+.. figure:: img/legendoptions.png
+   :align: center
+
+   *Using LEGEND_OPTIONS to control the output*
+
+
 
 Raster Legends Explained
 ------------------------
@@ -98,7 +128,7 @@ Just to jump right to the conclusions (which is a bad practice I know, but no on
 
 	http://localhost:8081/geoserver/wms?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&WIDTH=100&HEIGHT=20&LAYER=it.geosolutions:di08031_da&LEGEND_OPTIONS=forceRule:True;dx:0.2;dy:0.2;mx:0.2;my:0.2;fontStyle:bold;borderColor:0000ff;border:true;fontColor:ff0000;fontSize:18
 
-Do not worry if it seems like something written in ancient dead language, I am going to explain the various params here below. Nevertheless it is important to point out that basic info on how to create and set params can be found in this `page <http://geoserver.org/display/GEOSDOC/GetLegendGraphic+Improvements>`_.
+Do not worry if it seems like something written in ancient dead language, I am going to explain the various params here below. Nevertheless it is important to point out that basic info on how to create and set params can be found in this `page <http://rancor.boundlessgeo.com:8080/display/GEOSDOC/GetLegendGraphic+Improvements>`_.
 
 .. figure:: img/rasterlegend2.png
    :align: center 
@@ -150,7 +180,7 @@ Refer to the SLD rainfall_classes.sld in attachment. Notice that the first legen
 The various control parameters and how to set them
 ''''''''''''''''''''''''''''''''''''''''''''''''''
 
-I am now going to briefly explain the various parameters tht we can use to control the layout and content of the legend (refer also to this `page <http://geoserver.org/display/GEOSDOC/GetLegendGraphic+Improvements>`_). Here below I have put a request that puts all the various options at tow::
+I am now going to briefly explain the various parameters tht we can use to control the layout and content of the legend (refer also to this `page <http://rancor.boundlessgeo.com:8080/display/GEOSDOC/GetLegendGraphic+Improvements>`_). Here below I have put a request that puts all the various options at tow::
 
 	http://localhost:8081/geoserver/wms?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&WIDTH=100&HEIGHT=20&LAYER=it.geosolutions:di08031_da&LEGEND_OPTIONS=forceRule:True;dx:0.2;dy:0.2;mx:0.2;my:0.2;fontStyle:bold;borderColor:0000ff;border:true;fontColor:ff0000;fontSize:18
 
@@ -158,8 +188,5 @@ Let's now examine all the interesting elements, one by one. Notice that I am not
 
     - **forceRule (boolean)** by defaul rules for a ColorMapEntry are not drawn to keep the legend small and compact, unless there are not labels at all. You can change this behaviour by setting this parameter to true.
     - **dx,dy,mx,my (double)** can be used to set the margin and the buffers between elements
-    - **fontStyle (string)** can be set to italic or bold to control the text style. Other combination are not allowed right now but we could implement that as well.
-    - **fontSize (integer)** allows us to set the Font size for the various text elements. Notice that default size is 12.
     - **border (boolean)** activates or deactivates the boder on the color elements in order to make the separations cleare. Notice that I decided to **always** have a line that would split the various color elements for the ramp type of colormap.
-    - **borderColor (hex)** allows us to set the color for the border as explained above. Valid values are hex values withouth the leading #.
-    - **fontColor (hex)** allows us to set the color for the text of rules and labels (see above for recommendation on how to create values). 
+    - **borderColor (hex)** allows us to set the color for the border in 0xRRGGBB format

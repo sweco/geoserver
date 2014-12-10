@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.legendgraphic;
@@ -12,11 +13,16 @@ import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.awt.image.IndexColorModel;
-import java.io.File;
 import java.util.HashMap;
 
 import javax.imageio.ImageIO;
 
+import org.geoserver.platform.GeoServerExtensions;
+import org.geoserver.platform.GeoServerResourceLoader;
+import org.geoserver.platform.ServiceException;
+import org.geoserver.platform.resource.Paths;
+import org.geoserver.platform.resource.Resource;
+import org.geoserver.platform.resource.Resource.Type;
 import org.geoserver.wms.GetLegendGraphicRequest;
 import org.geoserver.wms.legendgraphic.ColorMapLegendCreator.Builder;
 import org.geoserver.wms.map.ImageUtils;
@@ -28,8 +34,6 @@ import org.geotools.styling.RasterSymbolizer;
 import org.geotools.styling.Rule;
 import org.geotools.styling.Style;
 import org.geotools.styling.Symbolizer;
-import org.vfny.geoserver.global.GeoserverDataDirectory;
-
 /**
  * Helper class to create legends for raster styles by parsing the rastersymbolizer element.
  * 
@@ -39,16 +43,19 @@ import org.vfny.geoserver.global.GeoserverDataDirectory;
 public class RasterLayerLegendHelper {
 
     /**
-     * The default legend is a simpe image with an R within it which stands for Raster.
+     * The default legend is a simple image with an R within it which stands for Raster.
      */
     private final static BufferedImage defaultLegend;
     static {
         BufferedImage imgShape = null;
         try {
-            final File stylesDirectory = GeoserverDataDirectory.findCreateConfigDir("styles");
-            final File rasterLegend = new File(stylesDirectory, "rasterLegend.png");
-            if (rasterLegend.exists())
-                imgShape = ImageIO.read(rasterLegend);
+            GeoServerResourceLoader loader = GeoServerExtensions.bean(GeoServerResourceLoader.class);
+            Resource rasterLegend = loader.get( Paths.path("styles","rasterLegend.png"));
+//            final File stylesDirectory = GeoserverDataDirectory.findCreateConfigDir("styles");
+//            final File rasterLegend = new File(stylesDirectory, "rasterLegend.png");
+            if (rasterLegend.getType() == Type.RESOURCE ){
+                imgShape = ImageIO.read(rasterLegend.file());
+            }
         } catch (Throwable e) {
             imgShape = null;
         }
@@ -69,7 +76,8 @@ public class RasterLayerLegendHelper {
     private Color bgColor;
 
     private ColorMapLegendCreator cMapLegendCreator;
-
+    
+    
     /**
      * Constructor for a RasterLayerLegendHelper.
      * 
@@ -77,15 +85,18 @@ public class RasterLayerLegendHelper {
      * It takes a {@link GetLegendGraphicRequest} object in order to do its magic.
      * 
      * @param request
-     *            the {@link GetLegendGraphicRequest} for which we want to builda legend
+     *            the {@link GetLegendGraphicRequest} for which we want to build a legend
+     * @param style the {@link Style} for which we want to build a legend
+     * @param rule the {@link Rule} to use for rendering
      */
-    public RasterLayerLegendHelper(final GetLegendGraphicRequest request) {
+    public RasterLayerLegendHelper(final GetLegendGraphicRequest request,Style style,String ruleName) {
         PackagedUtils.ensureNotNull(request, "The provided GetLegendGraphicRequest is null");
-        parseRequest(request);
+        
+        parseRequest(request,style,ruleName);
     }
 
     @SuppressWarnings("unchecked")
-    private void parseRequest(final GetLegendGraphicRequest request) {
+    private void parseRequest(final GetLegendGraphicRequest request,Style gt2Style,String ruleName) {
         // get the requested layer
         // and check that it is actually a grid
         // final FeatureType layer = request.getLayer();
@@ -94,20 +105,23 @@ public class RasterLayerLegendHelper {
         // if(!found)
         // throw new IllegalArgumentException("Unable to create legend for non raster style");
 
-        // get the style and its rules
-        final Style gt2Style = request.getStyle();
+        
         final FeatureTypeStyle[] ftStyles = gt2Style.getFeatureTypeStyles();
         final double scaleDenominator = request.getScale();
 
         final Rule[] applicableRules;
-        if (request.getRule() != null) {
-            applicableRules = new Rule[] { request.getRule() };
+        
+        if (ruleName != null) {
+            Rule rule = LegendUtils.getRule(ftStyles, ruleName);
+            if (rule == null) {
+                throw new ServiceException("Specified style does not contains a rule named " + ruleName);
+            }
+            applicableRules = new Rule[] {rule};
         } else {
             applicableRules = LegendUtils.getApplicableRules(ftStyles, scaleDenominator);
         }
-        if (applicableRules.length != 1)
-            throw new IllegalArgumentException(
-                    "Unable to create a legend for this style, we need exactly 1 rule");
+        // no rules means no legend has to be produced
+        if (applicableRules.length != 0) {
 
 //        final NumberRange<Double> scaleRange = NumberRange.create(scaleDenominator,
 //                scaleDenominator);
@@ -117,7 +131,7 @@ public class RasterLayerLegendHelper {
         height = request.getHeight();
         if (width <= 0 || height <= 0)
             throw new IllegalArgumentException(
-                    "Invalid widht and or height for the GetLegendGraphicRequest");
+                    "Invalid width and or height for the GetLegendGraphicRequest");
 
         final Symbolizer[] symbolizers = applicableRules[0].getSymbolizers();
         if (symbolizers == null || symbolizers.length != 1 | symbolizers[0] == null)
@@ -183,6 +197,7 @@ public class RasterLayerLegendHelper {
 
         } else
             cMapLegendCreator = null;
+        }
 
     }
 
@@ -192,6 +207,9 @@ public class RasterLayerLegendHelper {
      * @return a {@link BufferedImage} that represents the legend for the provided request.
      */
     public BufferedImage getLegend() {
+        if(rasterSymbolizer == null) {
+            return null;
+        }
         return createResponse();
     }
 

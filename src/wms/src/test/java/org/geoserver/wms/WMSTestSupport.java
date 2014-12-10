@@ -1,8 +1,11 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
+
+import static org.junit.Assert.*;
 
 import java.awt.Color;
 import java.awt.Frame;
@@ -16,7 +19,6 @@ import java.awt.image.Raster;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,12 +34,19 @@ import org.custommonkey.xmlunit.SimpleNamespaceContext;
 import org.custommonkey.xmlunit.XMLUnit;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CatalogBuilder;
+import org.geoserver.catalog.CoverageInfo;
+import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
+import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.data.test.MockData;
-import org.geoserver.test.GeoServerTestSupport;
+import org.geoserver.data.test.SystemTestData;
+import org.geoserver.test.GeoServerSystemTestSupport;
+import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.data.FeatureSource;
 import org.geotools.map.FeatureLayer;
+import org.geotools.map.GridCoverageLayer;
+import org.geotools.map.Layer;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.geotools.styling.Style;
 import org.geotools.xml.transform.TransformerBase;
@@ -60,9 +69,9 @@ import com.vividsolutions.jts.geom.Envelope;
  * @author Justin Deoliveira, The Open Planning Project, jdeolive@openplans.org
  * 
  */
-public abstract class WMSTestSupport extends GeoServerTestSupport {
+public abstract class WMSTestSupport extends GeoServerSystemTestSupport {
 
-    private static final String NATURE_GROUP = "nature";
+    protected static final String NATURE_GROUP = "nature";
 
     protected static final int SHOW_TIMEOUT = 2000;
 
@@ -70,6 +79,10 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
 
     protected static final Color BG_COLOR = Color.white;
 
+    protected static final Color COLOR_PLACES_GRAY = new Color(170, 170, 170);
+    protected static final Color COLOR_LAKES_BLUE = new Color(64, 64, 192);
+    
+    
     /**
      * @return The global wms singleton from the application context.
      */
@@ -80,10 +93,16 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
         return wms;
     }
 
-    @Override
-    protected void oneTimeSetUp() throws Exception {
-        super.oneTimeSetUp();
+    /**
+     * @return The global web map service singleton from the application context.
+     */
+    protected WebMapService getWebMapService() {
+        return (WebMapService) applicationContext.getBean("webMapService");
+    }
 
+    @Override
+    protected void setUpTestData(SystemTestData testData) throws Exception {
+        super.setUpTestData(testData);
         Map<String, String> namespaces = new HashMap<String, String>();
         namespaces.put("xlink", "http://www.w3.org/1999/xlink");
         namespaces.put("xsi", "http://www.w3.org/2001/XMLSchema-instance");
@@ -91,10 +110,17 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
         namespaces.put("wcs", "http://www.opengis.net/wcs/1.1.1");
         namespaces.put("gml", "http://www.opengis.net/gml");
         namespaces.put("sf", "http://cite.opengeospatial.org/gmlsf");
-        getTestData().registerNamespaces(namespaces);
+        namespaces.put("kml", "http://www.opengis.net/kml/2.2");
+
+        testData.registerNamespaces(namespaces);
         registerNamespaces(namespaces);
         XMLUnit.setXpathNamespaceContext(new SimpleNamespaceContext(namespaces));
         
+
+    }
+    @Override
+    protected void onSetUp(SystemTestData testData) throws Exception {
+        super.onSetUp(testData);
         // setup a layer group
         Catalog catalog = getCatalog();
         LayerGroupInfo group = catalog.getFactory().createLayerGroup();
@@ -108,12 +134,11 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
             cb.calculateLayerGroupBounds(group);
             catalog.add(group);
         }
+        testData.addStyle("default", "Default.sld",MockData.class, catalog);
+        //"default", MockData.class.getResource("Default.sld")
+
     }
     
-    @Override
-    protected void setUpInternal() throws Exception {
-        super.setUpInternal();
-    }
 
     /**
      * subclass hook to register additional namespaces.
@@ -121,11 +146,7 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
     protected void registerNamespaces(Map<String, String> namespaces) {
     }
 
-    @Override
-    protected void populateDataDirectory(MockData dataDirectory) throws Exception {
-        super.populateDataDirectory(dataDirectory);
-        dataDirectory.addStyle("default", MockData.class.getResource("Default.sld"));
-    }
+ 
 
     /**
      * Convenience method for subclasses to create a map layer from a layer name.
@@ -138,7 +159,7 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
      * 
      * @return A new map layer.
      */
-    protected FeatureLayer createMapLayer(QName layerName) throws IOException {
+    protected Layer createMapLayer(QName layerName) throws IOException {
         return createMapLayer(layerName, null);
     }
 
@@ -155,23 +176,38 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
      * 
      * @return A new map layer.
      */
-    protected FeatureLayer createMapLayer(QName layerName, String styleName) throws IOException {
-        // TODO: support coverages
+    protected Layer createMapLayer(QName layerName, String styleName) throws IOException {
         Catalog catalog = getCatalog();
-        org.geoserver.catalog.FeatureTypeInfo info = catalog.getFeatureTypeByName(
-                layerName.getNamespaceURI(), layerName.getLocalPart());
+
         LayerInfo layerInfo = catalog.getLayerByName(layerName.getLocalPart());
         Style style = layerInfo.getDefaultStyle().getStyle();
         if (styleName != null) {
             style = catalog.getStyleByName(styleName).getStyle();
         }
 
-        FeatureSource<? extends FeatureType, ? extends Feature> featureSource;
-        featureSource = info.getFeatureSource(null, null);
+        FeatureTypeInfo info = catalog.getFeatureTypeByName(
+                layerName.getNamespaceURI(), layerName.getLocalPart());
+        Layer layer = null;
+        if (info != null) {
+            FeatureSource<? extends FeatureType, ? extends Feature> featureSource;
+            featureSource = info.getFeatureSource(null, null);
 
-        FeatureLayer layer = new FeatureLayer(featureSource, style);
-        layer.setTitle(layer.getTitle());
+            layer = new FeatureLayer(featureSource, style);
+        }
+        else {
+            //try a coverage
+            CoverageInfo cinfo = 
+                catalog.getCoverageByName(layerName.getNamespaceURI(), layerName.getLocalPart());
+            GridCoverage2D cov = (GridCoverage2D) cinfo.getGridCoverage(null, null);
+        
+            layer = new GridCoverageLayer(cov, style);
+        }
 
+        if (layer == null) {
+            throw new IllegalArgumentException("Could not find layer for " + layerName);
+        }
+
+        layer.setTitle(layerInfo.getTitle());
         return layer;
     }
 
@@ -240,6 +276,19 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
     protected void assertNotBlank(String testName, BufferedImage image, Color bgColor) {
         int pixelsDiffer = countNonBlankPixels(testName, image, bgColor);
         assertTrue(testName + " image is comlpetely blank", 0 < pixelsDiffer);
+    }
+
+    /**
+     * Asserts that the image is blank, in the sense that all pixels will be equal to the background
+     * color
+     * 
+     * @param testName the name of the test to throw meaningful messages if something goes wrong
+     * @param image the image to check it is not "blank"
+     * @param bgColor the background color for which differing pixels are looked for
+     */
+    protected void assertBlank(String testName, BufferedImage image, Color bgColor) {
+        int pixelsDiffer = countNonBlankPixels(testName, image, bgColor);
+        assertEquals(testName + " image is completely blank", 0, pixelsDiffer);
     }
 
     /**
@@ -341,6 +390,17 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
         showImage(testName, image);
     }
 
+    /**
+     * Checks that the image generated by the map producer is not blank.
+     * 
+     * @param testName
+     * @param producer
+     */
+    protected void assertBlank(String testName, BufferedImage image) {
+        assertBlank(testName, image, BG_COLOR);
+        showImage(testName, image);
+    }
+
     public static void showImage(String frameName, final BufferedImage image) {
         showImage(frameName, SHOW_TIMEOUT, image);
     }
@@ -393,7 +453,7 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
      * @see #checkImage(MockHttpServletResponse, String)
      */
     protected void checkImage(MockHttpServletResponse response) {
-        checkImage(response, "image/png");
+        checkImage(response, "image/png", -1, -1);
     }
     
     /**
@@ -401,31 +461,21 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
      * actual image into a buffered image.
      * 
      */
-    protected void checkImage(MockHttpServletResponse response, String mimeType) {
+    protected void checkImage(MockHttpServletResponse response, String mimeType, int width, int height) {
         assertEquals(mimeType, response.getContentType());
         try {
             BufferedImage image = ImageIO.read(getBinaryInputStream(response));
             assertNotNull(image);
-            assertEquals(image.getWidth(), 550);
-            assertEquals(image.getHeight(), 250);
+            if(width > 0) {
+                assertEquals(width, image.getWidth());
+            }
+            if(height > 0) {
+                assertEquals(height, image.getHeight());
+            }
         } catch (Throwable t) {
             t.printStackTrace();
             fail("Could not read image returned from GetMap:" + t.getLocalizedMessage());
         }
-    }
-    
-    /**
-     * Retries the request result as a BufferedImage, checking the mime type is the expected one
-     * @param path
-     * @param mime
-     * @return
-     * @throws Exception
-     */
-    protected BufferedImage getAsImage(String path, String mime) throws Exception {
-        MockHttpServletResponse resp = getAsServletResponse(path);
-        assertEquals(mime, resp.getContentType());
-        InputStream is = getBinaryInputStream(resp);
-        return ImageIO.read(is);
     }
     
     /**
@@ -436,6 +486,32 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
      * @param color
      */
     protected void assertPixel(BufferedImage image, int i, int j, Color color) {
+        Color actual = getPixelColor(image, i, j);
+        
+
+        assertEquals(color, actual);
+    }
+    
+    /**
+     * Checks the pixel i/j is fully transparent
+     * @param image
+     * @param i
+     * @param j
+     */
+    protected void assertPixelIsTransparent(BufferedImage image, int i, int j) {
+  	    int pixel = image.getRGB(i,j);
+        assertEquals(true, (pixel>>24) == 0x00);
+    }
+
+    /**
+     * Gets a specific pixel color from the specified buffered image
+     * @param image
+     * @param i
+     * @param j
+     * @param color
+     * @return
+     */
+    protected Color getPixelColor(BufferedImage image, int i, int j) {
         ColorModel cm = image.getColorModel();
         Raster raster = image.getRaster();
         Object pixel = raster.getDataElements(i, j, null);
@@ -444,10 +520,53 @@ public abstract class WMSTestSupport extends GeoServerTestSupport {
         if(cm.hasAlpha()) {
             actual = new Color(cm.getRed(pixel), cm.getGreen(pixel), cm.getBlue(pixel), cm.getAlpha(pixel));
         } else {
-            actual = new Color(cm.getRed(pixel), cm.getGreen(pixel), cm.getBlue(pixel), color.getAlpha());
+            actual = new Color(cm.getRed(pixel), cm.getGreen(pixel), cm.getBlue(pixel), 255);
         }
-
-        assertEquals(color, actual);
+        return actual;
+    }
+    /**
+     * Sets up a template in a feature type directory.
+     * 
+     * @param featureTypeName The name of the feature type.
+     * @param template The name of the template.
+     * @param body The content of the template.
+     * 
+     * @throws IOException
+     */
+    protected void setupTemplate(QName featureTypeName,String template,String body)
+        throws IOException {
+        
+        ResourceInfo info = getCatalog().getResourceByName(toName(featureTypeName), ResourceInfo.class);
+        getDataDirectory().copyToResourceDir(info, new ByteArrayInputStream(body.getBytes()),template);
+        
     }
 
+    protected LayerGroupInfo createLakesPlacesLayerGroup(Catalog catalog, LayerGroupInfo.Mode mode, LayerInfo rootLayer) throws Exception {
+        return createLakesPlacesLayerGroup(catalog, "lakes_and_places", mode, rootLayer);
+    }    
+
+    protected LayerGroupInfo createLakesPlacesLayerGroup(Catalog catalog, String name, LayerGroupInfo.Mode mode, LayerInfo rootLayer) throws Exception {
+        LayerInfo lakes = catalog.getLayerByName(getLayerId(MockData.LAKES));
+        LayerInfo places = catalog.getLayerByName(getLayerId(MockData.NAMED_PLACES));
+
+        LayerGroupInfo group = catalog.getFactory().createLayerGroup();
+        group.setName(name);
+        
+        group.setMode(mode);
+        if (rootLayer != null) {
+            group.setRootLayer(rootLayer);
+            group.setRootLayerStyle(rootLayer.getDefaultStyle());
+        }
+        
+        group.getLayers().add(lakes);
+        group.getLayers().add(places);
+
+        CatalogBuilder cb = new CatalogBuilder(catalog);
+        cb.calculateLayerGroupBounds(group);
+        
+        catalog.add(group);
+        
+        return group;
+    }    
+        
 }

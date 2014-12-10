@@ -1,25 +1,30 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.web;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.apache.wicket.Application;
 import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.Component;
+import org.apache.wicket.Page;
 import org.apache.wicket.RequestCycle;
 import org.apache.wicket.ResourceReference;
 import org.apache.wicket.ajax.IAjaxIndicatorAware;
+import org.apache.wicket.behavior.AttributeAppender;
 import org.apache.wicket.behavior.HeaderContributor;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.WebPage;
@@ -30,13 +35,21 @@ import org.apache.wicket.markup.html.link.ExternalLink;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
+import org.apache.wicket.model.LoadableDetachableModel;
+import org.apache.wicket.model.Model;
 import org.apache.wicket.model.StringResourceModel;
 import org.apache.wicket.protocol.http.WebResponse;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.config.GeoServer;
+import org.geoserver.ows.util.CaseInsensitiveMap;
+import org.geoserver.ows.util.KvpUtils;
+import org.geoserver.platform.GeoServerExtensions;
+import org.geoserver.security.GeoServerSecurityManager;
 import org.geoserver.web.spring.security.GeoServerSession;
 import org.geoserver.web.wicket.ParamResourceModel;
 import org.geotools.util.logging.Logging;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 
 /**
  * Base class for web pages in GeoServer web application.
@@ -58,11 +71,23 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
     protected static final String HEADER_PANEL = "headerPanel";
 
     protected static final Logger LOGGER = Logging.getLogger(GeoServerBasePage.class);
-
+    
+    protected static volatile GeoServerNodeInfo NODE_INFO;
+    
     /**
      * feedback panel for subclasses to report errors and information.
      */
     protected FeedbackPanel feedbackPanel;
+
+    /**
+     * page for this page to return to when the page is finished, could be null.
+     */
+    protected Page returnPage;
+
+    /** 
+     * page class for this page to return to when the page is finished, could be null. 
+     */
+    protected Class<? extends Page> returnPageClass;
 
 	@SuppressWarnings("serial")
     public GeoServerBasePage() {
@@ -183,9 +208,60 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
                 new ResourceReference(GeoServerBasePage.class, "img/ajax-loader.gif")));
         
         add(new WebMarkupContainer(HEADER_PANEL));
+        
+        
+        // allow the subclasses to initialize before getTitle/getDescription are called
+        add(new Label("gbpTitle", new LoadableDetachableModel<String>() {
+
+            @Override
+            protected String load() {
+                return getTitle();
+            }
+        }));
+        add(new Label("gbpDescription", new LoadableDetachableModel<String>() {
+
+            @Override
+            protected String load() {
+                return getDescription();
+            }
+        }));
+
+        // node id handling
+        WebMarkupContainer container = new WebMarkupContainer("nodeIdContainer");
+        add(container);
+        String id = getNodeInfo().getId();
+        Label label = new Label("nodeId", id);
+        container.add(label);
+        NODE_INFO.customize(container);     
+        if(id == null) {
+            container.setVisible(false);
+        }
+    }
+
+    private GeoServerNodeInfo getNodeInfo() {
+        // we don't synch on this one, worst it can happen, we create
+        // two instances of DefaultGeoServerNodeInfo, and one wil be gc-ed soon
+        if (NODE_INFO == null) {
+            // see if someone plugged a custom node info bean, otherwise use the default one
+            GeoServerNodeInfo info = GeoServerExtensions.bean(GeoServerNodeInfo.class);
+            if (info == null) {
+                info = new DefaultGeoServerNodeInfo();
+            }
+            NODE_INFO = info;
+        }
+
+        return NODE_INFO;
+    }
+
+    protected String getTitle() {
+        return new ParamResourceModel("title", this).getString();
     }
 	
-	/**
+	protected String getDescription() {
+	    return new ParamResourceModel("description", this).getString();
+    }
+
+    /**
 	 * Gets the page title from the PageName.title resource, falling back on "GeoServer" if not found
 	 * @return
 	 */
@@ -310,4 +386,62 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
        return feedbackPanel;
    }
 
+   /**
+    * Sets the return page to navigate to when this page is done its task.
+    * @see #doReturn()
+    */
+   public GeoServerBasePage setReturnPage(Page returnPage) {
+       this.returnPage = returnPage;
+       return this;
+   }
+
+   /**
+    * Sets the return page class to navigate to when this page is done its task.
+    * @see #doReturn()
+    */
+   public GeoServerBasePage setReturnPage(Class<? extends Page> returnPageClass) {
+       this.returnPageClass = returnPageClass;
+       return this;
+   }
+
+   /**
+    * Returns from the page by navigating to one of {@link #returnPage} or {@link #returnPageClass},
+    * processed in that order.
+    * <p>
+    * This method should be called by pages that must return after doing some task on a form submit
+    * such as a save or a cancel. If no return page has been set via {@Link {@link #setReturnPage(Page)}} 
+    * or {@link #setReturnPageClass(Class)} then {@link GeoServerHomePage} is used.
+    * </p>
+    */
+   protected void doReturn() {
+       doReturn(null);
+   }
+
+   /**
+    * Returns from the page by navigating to one of {@link #returnPage} or {@link #returnPageClass},
+    * processed in that order.
+    * <p>
+    * This method accepts a parameter to use as a default in cases where {@link #returnPage} and
+    * {@link #returnPageClass} are not set and a default other than {@link GeoServerHomePage} should
+    * be used.
+    * </p>
+    * <p>
+    * This method should be called by pages that must return after doing some task on a form submit
+    * such as a save or a cancel. If no return page has been set via {@Link {@link #setReturnPage(Page)}} 
+    * or {@link #setReturnPageClass(Class)} then {@link GeoServerHomePage} is used.
+    * </p>
+    */
+   protected void doReturn(Class<? extends Page> defaultPageClass) {
+       if (returnPage != null) {
+           setResponsePage(returnPage);
+           return;
+       }
+       if (returnPageClass != null) {
+           setResponsePage(returnPageClass);
+           return;
+       }
+
+       defaultPageClass = defaultPageClass != null ? defaultPageClass : GeoServerHomePage.class;
+       setResponsePage(defaultPageClass);
+   }
 }

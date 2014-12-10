@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.ows;
@@ -210,9 +211,18 @@ public abstract class Response {
                 name = name + "-" + opName;
             }
             String[] typeParts = mimeType.split(";");
-            String extension = typeParts[0].split("/")[0];
-            name = name + "." + extension;
+            name = name + "." + typeParts[0].split("/")[0];
         }
         return name;
+    }
+    
+    /**
+     * Returns the charset for this response, the Dispatcher will set it in the ServletResponse.
+     * The default implementation returns <code>null</code>, in this case no encoding should be set.
+     * Subclasses returning text documents (CSV,HTML,JSON) should override taking into account SettingsInfo.getCharset()
+     * as well as the specific encoding requirements of the returned format.
+     */
+    public String getCharset(Operation operation){ 
+       return null;
     }
 }

@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -37,6 +38,7 @@ import org.apache.wicket.validation.IValidatable;
 import org.apache.wicket.validation.validator.AbstractValidator;
 import org.geoserver.catalog.DataStoreInfo;
 import org.geoserver.catalog.FeatureTypeInfo;
+import org.geoserver.web.ComponentAuthorizer;
 import org.geoserver.web.GeoServerSecuredPage;
 import org.geoserver.web.data.store.StorePage;
 import org.geoserver.web.wicket.GeoServerAjaxFormLink;
@@ -100,6 +102,8 @@ public abstract class SQLViewAbstractPage extends GeoServerSecuredPage {
     boolean guessGeometrySrid = false;
 
     private CheckBox guessCheckbox;
+    
+    private boolean escapeSql = true;
 
     private static final List GEOMETRY_TYPES = Arrays.asList(Geometry.class,
             GeometryCollection.class, Point.class, MultiPoint.class, LineString.class,
@@ -148,12 +152,13 @@ public abstract class SQLViewAbstractPage extends GeoServerSecuredPage {
             DataAccess da = store.getDataStore(null);
             if (!(da instanceof JDBCDataStore)) {
                 error("Cannot create a SQL view if the store is not database based");
-                setResponsePage(StorePage.class);
+                doReturn(StorePage.class);
                 return;
             }
 
             name = virtualTable.getName();
             sql = virtualTable.getSql();
+            escapeSql = virtualTable.isEscapeSql();
 
             paramProvider.init(virtualTable);
             try {
@@ -226,7 +231,8 @@ public abstract class SQLViewAbstractPage extends GeoServerSecuredPage {
         // the "refresh attributes" link
         form.add(refreshLink());
         form.add(guessCheckbox = new CheckBox("guessGeometrySrid", new PropertyModel(this, "guessGeometrySrid")));
-
+        form.add(new CheckBox("escapeSql"));
+ 
         // the editable attribute table
         attributes = new GeoServerTablePanel<SQLViewAttribute>("attributes", attProvider) {
 
@@ -377,6 +383,7 @@ public abstract class SQLViewAbstractPage extends GeoServerSecuredPage {
             VirtualTable vt = new VirtualTable(vtName, virtualTable);
             // hide the primary key definitions or we'll loose some columns
             vt.setPrimaryKeyColumns(Collections.EMPTY_LIST);
+            vt.setEscapeSql(escapeSql);
             ds.addVirtualTable(vt);
             return guessFeatureType(ds, vt.getName(), guessGeometrySrid);
         } finally {
@@ -570,4 +577,8 @@ public abstract class SQLViewAbstractPage extends GeoServerSecuredPage {
         }
     }
     
+    @Override
+    protected ComponentAuthorizer getPageAuthorizer() {
+        return ComponentAuthorizer.WORKSPACE_ADMIN;
+    }
 }

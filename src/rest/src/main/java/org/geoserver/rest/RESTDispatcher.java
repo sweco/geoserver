@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.rest;
@@ -33,9 +34,9 @@ import com.noelios.restlet.ext.servlet.ServletConverter;
  */
 public class RESTDispatcher extends AbstractController {
     /** HTTP method "PUT" */
-    public static String METHOD_PUT = "PUT";
+    public static final String METHOD_PUT = "PUT";
     /** HTTP method "DELETE" */
-    public static String METHOD_DELETE = "DELETE";
+    public static final String METHOD_DELETE = "DELETE";
     
     /**
      * logger

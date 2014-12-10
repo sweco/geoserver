@@ -1,17 +1,25 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.config;
 
-import java.io.BufferedOutputStream;
+import static org.geoserver.data.util.IOUtils.xStreamPersist;
+
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CatalogException;
 import org.geoserver.catalog.CoverageInfo;
@@ -34,9 +42,19 @@ import org.geoserver.catalog.event.CatalogPostModifyEvent;
 import org.geoserver.catalog.event.CatalogRemoveEvent;
 import org.geoserver.config.util.XStreamPersister;
 import org.geoserver.platform.GeoServerResourceLoader;
+import org.geoserver.platform.resource.Files;
+import org.geoserver.platform.resource.Resource;
+import org.geoserver.platform.resource.Resource.Type;
+import org.geotools.styling.AbstractStyleVisitor;
+import org.geotools.styling.ExternalGraphic;
+import org.geotools.styling.Style;
 import org.geotools.util.logging.Logging;
 
+
+
 public class GeoServerPersister implements CatalogListener, ConfigurationListener {
+
+    private static final int MAX_RENAME_ATTEMPTS = 100;
 
     /**
      * logging instance
@@ -44,10 +62,12 @@ public class GeoServerPersister implements CatalogListener, ConfigurationListene
     static Logger LOGGER = Logging.getLogger( "org.geoserver.config");
      
     GeoServerResourceLoader rl;
+    GeoServerDataDirectory dd;
     XStreamPersister xp;
     
     public GeoServerPersister(GeoServerResourceLoader rl, XStreamPersister xp) {
         this.rl = rl;
+        this.dd = new GeoServerDataDirectory(rl);
         this.xp = xp;
     }
     
@@ -124,8 +144,8 @@ public class GeoServerPersister implements CatalogListener, ConfigurationListene
                 i = event.getPropertyNames().indexOf( "workspace");
                 if ( i > -1 ) {
                     WorkspaceInfo newWorkspace = (WorkspaceInfo) event.getNewValues().get( i );
-                    File oldDir = dir( (StoreInfo) source );
-                    oldDir.renameTo( new File( dir( newWorkspace ), oldDir.getName() ) );
+                    Resource oldDir = dd.get((StoreInfo) source );
+                    moveResToDir(oldDir, dd.get(newWorkspace));
                 }
             }
             
@@ -134,11 +154,44 @@ public class GeoServerPersister implements CatalogListener, ConfigurationListene
                 i = event.getPropertyNames().indexOf( "store");
                 if ( i > -1 ) {
                     StoreInfo newStore = (StoreInfo) event.getNewValues().get( i );
-                    File oldDir = dir( (FeatureTypeInfo) source );
-                    oldDir.renameTo( new File( dir( newStore ), oldDir.getName() ) );
+                    Resource oldDir = dd.get((FeatureTypeInfo) source);
+                    Resource newDir = dd.get(newStore);
+                    moveResToDir(oldDir, newDir);
                 }
             }
-            
+
+            //handle the case of a style changing workspace
+            if (source instanceof StyleInfo) {
+                i = event.getPropertyNames().indexOf("workspace");
+                if (i > -1) {
+                    WorkspaceInfo newWorkspace = (WorkspaceInfo) event.getNewValues().get( i );
+                    Resource newDir = dd.getStyles(newWorkspace);
+
+                    //look for any resource files (image, etc...) and copy them over, don't move 
+                    // since they could be shared among other styles
+                    for (Resource old : dd.additionalStyleResources((StyleInfo) source)) {
+                        copyResToDir(old, newDir);
+                    }
+
+                    //move over the config file and the sld
+                    for (Resource old : baseResources((StyleInfo)source)) {
+                        moveResToDir(old, newDir);
+                    }
+
+                }
+            }
+
+            //handle the case of a layer group changing workspace
+            if (source instanceof LayerGroupInfo) {
+                i = event.getPropertyNames().indexOf("workspace");
+                if (i > -1) {
+                    final WorkspaceInfo newWorkspace = (WorkspaceInfo) event.getNewValues().get( i );
+                    final Resource oldRes = dd.config((LayerGroupInfo)source);
+                    final Resource newDir = dd.getLayerGroups(newWorkspace);
+                    moveResToDir(oldRes, newDir);
+                }
+            }
+
             //handle default workspace
             if ( source instanceof Catalog ) {
                 i = event.getPropertyNames().indexOf("defaultWorkspace");
@@ -146,8 +199,7 @@ public class GeoServerPersister implements CatalogListener, ConfigurationListene
                     WorkspaceInfo defWorkspace = (WorkspaceInfo) event.getNewValues().get( i );
                     // SG don't bother with a default workspace if we do not have one
                     if (defWorkspace != null) {
-                        File d = rl.createDirectory("workspaces");
-                        persist(defWorkspace, new File(d, "default.xml"));
+                        persist(defWorkspace, dd.getWorkspaces("default.xml"));
                     }
                 }
             }
@@ -248,20 +300,51 @@ public class GeoServerPersister implements CatalogListener, ConfigurationListene
     
     public void handlePostGlobalChange(GeoServerInfo global) {
         try {
-            persist( global, new File( rl.getBaseDirectory(), "global.xml") );
+            persist( global, dd.config(global) );
         } 
         catch (IOException e) {
             throw new RuntimeException( e );
         }
     }
-    
+
+    public void handleSettingsAdded(SettingsInfo settings) {
+        handleSettingsPostModified(settings);
+    }
+
+    public void handleSettingsModified(SettingsInfo settings, List<String> propertyNames,
+            List<Object> oldValues, List<Object> newValues) {
+        //handle case of settings changing workspace
+        int i = propertyNames.indexOf( "workspace");
+        if ( i > -1 ) {
+            WorkspaceInfo newWorkspace = (WorkspaceInfo) newValues.get( i );
+            LOGGER.fine( "Moving settings '" + settings + " to workspace: " + newWorkspace);
+            
+            moveResToDir(dd.config(settings), dd.get(newWorkspace));
+        }
+    }
+
+    public void handleSettingsPostModified(SettingsInfo settings) {
+        LOGGER.fine( "Persisting settings " + settings );
+        try {
+            persist(settings, dd.config(settings));
+        }
+        catch(IOException e) {
+            throw new RuntimeException( e );
+        }
+    }
+
+    public void handleSettingsRemoved(SettingsInfo settings) {
+        LOGGER.fine( "Removing settings " + settings );
+        rmRes(dd.config(settings));
+    }
+
     public void handleLoggingChange(LoggingInfo logging, List<String> propertyNames,
             List<Object> oldValues, List<Object> newValues) {
     }
     
     public void handlePostLoggingChange(LoggingInfo logging) {
         try {
-            persist( logging, new File( rl.getBaseDirectory(), "logging.xml") );
+            persist( logging, dd.config(logging) );
         } 
         catch (IOException e) {
             throw new RuntimeException( e );
@@ -285,284 +368,237 @@ public class GeoServerPersister implements CatalogListener, ConfigurationListene
     }
     
     //workspaces
-    void addWorkspace( WorkspaceInfo ws ) throws IOException {
+    private void addWorkspace( WorkspaceInfo ws ) throws IOException {
         LOGGER.fine( "Persisting workspace " + ws.getName() );
-        File dir = dir( ws, true );
-        dir.mkdirs();
-        
-        persist( ws, file( ws ) );
+        Resource xml = dd.config(ws);
+        ensureParent(xml);
+        persist( ws, xml );
     }
     
-    void renameWorkspace( WorkspaceInfo ws, String newName ) throws IOException {
+    private void renameWorkspace( WorkspaceInfo ws, String newName ) throws IOException {
         LOGGER.fine( "Renaming workspace " + ws.getName() + "to " + newName );
-        rename( dir( ws ), newName );
+        Resource directory = dd.get(ws);
+        renameRes(directory, newName);
     }
     
-    void modifyWorkspace( WorkspaceInfo ws ) throws IOException {
+    private void modifyWorkspace( WorkspaceInfo ws ) throws IOException {
         LOGGER.fine( "Persisting workspace " + ws.getName() );
-        persist( ws, file( ws ) );
+        Resource r = dd.config(ws);
+        persist( ws, r );
     }
     
-    void removeWorkspace( WorkspaceInfo ws ) throws IOException {
+    private void removeWorkspace( WorkspaceInfo ws ) throws IOException {
         LOGGER.fine( "Removing workspace " + ws.getName() );
-        File dir = dir( ws );
-        FileUtils.deleteDirectory( dir );
-    }
-    
-    File dir( WorkspaceInfo ws ) throws IOException {
-        return dir( ws, false );
-    }
-    
-    File dir( WorkspaceInfo ws, boolean create ) throws IOException {
-        File d = rl.find( "workspaces", ws.getName() );
-        if ( d == null && create ) {
-            d = rl.createDirectory( "workspaces", ws.getName() );
-        }
-        return d;
-    }
-    
-    File file( WorkspaceInfo ws ) throws IOException {
-        return new File( dir( ws ), "workspace.xml" );
+        Resource directory = dd.get(ws);
+        rmRes(directory);
     }
     
     //namespaces
-    void addNamespace( NamespaceInfo ns ) throws IOException {
+    private void addNamespace( NamespaceInfo ns ) throws IOException {
         LOGGER.fine( "Persisting namespace " + ns.getPrefix() );
-        File dir = dir( ns, true );
-        dir.mkdirs();
-        persist( ns, file(ns) );
+        Resource xml = dd.config(ns);
+        ensureParent(xml);
+        persist( ns, xml );
     }
     
-    void modifyNamespace( NamespaceInfo ns) throws IOException {
+    private void modifyNamespace( NamespaceInfo ns) throws IOException {
         LOGGER.fine( "Persisting namespace " + ns.getPrefix() );
-        persist( ns, file(ns) );
+        Resource xml = dd.config(ns);
+        ensureParent(xml);
+        persist( ns, xml );
     }
     
-    void removeNamespace( NamespaceInfo ns ) throws IOException {
+    private void removeNamespace( NamespaceInfo ns ) throws IOException {
         LOGGER.fine( "Removing namespace " + ns.getPrefix() );
-        file( ns ).delete();
-    }
-    
-    File dir( NamespaceInfo ns ) throws IOException {
-        return dir( ns, false );
-    }
-    
-    File dir( NamespaceInfo ns, boolean create ) throws IOException {
-        File d = rl.find( "workspaces", ns.getPrefix() );
-        if ( d == null && create ) {
-            d = rl.createDirectory( "workspaces", ns.getPrefix() );
-        }
-        return d;
-    }
-    
-    File file( NamespaceInfo ns ) throws IOException {
-        return new File( dir( ns ), "namespace.xml");
+        Resource directory = dd.get(ns);
+        rmRes(directory);
     }
     
     //datastores
-    void addDataStore( DataStoreInfo ds ) throws IOException {
+    private void addDataStore( DataStoreInfo ds ) throws IOException {
         LOGGER.fine( "Persisting datastore " + ds.getName() );
-        File dir = dir( ds );
-        dir.mkdir();
-        
-        persist( ds, file( ds ) );
+        Resource xml = dd.config(ds);
+        ensureParent(xml);
+        persist( ds, xml );
     }
     
-    void renameStore( StoreInfo s, String newName ) throws IOException {
+    private void renameStore( StoreInfo s, String newName ) throws IOException {
         LOGGER.fine( "Renaming store " + s.getName() + "to " + newName );
-        rename( dir( s ), newName );
+        Resource directory = dd.get(s);
+        renameRes(directory, newName);
     }
     
-    void modifyDataStore( DataStoreInfo ds ) throws IOException {
+    private void modifyDataStore( DataStoreInfo ds ) throws IOException {
         LOGGER.fine( "Persisting datastore " + ds.getName() );
-        persist( ds, file( ds ) );
+        Resource xml = dd.config(ds);
+        persist( ds, xml );
     }
     
-    void removeDataStore( DataStoreInfo ds ) throws IOException {
+    private void removeDataStore( DataStoreInfo ds ) throws IOException {
         LOGGER.fine( "Removing datastore " + ds.getName() );
-        File dir = dir( ds );
-        FileUtils.deleteDirectory( dir );
-    }
-    
-    File dir( StoreInfo s ) throws IOException {
-        return new File( dir( s.getWorkspace() ), s.getName() );
-    }
-    
-    File file( DataStoreInfo ds ) throws IOException {
-        return new File( dir( ds ), "datastore.xml" );
+        Resource directory = dd.get(ds);
+        rmRes(directory);
     }
     
     //feature types
-    void addFeatureType( FeatureTypeInfo ft ) throws IOException {
+    private void addFeatureType( FeatureTypeInfo ft ) throws IOException {
         LOGGER.fine( "Persisting feature type " + ft.getName() );
-        File dir = dir( ft );
-        dir.mkdir();
-        persist( ft, file( ft ) );
+        Resource xml = dd.config(ft);
+        ensureParent(xml);
+        persist( ft, xml );
     }
     
-    void renameResource( ResourceInfo r, String newName ) throws IOException {
+    private void renameResource( ResourceInfo r, String newName ) throws IOException {
         LOGGER.fine( "Renaming resource " + r.getName() + " to " + newName );
-        rename( dir( r ), newName );
+        Resource directory = dd.get(r);
+        renameRes(directory, newName);
     }
     
-    void modifyFeatureType( FeatureTypeInfo ft ) throws IOException {
+    private void modifyFeatureType( FeatureTypeInfo ft ) throws IOException {
         LOGGER.fine( "Persisting feature type " + ft.getName() );
-        persist( ft, file( ft ) );
+        Resource xml = dd.config(ft);
+        persist( ft, xml );
     }
     
-    void removeFeatureType( FeatureTypeInfo ft ) throws IOException {
+    private void removeFeatureType( FeatureTypeInfo ft ) throws IOException {
         LOGGER.fine( "Removing feature type " + ft.getName() );
-        File dir = dir( ft );
-        FileUtils.deleteDirectory( dir );
-    }
-    
-    File dir( ResourceInfo r ) throws IOException {
-        return new File( dir( r.getStore() ), r.getName() );
-    }
-    
-    File file( FeatureTypeInfo ft ) throws IOException {
-        return new File( dir( ft ), "featuretype.xml");
+        Resource directory = dd.get(ft);
+        rmRes(directory);
     }
     
     //coverage stores
-    void addCoverageStore( CoverageStoreInfo cs ) throws IOException {
+    private void addCoverageStore( CoverageStoreInfo cs ) throws IOException {
         LOGGER.fine( "Persisting coverage store " + cs.getName() );
-        File dir = dir( cs );
-        dir.mkdir();
-        
-        persist( cs, file( cs ) );
+        Resource xml = dd.config(cs);
+        ensureParent(xml);
+        persist( cs, xml );
     }
     
-    void modifyCoverageStore( CoverageStoreInfo cs ) throws IOException {
+    private void modifyCoverageStore( CoverageStoreInfo cs ) throws IOException {
         LOGGER.fine( "Persisting coverage store " + cs.getName() );
-        persist( cs, file( cs ) );
+        Resource r = dd.config(cs);
+        persist( cs, r );
     }
     
-    void removeCoverageStore( CoverageStoreInfo cs ) throws IOException {
+    private void removeCoverageStore( CoverageStoreInfo cs ) throws IOException {
         LOGGER.fine( "Removing coverage store " + cs.getName() );
-        File dir = dir( cs );
-        FileUtils.deleteDirectory( dir );
-    }
-    
-    File file( CoverageStoreInfo cs ) throws IOException {
-        return new File( dir( cs ), "coveragestore.xml");
+        Resource r = dd.get(cs);
+        rmRes(r);
     }
     
     //coverages
-    void addCoverage( CoverageInfo c ) throws IOException {
+    private void addCoverage( CoverageInfo c ) throws IOException {
         LOGGER.fine( "Persisting coverage " + c.getName() );
-        File dir = dir( c );
-        dir.mkdir();
-        persist( c, dir, "coverage.xml" );
+        Resource xml = dd.config(c);
+        ensureParent(xml);
+        persist( c, xml );
     }
     
-    void modifyCoverage( CoverageInfo c ) throws IOException {
+    private void modifyCoverage( CoverageInfo c ) throws IOException {
         LOGGER.fine( "Persisting coverage " + c.getName() );
-        File dir = dir( c );
-        persist( c, dir, "coverage.xml");
+        Resource xml = dd.config(c);
+        persist( c, xml );
     }
     
-    void removeCoverage( CoverageInfo c ) throws IOException {
+    private void removeCoverage( CoverageInfo c ) throws IOException {
         LOGGER.fine( "Removing coverage " + c.getName() );
-        File dir = dir( c );
-        FileUtils.deleteDirectory( dir );
+        Resource directory = dd.get(c);
+        rmRes(directory);
     }
     
     //wms stores
-    void addWMSStore( WMSStoreInfo wms ) throws IOException {
-        LOGGER.fine( "Persisting wms store " + wms.getName() );
-        File dir = dir( wms );
-        dir.mkdir();
-        
-        persist( wms, file( wms ) );
+    private void addWMSStore( WMSStoreInfo wmss ) throws IOException {
+        LOGGER.fine( "Persisting wms store " + wmss.getName() );
+        Resource xml = dd.config(wmss);
+        ensureParent(xml);
+        persist(wmss, xml);
     }
     
-    void modifyWMSStore( WMSStoreInfo ds ) throws IOException {
-        LOGGER.fine( "Persisting wms store " + ds.getName() );
-        persist( ds, file( ds ) );
+    private void modifyWMSStore( WMSStoreInfo wmss ) throws IOException {
+        LOGGER.fine( "Persisting wms store " + wmss.getName() );
+        Resource xml = dd.config(wmss);
+        persist(wmss, xml);
     }
     
-    void removeWMSStore( WMSStoreInfo ds ) throws IOException {
-        LOGGER.fine( "Removing datastore " + ds.getName() );
-        File dir = dir( ds );
-        FileUtils.deleteDirectory( dir );
-    }
-    
-    File file( WMSStoreInfo ds ) throws IOException {
-        return new File( dir( ds ), "wmsstore.xml" );
+    private void removeWMSStore( WMSStoreInfo wmss ) throws IOException {
+        LOGGER.fine( "Removing datastore " + wmss.getName() );
+        Resource directory = dd.get(wmss);
+        rmRes(directory);
     }
     
     //wms layers
-    void addWMSLayer( WMSLayerInfo wms ) throws IOException {
+    private void addWMSLayer( WMSLayerInfo wms ) throws IOException {
         LOGGER.fine( "Persisting wms layer " + wms.getName() );
-        File dir = dir( wms );
-        dir.mkdir();
-        persist( wms, dir, "wmslayer.xml" );
+        Resource xml = dd.config(wms);
+        ensureParent(xml);
+        persist( wms, xml );
     }
     
-    void modifyWMSLayer( WMSLayerInfo wms ) throws IOException {
+    private void modifyWMSLayer( WMSLayerInfo wms ) throws IOException {
         LOGGER.fine( "Persisting wms layer" + wms.getName() );
-        File dir = dir( wms );
-        persist( wms, dir, "wmslayer.xml");
+        Resource xml = dd.config(wms);
+        persist( wms, xml );
     }
     
-    void removeWMSLayer( WMSLayerInfo c ) throws IOException {
-        LOGGER.fine( "Removing wms layer " + c.getName() );
-        File dir = dir( c );
-        FileUtils.deleteDirectory( dir );
+    private void removeWMSLayer( WMSLayerInfo wms ) throws IOException {
+        LOGGER.fine( "Removing wms layer " + wms.getName() );
+        Resource directory = dd.get(wms);
+        rmRes(directory);
     }
     
     //layers
-    void addLayer( LayerInfo l ) throws IOException {
+    private void addLayer( LayerInfo l ) throws IOException {
         LOGGER.fine( "Persisting layer " + l.getName() );
-        File dir = dir( l );
-        dir.mkdir();
-        persist( l, file( l ) );
+        Resource xml = dd.config(l);
+        ensureParent(xml);
+        persist( l, xml );
     }
     
-    void modifyLayer( LayerInfo l ) throws IOException {
+    private void modifyLayer( LayerInfo l ) throws IOException {
         LOGGER.fine( "Persisting layer " + l.getName() );
-        persist( l, file( l ) );
+        Resource xml = dd.config(l);
+        persist( l, xml );
     }
     
-    void removeLayer( LayerInfo l ) throws IOException {
+    private void removeLayer( LayerInfo l ) throws IOException {
         LOGGER.fine( "Removing layer " + l.getName() );
-        File dir = dir( l );
-        FileUtils.deleteDirectory( dir );
-    }
-    
-    File dir( LayerInfo l ) throws IOException {
-        if ( l.getResource() instanceof FeatureTypeInfo) {
-            return dir( (FeatureTypeInfo) l.getResource() );
-        }
-        else if ( l.getResource() instanceof CoverageInfo ) {
-            return dir( (CoverageInfo) l.getResource() );
-        }
-        else if ( l.getResource() instanceof WMSLayerInfo ) {
-            return dir( (WMSLayerInfo) l.getResource() );
-        }
-        return null;
-    }
-    
-    File file( LayerInfo l ) throws IOException {
-        return new File( dir( l ), "layer.xml" );
+        Resource directory = dd.get(l);
+        rmRes(directory);
     }
     
     //styles
-    void addStyle( StyleInfo s ) throws IOException {
+    private void addStyle( StyleInfo s ) throws IOException {
         LOGGER.fine( "Persisting style " + s.getName() );
-        dir( s, true );
-        persist( s, file( s ) );
+        Resource xml = dd.config(s);
+        ensureParent(xml);
+        persist( s, xml );
     }
     
-    void renameStyle( StyleInfo s, String newName ) throws IOException {
+    private void renameStyle( StyleInfo s, String newName ) throws IOException {
         LOGGER.fine( "Renameing style " + s.getName() + " to " + newName );
-        rename( file( s ), newName+".xml" );
+        Resource xml = dd.config(s);
+        renameRes( xml, newName+".xml" );
+        
+        Resource style = dd.style(s);
+        String sldFileName = newName + ".sld";
+        Resource target = style.parent().get(sldFileName);
+        int i = 1;
+        while(target.getType()!=Type.UNDEFINED && i <= MAX_RENAME_ATTEMPTS) {
+            sldFileName = newName + i + ".sld";
+            target = style.parent().get(sldFileName);
+        }
+        if (i > MAX_RENAME_ATTEMPTS) {
+            throw new IOException("All target files between " + newName + "1.sld and " + newName
+                    + MAX_RENAME_ATTEMPTS + ".sld are in use already, giving up");
+        }
+        renameRes(style, target.name());
+        s.setFilename(sldFileName);
     }
     
-    void modifyStyle( StyleInfo s ) throws IOException {
+    private void modifyStyle( StyleInfo s ) throws IOException {
         LOGGER.fine( "Persisting style " + s.getName() );
-        persist( s, file( s ) );
+        Resource xml = dd.config(s);
+        persist( s, xml );
         /*
         //save out sld
         File f = file(s);
@@ -581,141 +617,127 @@ public class GeoServerPersister implements CatalogListener, ConfigurationListene
         */
     }
     
-    void removeStyle( StyleInfo s ) throws IOException {
+    private void removeStyle( StyleInfo s ) throws IOException {
         LOGGER.fine( "Removing style " + s.getName() );
-        file( s ).delete();
+        Resource xml = dd.config(s);
+        rmRes(xml);
+    }
+
+    /*
+     * returns the SLD file as well
+     */
+    private List<Resource> baseResources(StyleInfo s) throws IOException {
+        List<Resource> list = 
+            Arrays.asList(dd.config(s), dd.style(s));
+        return list;
     }
     
-    File dir( StyleInfo s ) throws IOException {
-        return dir( s, false );
-    }
+    /*
+     * returns additional resource files 
+     */
+    private List<Resource> additionalResources(StyleInfo s) throws IOException {
+        final List<Resource> files = new ArrayList<Resource>();
+        final Resource baseDir = dd.get(s);
+        try {
+            Style parsedStyle = dd.parsedStyle(s);
+            parsedStyle.accept(new AbstractStyleVisitor() {
+                @Override
+                public void visit(ExternalGraphic exgr) {
+                    if (exgr.getOnlineResource() == null) {
+                        return;
+                    }
     
-    File dir( StyleInfo s, boolean create ) throws IOException {
-        File d = rl.find( "styles" );
-        if ( d == null && create ) {
-            d = rl.createDirectory( "styles" );
+                    URI uri = exgr.getOnlineResource().getLinkage();
+                    if (uri == null) {
+                        return;
+                    }
+    
+                    Resource r = null;
+                    try {
+                        r = uriToResource(baseDir, uri);
+                        if (r!=null && r.getType()!=Type.UNDEFINED) files.add(r);
+                    } catch (IllegalArgumentException|MalformedURLException e) {
+                        LOGGER.log(Level.WARNING, "Error attemping to process SLD resource", e);
+                    } 
+                }
+            });
         }
-        return d;
-    }
-    
-    File file( StyleInfo s ) throws IOException {
-        //special case for styles, if the file name (minus the suffix) matches the id of the style
-        // and the suffix is xml (rather than sld) we need to avoid overwritting the actual 
-        // style file
-        if (s.getFilename() != null && s.getFilename().endsWith(".xml") 
-            && s.getFilename().startsWith(s.getName()+".")) {
-            //append a second .xml suffix
-            return new File( dir( s ), s.getName() + ".xml.xml");
+        catch(IOException e) {
+            LOGGER.log(Level.WARNING, "Error loading style", e);
         }
-        else {
-            return new File( dir( s ), s.getName() + ".xml");
-        }
+        return files;
     }
-    
+
     //layer groups
-    void addLayerGroup( LayerGroupInfo lg ) throws IOException {
+    private void addLayerGroup( LayerGroupInfo lg ) throws IOException {
         LOGGER.fine( "Persisting layer group " + lg.getName() );
-        
-        dir( lg, true );
-        persist( lg, file( lg ) );
+        Resource xml = dd.config(lg);
+        ensureParent(xml);
+        persist(lg, xml);
     }
     
-    void renameLayerGroup( LayerGroupInfo lg, String newName ) throws IOException {
+    private void renameLayerGroup( LayerGroupInfo lg, String newName ) throws IOException {
         LOGGER.fine( "Renaming layer group " + lg.getName() + " to " + newName );
-        rename( file( lg ), newName+".xml" );
+        Resource xml = dd.config(lg);
+        renameRes( xml, String.format("%s.xml", newName));
     }
 
-    void modifyLayerGroup( LayerGroupInfo lg ) throws IOException {
+    private void modifyLayerGroup( LayerGroupInfo lg ) throws IOException {
         LOGGER.fine( "Persisting layer group " + lg.getName() );
-        persist( lg, file( lg ) );
+        Resource xml = dd.config(lg);
+        persist(lg, xml);
     }
     
-    void removeLayerGroup( LayerGroupInfo lg ) throws IOException {
+    private void removeLayerGroup( LayerGroupInfo lg ) throws IOException {
         LOGGER.fine( "Removing layer group " + lg.getName() );
-        file( lg ).delete();
+        Resource xml = dd.config(lg);
+        rmRes(xml);
     }
     
-    File dir( LayerGroupInfo lg ) throws IOException {
-        return dir( lg, false );
-    }
-    
-    File dir( LayerGroupInfo lg, boolean create ) throws IOException {
-        File d = rl.find( "layergroups" );
-        if ( d == null && create ) {
-            d = rl.createDirectory( "layergroups"); 
-        }
-        return d;
-    }
-    
-    File file( LayerGroupInfo lg ) throws IOException {
-        return new File( dir( lg ), lg.getName() + ".xml" );
-    }
-    
-    //helpers
-    void backupDirectory(File dir) throws IOException {
-        File bak = new File( dir.getCanonicalPath() + ".bak");
-        if ( bak.exists() ) {
-            FileUtils.deleteDirectory( bak );
-        }
-        dir.renameTo( bak );
-    }
-    
-    void rename(File f, String newName) throws IOException {
-        rename( f, new File( f.getParentFile(), newName ) );
-    }
-    
-    void rename( File source, File dest ) throws IOException {
-        // same path? Do nothing
-        if (source.getCanonicalPath().equalsIgnoreCase(dest.getCanonicalPath()))
-            return;
-
-        // different path
-        boolean win = System.getProperty("os.name").startsWith("Windows");
-        if ( win && dest.exists() ) {
-            //windows does not do atomic renames, and can not rename a file if the dest file
-            // exists
-            if (!dest.delete()) {
-                throw new IOException("Could not delete: " + dest.getCanonicalPath());
-            }
-            source.renameTo(dest);
-        }
-        else {
-            source.renameTo(dest);
-        }
-    }
-    
-    void persist( Object o, File dir, String filename ) throws IOException {
-        persist( o, new File( dir, filename ) );
-    }
-
-    void persist( Object o, File f ) throws IOException {
+    private void persist( Object o, Resource r ) throws IOException {
         try {
             synchronized ( xp ) {
-                //first save to a temp file
-                File temp = new File(f.getParentFile(),f.getName()+".tmp");
-                if ( temp.exists() ) {
-                    temp.delete();
-                }
-                
-                BufferedOutputStream out = null;
-                try{
-                    out=new BufferedOutputStream( new FileOutputStream( temp ) );
-                    xp.save( o, out );
-                    out.flush();
-                } finally {
-                    if (out != null)
-                        org.apache.commons.io.IOUtils.closeQuietly(out);
-                }
-                
-                //no errors, overwrite the original file
-                rename(temp,f);
+                xStreamPersist(r, o, xp);
             }
-            LOGGER.fine("Persisted " + o.getClass().getName() + " to " + f.getAbsolutePath() );
+            LOGGER.fine("Persisted " + o.getClass().getName() + " to " + r.path() );
         }
         catch( Exception e ) {
             //catch any exceptions and send them back as CatalogExeptions
-            String msg = "Error persisting " + o + " to " + f.getCanonicalPath();
+            String msg = "Error persisting " + o + " to " + r.path();
             throw new CatalogException(msg, e);
+        }
+    }
+    
+    private void rmRes(Resource r) {
+        rl.remove(r.path());
+    }
+    private void renameRes(Resource r, String newName) {
+        rl.move(r.path(), r.parent().get(newName).path());
+    }
+    private void moveResToDir(Resource r, Resource newDir) {
+        rl.move(r.path(), newDir.get(r.name()).path());
+    }
+    
+    private void copyResToDir(Resource r, Resource newDir) throws IOException {
+        Resource newR = newDir.get(r.name());
+        try(InputStream in = r.in();
+            OutputStream out = newR.out()){
+            IOUtils.copy(in, out);
+        }
+    }
+    private void ensureParent(Resource r) {
+        r.parent().dir();
+    }
+    
+    private Resource uriToResource(Resource base, URI uri) throws MalformedURLException {
+        if(uri.getScheme()!=null && !uri.getScheme().equals("file")) {
+            return null;
+        }
+        if(uri.isAbsolute() && ! uri.isOpaque()) {
+            assert uri.getScheme().equals("file");
+            return Files.asResource(new File(uri.toURL().getFile()));
+        }  else {
+            return base.get(uri.getSchemeSpecificPart());
         }
     }
 

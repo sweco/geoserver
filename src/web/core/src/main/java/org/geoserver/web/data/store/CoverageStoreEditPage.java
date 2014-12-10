@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -49,7 +50,7 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
         
         if(csi == null) {
             error(new ParamResourceModel("CoverageStoreEditPage.notFound", this, storeName, wsName).getString());
-            setResponsePage(StorePage.class);
+            doReturn(StorePage.class);
             return;
         }
         
@@ -70,17 +71,27 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
 
         initUI(store);
     }
-    
+
+    /**
+     * Creates a new edit page directly from a store object.
+     */
+    public CoverageStoreEditPage(CoverageStoreInfo store) throws IllegalArgumentException {
+        initUI(store);
+    }
+
     @Override
     void initUI(CoverageStoreInfo store) {
         dialog = new GeoServerDialog("dialog");
         add(dialog);
         
         super.initUI(store);
-        
-        String workspaceId = store.getWorkspace().getId();
-        workspacePanel.getFormComponent().add(
-                new CheckExistingResourcesInWorkspaceValidator(store.getId(), workspaceId));
+
+        if (store.getId() != null) {
+            //store id == null means the store is not part of catalog, forgo uniqueness check
+            String workspaceId = store.getWorkspace().getId();
+            workspacePanel.getFormComponent().add(
+                    new CheckExistingResourcesInWorkspaceValidator(store.getId(), workspaceId));
+        }
     }
 
     @SuppressWarnings("deprecation")
@@ -115,7 +126,7 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
                 LOGGER.info("Connection to store " + info.getName() + " validated. Got a "
                         + reader.getClass().getName() + ". Saving store");
                 doSaveStore(info);
-                setResponsePage(StorePage.class);
+                doReturn(StorePage.class);
             } catch (IOException e) {
                 confirmSaveOnConnectionFailure(info, requestTarget, e);
             } catch (RuntimeException e) {
@@ -124,7 +135,7 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
         } else {
             // store's disabled, no need to check for availability
             doSaveStore(info);
-            setResponsePage(StorePage.class);
+            doReturn(StorePage.class);
         }
     }
 
@@ -158,13 +169,19 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
             @Override
             public void onClose(AjaxRequestTarget target) {
                 if (accepted) {
-                    setResponsePage(StorePage.class);
+                    doReturn(StorePage.class);
                 }
             }
         });
     }
 
-    private void doSaveStore(final CoverageStoreInfo info) {
+    /**
+     * Performs the save of the store.
+     * <p>
+     * This method may be subclasses to provide custom save functionality.
+     * </p>
+     */
+    protected void doSaveStore(final CoverageStoreInfo info) {
         try {
             Catalog catalog = getCatalog();
 
@@ -180,6 +197,7 @@ public class CoverageStoreEditPage extends AbstractCoverageStorePage {
 
             ResourcePool resourcePool = catalog.getResourcePool();
             resourcePool.clear(info);
+            catalog.validate(info, false).throwIfInvalid();
             catalog.save(info);
 
             for (CoverageInfo coverage : alreadyConfigured) {

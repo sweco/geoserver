@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.jai;
 
 import java.util.List;
@@ -17,10 +22,6 @@ import com.sun.media.jai.util.SunTileCache;
  * Initializes JAI functionality from configuration.
  * 
  * @author Justin Deoliveira, The Open Planning Project
- * 
- * TODO: we should figure out if we want JAI to be core to the model or a plugin
- * ... right now it is both
- *
  */
 public class JAIInitializer implements GeoServerInitializer {
 
@@ -33,12 +34,11 @@ public class JAIInitializer implements GeoServerInitializer {
                     List<String> propertyNames, List<Object> oldValues,
                     List<Object> newValues) {
                 
-                initJAI( global.getJAI() );
-            }
-            
-            @Override
-            public void handlePostGlobalChange(GeoServerInfo global) {
-                initJAI(global.getJAI());
+                if (propertyNames.contains("jAI")) {//TODO: check why the propertyname is reported as jAI instead of JAI
+                    // Make sure to proceed with JAI init
+                    // only in case the global change involved that section
+                    initJAI(global.getJAI() );
+                }
             }
         });
     }
@@ -48,11 +48,6 @@ public class JAIInitializer implements GeoServerInitializer {
         JAI jaiDef = JAI.getDefaultInstance();
         jai.setJAI( jaiDef );
         
-        // setup concurrent operation registry
-        if(!(jaiDef.getOperationRegistry() instanceof ConcurrentOperationRegistry)) {
-            jaiDef.setOperationRegistry(ConcurrentOperationRegistry.initializeRegistry());
-        }
-        
         // setting JAI wide hints
         jaiDef.setRenderingHint(JAI.KEY_CACHED_TILE_RECYCLING_ENABLED, jai.isRecycling());
         
@@ -61,6 +56,12 @@ public class JAIInitializer implements GeoServerInitializer {
             final ConcurrentTileFactory recyclingFactory = new ConcurrentTileFactory();
             jaiDef.setRenderingHint(JAI.KEY_TILE_FACTORY, recyclingFactory);
             jaiDef.setRenderingHint(JAI.KEY_TILE_RECYCLER, recyclingFactory);
+        } else {
+            if(!jai.isRecycling()){
+                final PassThroughTileFactory passThroughFactory = new PassThroughTileFactory();
+                jaiDef.setRenderingHint(JAI.KEY_TILE_FACTORY, passThroughFactory);
+                jaiDef.setRenderingHint(JAI.KEY_TILE_RECYCLER, passThroughFactory);
+            }
         }
         
         // Setting up Cache Capacity
@@ -80,5 +81,7 @@ public class JAIInitializer implements GeoServerInitializer {
         
         // Workaround for native mosaic BUG
         Registry.setNativeAccelerationAllowed("Mosaic", jai.isAllowNativeMosaic(), jaiDef);
+        // Workaround for native Warp BUG
+        Registry.setNativeAccelerationAllowed("Warp", jai.isAllowNativeWarp(), jaiDef);
     }
 }

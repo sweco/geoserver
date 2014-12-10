@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -29,6 +30,8 @@ public class ParamInfo implements Serializable {
     private final String title;
 
     private boolean password;
+    
+    private boolean largeText;
 
     private Class<?> binding;
 
@@ -41,8 +44,12 @@ public class ParamInfo implements Serializable {
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public ParamInfo(Param param) {
         this.name = param.key;
-        this.title = param.title == null ? null : param.title.toString();
+        // the "short" Param constructor sets the title equal to the key, that's not
+        // very useful, use the description in that case instead
+        this.title = param.title != null && !param.title.toString().equals(param.key) ? param.title
+                .toString() : param.getDescription().toString();
         this.password = param.isPassword();
+        this.largeText = param.metadata != null && Boolean.TRUE.equals(param.metadata.get(Param.IS_LARGE_TEXT));
         if (Serializable.class.isAssignableFrom(param.type)) {
             this.binding = param.type;
             this.value = (Serializable) param.sample;
@@ -92,6 +99,10 @@ public class ParamInfo implements Serializable {
 
     public boolean isPassword() {
         return password;
+    }
+    
+    public boolean isLargeText() {
+        return largeText;
     }
 
     public Class<?> getBinding() {

@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.ows;
@@ -27,7 +28,7 @@ public class ProxifyingURLMangler implements URLMangler {
         String proxyBase = GeoServerExtensions.getProperty("PROXY_BASE_URL");
         if (proxyBase == null) {
             //if no system property fall back to configuration
-            proxyBase = geoServer.getGlobal().getProxyBaseUrl();
+            proxyBase = geoServer.getSettings().getProxyBaseUrl();
         }
 
         // perform the replacement if the proxy base is set

@@ -1,8 +1,11 @@
-/* Copyright (c) 2011 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.gwc.config;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -16,9 +19,9 @@ import java.util.logging.Logger;
 
 import org.geoserver.config.util.XStreamPersister;
 import org.geoserver.config.util.XStreamPersisterFactory;
+import org.geoserver.data.util.IOUtils;
 import org.geoserver.platform.GeoServerResourceLoader;
 import org.geotools.util.logging.Logging;
-import org.springframework.util.Assert;
 
 import com.thoughtworks.xstream.XStream;
 
@@ -32,7 +35,7 @@ public class GWCConfigPersister {
 
     private static final Logger LOGGER = Logging.getLogger(GWCConfigPersister.class);
 
-    public static final String GWC_CONFIG_FILE = "gwc-gs.xml";
+    static final String GWC_CONFIG_FILE = "gwc-gs.xml";
 
     private final XStreamPersisterFactory persisterFactory;
 
@@ -68,7 +71,7 @@ public class GWCConfigPersister {
 
     private synchronized void loadConfig() throws IOException {
         File configFile = findConfigFile();
-        Assert.notNull(configFile);
+        checkNotNull(configFile, "gwc config file does not exist: ", GWC_CONFIG_FILE);
 
         XStreamPersister xmlPersister = this.persisterFactory.createXMLPersister();
         configureXstream(xmlPersister.getXStream());
@@ -109,7 +112,7 @@ public class GWCConfigPersister {
             out.close();
         }
         File configFile = new File(getConfigRoot(), GWC_CONFIG_FILE);
-        tmp.renameTo(configFile);
+        IOUtils.rename(tmp, configFile);
         this.config = config;
         LOGGER.finer("Integrated GWC configuration saved to " + configFile.getAbsolutePath());
     }

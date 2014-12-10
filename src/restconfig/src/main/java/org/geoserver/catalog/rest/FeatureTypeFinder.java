@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog.rest;
@@ -35,14 +36,26 @@ public class FeatureTypeFinder extends AbstractCatalogFinder {
         }
         
         if ( ft != null ) {
+            // Check if the quietOnNotFound parameter is set
+            boolean quietOnNotFound=quietOnNotFoundEnabled(request);    
             if ( ds != null &&
                     catalog.getFeatureTypeByDataStore(catalog.getDataStoreByName(ws, ds), ft) == null) {
+                
+                // If true, no exception is returned
+                if(quietOnNotFound){
+                    return null;
+                }
                 throw new RestletException( "No such feature type: "+ws+","+ds+","+ft, Status.CLIENT_ERROR_NOT_FOUND );
             }
             else {
                 //look up by workspace/namespace
                 NamespaceInfo ns = catalog.getNamespaceByPrefix( ws );
                 if ( ns == null || catalog.getFeatureTypeByName( ns, ft ) == null ) {
+                    
+                    // If true, no exception is returned
+                    if(quietOnNotFound){
+                        return null;
+                    }
                     throw new RestletException( "No such feature type: "+ws+","+ft, Status.CLIENT_ERROR_NOT_FOUND );
                 }
             }

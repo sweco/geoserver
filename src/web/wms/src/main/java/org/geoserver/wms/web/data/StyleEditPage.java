@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -10,6 +11,12 @@ import java.util.logging.Level;
 
 import org.apache.wicket.PageParameters;
 import org.apache.wicket.WicketRuntimeException;
+import org.apache.wicket.behavior.AbstractBehavior;
+import org.apache.wicket.behavior.AttributeAppender;
+import org.apache.wicket.markup.html.IHeaderResponse;
+import org.apache.wicket.markup.html.form.Form;
+import org.apache.wicket.model.Model;
+import org.apache.wicket.model.StringResourceModel;
 import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.Styles;
 import org.geoserver.web.wicket.ParamResourceModel;
@@ -21,18 +28,54 @@ import org.geotools.util.Version;
 public class StyleEditPage extends AbstractStylePage {
     
     public static final String NAME = "name";
+    public static final String WORKSPACE = "workspace";
 
     public StyleEditPage(PageParameters parameters) {
         String name = parameters.getString(NAME);
-        StyleInfo si = getCatalog().getStyleByName(name);
+        String workspace = parameters.getString(WORKSPACE);
+
+        StyleInfo si = workspace != null ? getCatalog().getStyleByName(workspace, name) : 
+            getCatalog().getStyleByName(name);
         
         if(si == null) {
             error(new ParamResourceModel("StyleEditPage.notFound", this, name).getString());
-            setResponsePage(StylePage.class);
+            doReturn(StylePage.class);
             return;
         }
         
         initUI(si);
+
+        if (!isAuthenticatedAsAdmin()) {
+            Form f = (Form)get("form");
+    
+            //global styles only editable by full admin
+            if (si.getWorkspace() == null) {
+                styleForm.setEnabled(false);
+                nameTextField.setEnabled(false);
+                uploadForm.setEnabled(false);
+
+                editor.add(new AttributeAppender("class", new Model("disabled"), " "));
+                get("validate").add(new AttributeAppender("style", new Model("display:none;"), " "));
+                add(new AbstractBehavior() {
+                    @Override
+                    public void renderHead(IHeaderResponse response) {
+                        response.renderOnLoadJavascript(
+                            "document.getElementById('mainFormSubmit').style.display = 'none';");
+                        response.renderOnLoadJavascript(
+                            "document.getElementById('uploadFormSubmit').style.display = 'none';");
+                    }
+                });
+
+                info(new StringResourceModel("globalStyleReadOnly", this, null).getString());
+            }
+
+            //always disable the workspace toggle
+            f.get("workspace").setEnabled(false);
+        }
+
+        // format only settable upon creation
+        formatChoice.setEnabled(false);
+        formatReadOnlyMessage.setVisible(true);
     }
     
     public StyleEditPage(StyleInfo style) {
@@ -45,18 +88,18 @@ public class StyleEditPage extends AbstractStylePage {
         // write out the file and save name modifications
         try {
             StyleInfo style = (StyleInfo) styleForm.getModelObject();
-            Version version = Styles.findVersion(new ByteArrayInputStream(rawSLD.getBytes()));
+            Version version = Styles.handler(formatChoice.getModelObject()).version(rawStyle);
             style.setSLDVersion(version);
             
             // write out the SLD
             try {
                 getCatalog().getResourcePool().writeStyle(style,
-                        new ByteArrayInputStream(rawSLD.getBytes()));
+                        new ByteArrayInputStream(rawStyle.getBytes()));
             } catch (IOException e) {
                 throw new WicketRuntimeException(e);
             }
             getCatalog().save(style);
-            setResponsePage( StylePage.class );
+            doReturn( StylePage.class );
         } catch( Exception e ) {
             LOGGER.log(Level.SEVERE, "Error occurred saving the style", e);
             styleForm.error( e );

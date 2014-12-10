@@ -1,4 +1,12 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wps.gs;
+
+import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertTrue;
 
 import java.util.ArrayList;
 
@@ -6,9 +14,10 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.factory.GeoTools;
-import org.geotools.process.raster.gs.PolygonExtractionProcess;
+import org.geotools.process.raster.PolygonExtractionProcess;
 import org.geotools.util.NullProgressListener;
 import org.jaitools.numeric.Range;
+import org.junit.Test;
 import org.opengis.feature.simple.SimpleFeature;
 
 /**
@@ -23,10 +32,11 @@ public class PolygonExtractionProcessTest extends BaseRasterToVectorTest {
      * Nothing more nothing less.
      * @throws Exception
      */
+    @Test
     public void testProcessStandaloneBasic() throws Exception {
     	final GridCoverage2D gc = (GridCoverage2D) getCatalog().getCoverageByName(DEM.getLocalPart()).getGridCoverage(null, GeoTools.getDefaultHints());
+    	scheduleForDisposal(gc);
     	
-
     	final PolygonExtractionProcess process = new PolygonExtractionProcess();
 		final SimpleFeatureCollection fc = process.execute(
 				gc, 
@@ -51,8 +61,6 @@ public class PolygonExtractionProcessTest extends BaseRasterToVectorTest {
 			assertTrue(value > 0 && value < 8);
 		}
 		fi.close();
-		
-        
     }
 
     

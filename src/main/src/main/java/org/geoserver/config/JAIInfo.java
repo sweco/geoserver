@@ -1,13 +1,14 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.config;
 
+import java.io.Serializable;
+
 import javax.media.jai.JAI;
 import javax.media.jai.TileCache;
-
-import com.sun.media.jai.util.SunTileCache;
 
 /**
  * Java Advanced Imaging configuration.
@@ -15,7 +16,9 @@ import com.sun.media.jai.util.SunTileCache;
  * @author Justin Deoliveira, OpenGeo
  *
  */
-public interface JAIInfo {
+public interface JAIInfo extends Cloneable, Serializable {
+    
+    static enum PngEncoderType { JDK, NATIVE, PNGJ }; 
 
     /**
      * Flag controlling image interpolation.
@@ -55,9 +58,15 @@ public interface JAIInfo {
 
     /**
      * Flag controlling native PNG image processing.
+     * @deprecated Use {@link #getPngEncoderType()} instead
      */
+    @Deprecated
     boolean isPngAcceleration();
+    @Deprecated
     void setPngAcceleration(boolean pngAcceleration);
+    
+    PngEncoderType getPngEncoderType();
+    void setPngEncoderType(PngEncoderType type);
 
     /**
      * Flag controlling native JPEG image processing.
@@ -70,6 +79,12 @@ public interface JAIInfo {
      */
     boolean isAllowNativeMosaic();
     void setAllowNativeMosaic(boolean allowNativeMosaic);
+    
+    /**
+     * Flag controlling native warping operations.
+     */
+    boolean isAllowNativeWarp();
+    void setAllowNativeWarp(boolean allowNativeWarp);
     
     /**
      * Flag controlling the image io cache.
@@ -92,4 +107,6 @@ public interface JAIInfo {
      */
     TileCache getTileCache();
     void setTileCache(TileCache tileCache);
+
+    public JAIInfo clone();
 }

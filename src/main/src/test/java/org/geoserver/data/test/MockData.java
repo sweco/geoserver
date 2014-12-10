@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.data.test;
@@ -7,6 +8,7 @@ package org.geoserver.data.test;
 import java.awt.geom.AffineTransform;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +33,7 @@ import org.geotools.coverage.Category;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridGeometry2D;
-import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
+import org.geotools.coverage.grid.io.GridCoverage2DReader;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.coverage.grid.io.GridFormatFinder;
 import org.geotools.data.property.PropertyDataStoreFactory;
@@ -453,6 +455,25 @@ public class MockData implements TestData {
         }
     }
     
+    public void removeFeatureType(QName typeName) throws IOException {
+        String prefix = typeName.getPrefix();
+        String type = typeName.getLocalPart();
+        File featureTypeDir = new File(featureTypes, prefix + "_" + type);
+        if (!featureTypeDir.exists()) {
+            throw new FileNotFoundException("Type directory not found: "
+                    + featureTypeDir.getAbsolutePath());
+        }
+        File info = new File(featureTypeDir, "info.xml");
+        if (!info.exists()) {
+            throw new FileNotFoundException("FeatureType file not found: "
+                    + featureTypeDir.getAbsolutePath());
+        }
+        if (!IOUtils.delete(featureTypeDir)) {
+            throw new IOException("FetureType directory not deleted: "
+                    + featureTypeDir.getAbsolutePath());
+        }
+    }
+    
     /**
      * Adds the "well known" coverage types to the data directory.
      * 
@@ -474,7 +495,7 @@ public class MockData implements TestData {
         //addCoverage(GTOPO_DEM, TestData.class.getResource("W020N90/W020N90.manifest"),
         //        "dem", styleName);
         
-        addCoverage(USA_WORLDIMG, TestData.class.getResource("usa.zip"), null, styleName);
+        addCoverageFromZip(USA_WORLDIMG, TestData.class.getResource("usa.zip"), PNG, styleName);
     }
     
     /**
@@ -573,38 +594,60 @@ public class MockData implements TestData {
      * @param coverage
      */
     public void addCoverage(QName name, URL coverage, String extension, String styleName) throws Exception {
+        if (extension == null)
+            throw new IllegalArgumentException("Use addCoverageFromZip instead of passing NULL");
+        
         File directory = new File(data, name.getPrefix());
         if ( !directory.exists() ) {
             directory.mkdir();    
         }
         
         // create the coverage file
-        File f = new File(directory, name.getLocalPart() + (extension != null ? "." + extension : ""));
-        if (extension == null) {
-            f.mkdir();
+        File f = new File(directory, name.getLocalPart() + "." + extension);
+        
+        IOUtils.copy( coverage.openStream(), f );
+        
+        addCoverageFromPath(name, f, "file:" + name.getPrefix() + "/" + name.getLocalPart() + "." + extension, styleName);
+    }
+    
+    public void addCoverageFromZip(QName name, URL coverage, String extension, String styleName) throws Exception {
+        File directory = new File(data, name.getPrefix());
+        if (!directory.exists()) {
+            directory.mkdir();
         }
         
-        // copy over the contents
-        if (!f.isDirectory())
-            IOUtils.copy( coverage.openStream(), f );
-        else {
-            // assuming compressed file
-            final File compressedFile = new File(f, name.getLocalPart() + ".zip");
-            IOUtils.copy( coverage.openStream(), compressedFile );
-            IOUtils.decompress(compressedFile, f);
-            final File srcDir = new File(f, name.getLocalPart());
-            srcDir.mkdir();
-            FileUtils.copyDirectory(srcDir, f, true);
+        File f = new File(directory, name.getLocalPart());
+        f.mkdir();
+        
+        File compressedFile = new File(f, name.getLocalPart() + ".zip");
+        IOUtils.copy(coverage.openStream(), compressedFile);
+        IOUtils.decompress(compressedFile,  f);
+        final File srcDir = new File(f, name.getLocalPart());
+        srcDir.mkdir();
+        FileUtils.copyDirectory(srcDir,  f, true);
+        
+        if (extension != null) {
+            File coverageFile = new File(srcDir, name.getLocalPart() + "." + extension);
+            addCoverageFromPath(name, coverageFile,
+                    "file:" + name.getPrefix() + "/" + name.getLocalPart() + "/" + name.getLocalPart() + "." + extension,
+                    styleName);
+        } else {
+            addCoverageFromPath(name, f,
+                    "file:" + name.getPrefix() + "/" + name.getLocalPart(),
+                    styleName);
         }
-        coverageInfo(name, f, styleName);
+    }
+    
+    private void addCoverageFromPath(QName name, File coverage, String relpath, String styleName) throws Exception {
+        coverageInfo(name, coverage, styleName);
 
         // setup the meta information to be written in the catalog 
-        AbstractGridFormat format = (AbstractGridFormat) GridFormatFinder.findFormat(f);
+        AbstractGridFormat format = (AbstractGridFormat) GridFormatFinder.findFormat(coverage);
         namespaces.put(name.getPrefix(), name.getNamespaceURI());
         coverageStoresNamespaces.put(name.getLocalPart(), name.getPrefix());
         Map params = new HashMap();
         params.put(CatalogWriter.COVERAGE_TYPE_KEY, format.getName());
-        params.put(CatalogWriter.COVERAGE_URL_KEY, "file:" + name.getPrefix() + "/" + name.getLocalPart() + (extension != null ? "." + extension : ""));
+        params.put(CatalogWriter.COVERAGE_URL_KEY, relpath);
         coverageStores.put(name.getLocalPart(), params);
     }
     
@@ -746,7 +789,14 @@ public class MockData implements TestData {
         
         // let's grab the necessary metadata
         AbstractGridFormat format = (AbstractGridFormat) GridFormatFinder.findFormat(coverageFile);
-        AbstractGridCoverage2DReader reader = (AbstractGridCoverage2DReader) format.getReader(coverageFile);
+        GridCoverage2DReader reader;
+        try {
+            reader = (GridCoverage2DReader) format.getReader(coverageFile);
+        } catch (Exception e) {
+            String message = "Exception while trying to read " + coverageFile.getCanonicalPath() + " with format" + format.getName();
+            throw new RuntimeException(message, e);
+        }
+        
         if (reader == null) {
             throw new RuntimeException("No reader for " + coverageFile.getCanonicalPath() + " with format " + format.getName());
         }
@@ -763,7 +813,7 @@ public class MockData implements TestData {
         writer.write("<styles default=\"" + styleName + "\"/>\n");
         
         // envelope
-        CoordinateReferenceSystem crs = reader.getCrs();
+        CoordinateReferenceSystem crs = reader.getCoordinateReferenceSystem();
         GeneralEnvelope envelope = reader.getOriginalEnvelope();
         GeneralEnvelope wgs84envelope = CoverageStoreUtils.getWGS84LonLatEnvelope(envelope);
         final String nativeCrsName = CRS.lookupIdentifier(crs, false);
@@ -786,7 +836,7 @@ public class MockData implements TestData {
                 minCP[1] + (envelope.getSpan(1) / 20.0)
             };
         final GeneralEnvelope subEnvelope = new GeneralEnvelope(minCP, maxCP);
-        subEnvelope.setCoordinateReferenceSystem(reader.getCrs());
+        subEnvelope.setCoordinateReferenceSystem(reader.getCoordinateReferenceSystem());
 
         parameters.put(AbstractGridFormat.READ_GRIDGEOMETRY2D.getName().toString(),
             new GridGeometry2D(reader.getOriginalGridRange(), subEnvelope));

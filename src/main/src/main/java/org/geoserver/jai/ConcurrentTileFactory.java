@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2010 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.jai;
@@ -119,7 +120,7 @@ public class ConcurrentTileFactory implements TileFactory, TileRecycler {
                 Object array = PropertyUtils.getProperty(db, "bankData");
                 return new SoftReference<Object>(array);
             } catch (Exception e) {
-                throw new UnsupportedOperationException("Unkonwn data buffer type " + db);
+                throw new UnsupportedOperationException("Unknown data buffer type " + db);
             }
         }
 
@@ -260,7 +261,7 @@ public class ConcurrentTileFactory implements TileFactory, TileRecycler {
         return Raster.createWritableRaster(sampleModel, db, location);
     }
 
-    private static long getBufferSizeCSM(ComponentSampleModel csm) {
+    static long getBufferSizeCSM(ComponentSampleModel csm) {
         int[] bandOffsets = csm.getBandOffsets();
         int maxBandOff = bandOffsets[0];
         for (int i = 1; i < bandOffsets.length; i++)

@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.decoration;
@@ -382,5 +383,46 @@ public class MapDecorationLayout {
      */
     public boolean isEmpty() {
         return blocks.isEmpty();
+    }
+
+    public static Color parseColor(String origInput) {
+        if (origInput == null) return null;
+
+        String input = origInput.trim();
+        input = input.replaceFirst("\\A#", "");
+
+        int r, g, b, a;
+
+        switch (input.length()){
+            case 1:
+            case 2:
+                return new Color(Integer.valueOf(input, 16));
+            case 3:
+                r = Integer.valueOf(input.substring(0, 1), 16);
+                g = Integer.valueOf(input.substring(1, 2), 16);
+                b = Integer.valueOf(input.substring(2, 3), 16);
+                return new Color(r, g, b);
+            case 4:
+                r = Integer.valueOf(input.substring(0, 1), 16);
+                g = Integer.valueOf(input.substring(1, 2), 16);
+                b = Integer.valueOf(input.substring(2, 3), 16);
+                a = Integer.valueOf(input.substring(3, 4), 16);
+                return new Color(r, g, b, a);
+            case 6:
+                r = Integer.valueOf(input.substring(0, 2), 16);
+                g = Integer.valueOf(input.substring(2, 4), 16);
+                b = Integer.valueOf(input.substring(4, 6), 16);
+                return new Color(r, g, b);
+            case 8:
+                r = Integer.valueOf(input.substring(0, 2), 16);
+                g = Integer.valueOf(input.substring(2, 4), 16);
+                b = Integer.valueOf(input.substring(4, 6), 16);
+                a = Integer.valueOf(input.substring(6, 8), 16);
+                return new Color(r, g, b, a);
+            default: 
+                throw new RuntimeException("Couldn't decode color value: " + origInput 
+                    + " (" + input +")"
+                );
+        }
     }
 }

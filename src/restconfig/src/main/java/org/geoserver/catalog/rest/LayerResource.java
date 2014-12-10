@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog.rest;
@@ -12,6 +13,7 @@ import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.catalog.StyleInfo;
+import org.geoserver.catalog.WMSLayerInfo;
 import org.geoserver.config.util.XStreamPersister;
 import org.geoserver.rest.format.DataFormat;
 import org.restlet.Context;
@@ -26,7 +28,6 @@ public class LayerResource extends AbstractCatalogResource {
     public LayerResource(Context context, Request request, Response response,
          Catalog catalog) {
         super(context, request, response, LayerInfo.class, catalog);
-        
     }
     
     @Override
@@ -98,10 +99,20 @@ public class LayerResource extends AbstractCatalogResource {
     protected void configurePersister(XStreamPersister persister, DataFormat format) {
         persister.setCallback(new XStreamPersister.Callback() {
             @Override
-            protected void postEncodeReference(Object obj, String ref,
+            protected void postEncodeReference(Object obj, String ref, String prefix, 
                     HierarchicalStreamWriter writer, MarshallingContext context) {
                 if ( obj instanceof StyleInfo ) {
-                    encodeLink( "/styles/" + encode(((StyleInfo)obj).getName()), writer);
+                    StyleInfo style = (StyleInfo) obj;
+                    StringBuffer link = new StringBuffer();
+                    if (style.getWorkspace() != null) {
+                        String wsName = style.getWorkspace().getName();
+                        writer.startNode("workspace");
+                        writer.setValue(wsName);
+                        writer.endNode();
+                        link.append("/workspaces/").append(encode(wsName));
+                    }
+                    link.append("/styles/").append(encode(style.getName()));
+                    encodeLink(link.toString(), writer);
                 }
                 if ( obj instanceof ResourceInfo ) {
                     ResourceInfo r = (ResourceInfo) obj;
@@ -115,6 +126,10 @@ public class LayerResource extends AbstractCatalogResource {
                     else if ( r instanceof CoverageInfo ) {
                         link.append( "coveragestores/").append( encode(r.getStore().getName()) )
                             .append( "/coverages/");
+                    }
+                    else if ( r instanceof WMSLayerInfo ) {
+                        link.append( "wmsstores/").append( encode(r.getStore().getName()) )
+                            .append( "/wmslayers/");
                     }
                     else {
                         return;

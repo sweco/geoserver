@@ -1,5 +1,6 @@
-/* Copyright (c) 2010 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
@@ -45,8 +46,6 @@ public class GetLegendGraphic {
             throw new ServiceException("There is no support for creating legends in "
                     + outputFormat + " format", "InvalidFormat");
         }
-        // the 
-        EnvFunction.setLocalValues(request.getEnv());
         Object legend = format.produceLegendGraphic(request);
         return legend;
     }

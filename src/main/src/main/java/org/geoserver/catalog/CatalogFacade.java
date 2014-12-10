@@ -1,12 +1,20 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.catalog;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import org.geoserver.catalog.event.CatalogModifyEvent;
+import org.geoserver.catalog.impl.AbstractCatalogFacade;
 import org.geoserver.catalog.impl.DefaultCatalogFacade;
+import org.geoserver.catalog.util.CloseableIterator;
+import org.opengis.filter.Filter;
+import org.opengis.filter.sort.SortBy;
 
 /**
  * Data access facade for the catalog.
@@ -16,10 +24,11 @@ import org.geoserver.catalog.impl.DefaultCatalogFacade;
  */
 public interface CatalogFacade {
 
-    static WorkspaceInfo ANY_WORKSPACE = DefaultCatalogFacade.ANY_WORKSPACE;
+    static WorkspaceInfo ANY_WORKSPACE = AbstractCatalogFacade._ANY_WORKSPACE;
     
-    static NamespaceInfo ANY_NAMESPACE = DefaultCatalogFacade.ANY_NAMESPACE;
+    static NamespaceInfo ANY_NAMESPACE = AbstractCatalogFacade._ANY_NAMESPACE;
     
+    static WorkspaceInfo NO_WORKSPACE = AbstractCatalogFacade._NO_WORKSPACE;
     /**
      * The containing catalog.
      */
@@ -457,7 +466,7 @@ public interface CatalogFacade {
     LayerGroupInfo getLayerGroup(String id);
 
     /**
-     * Loads a layer group from persistent storage by specifying its name.
+     * Loads a global layer group from persistent storage by specifying its name.
      * 
      * @param name The name of the layer group.
      * 
@@ -466,11 +475,30 @@ public interface CatalogFacade {
     LayerGroupInfo getLayerGroupByName(String name);
 
     /**
+     * Returns the layer group matching a particular name in the specified workspace, or
+     * <code>null</code> if no such layer group could be found.
+     * 
+     * @param workspace The workspace containing the layer group. Not {@code null}, use
+     *        {@link DefaultCatalogFacade#NO_WORKSPACE} or
+     *        {@link DefaultCatalogFacade#ANY_WORKSPACE} to be explicit about what you're looking
+     *        for.
+     * @param name The name of the layer group to return.
+     */
+    LayerGroupInfo getLayerGroupByName(WorkspaceInfo workspace, String name);
+
+    /**
      * Loads all layer groups from persistent storage.
      * 
      * @return A list of layer groups, possibly empty.
      */
     List<LayerGroupInfo> getLayerGroups();
+
+    /**
+     * All layer groups in the specified workspace.
+     * 
+     * @param workspace The workspace containing layer groups.
+     */
+    List<LayerGroupInfo> getLayerGroupsByWorkspace(WorkspaceInfo workspace);
 
     //
     // Namespaces
@@ -691,11 +719,28 @@ public interface CatalogFacade {
     StyleInfo getStyleByName(String name);
 
     /**
+     * Returns the style matching a particular name in the specified workspace, or <code>null</code>
+     * if no such style could be found.
+     * 
+     * @param workspace The workspace containing the style; non {@code null}, use
+     *        {@value #ANY_WORKSPACE} or {@link #NO_WORKSPACE} as appropriate.
+     * @param name The name of the style to return.
+     */
+    StyleInfo getStyleByName(WorkspaceInfo workspace, String name);
+
+    /**
      * Loads all styles from persistent storage.
      * 
      * @return A list of styles, possibly empty.
      */
     List<StyleInfo> getStyles();
+
+    /**
+     * All styles in the specified workspace.
+     * 
+     * @param workspace The workspace containing styles.
+     */
+    List<StyleInfo> getStylesByWorkspace(WorkspaceInfo workspace);
 
     /**
      * Disposes the dao.
@@ -718,4 +763,32 @@ public interface CatalogFacade {
      * Pushes the data stored by this dao into another dao.
      */
     void syncTo(CatalogFacade other);
+    
+    /**
+     * @return the number of catalog objects of the requested type that match the given filter
+     */
+    public <T extends CatalogInfo> int count(final Class<T> of, final Filter filter);
+
+    /**
+     * @return {@code true} if {@link #list} can sort objects of the given type by the given
+     *         property name, {@code false} otherwise
+     */
+    public boolean canSort(Class<? extends CatalogInfo> type, String propertyName);
+
+    /**
+     * @return an iterator over the catalog objects of the requested type that match the given
+     *         filter
+     * @deprecated use {@link #list(Class, Filter, Integer, Integer, SortBy...)}
+     */
+    public <T extends CatalogInfo> CloseableIterator<T> list(final Class<T> of,
+            final Filter filter, @Nullable Integer offset, @Nullable Integer count,
+            @Nullable SortBy sortOrder);
+    
+    /**
+     * @return an iterator over the catalog objects of the requested type that match the given
+     *         filter
+     */
+    public <T extends CatalogInfo> CloseableIterator<T> list(final Class<T> of,
+            final Filter filter, @Nullable Integer offset, @Nullable Integer count,
+            @Nullable SortBy... sortOrder);
 }

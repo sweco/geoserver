@@ -1,15 +1,19 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wps;
 
 import java.math.BigInteger;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import net.opengis.ows11.AllowedValuesType;
 import net.opengis.ows11.CodeType;
@@ -34,13 +38,16 @@ import net.opengis.wps10.Wps10Factory;
 
 import org.geoserver.ows.Ows11Util;
 import org.geoserver.wfs.xml.XSProfile;
+import org.geoserver.wps.ppio.BinaryPPIO;
 import org.geoserver.wps.ppio.BoundingBoxPPIO;
 import org.geoserver.wps.ppio.ComplexPPIO;
 import org.geoserver.wps.ppio.LiteralPPIO;
 import org.geoserver.wps.ppio.ProcessParameterIO;
+import org.geoserver.wps.ppio.RawDataPPIO;
+import org.geoserver.wps.process.AbstractRawData;
+import org.geoserver.wps.process.GeoServerProcessors;
 import org.geotools.data.Parameter;
 import org.geotools.process.ProcessFactory;
-import org.geotools.process.Processors;
 import org.opengis.feature.type.Name;
 import org.springframework.context.ApplicationContext;
 
@@ -51,6 +58,8 @@ import org.springframework.context.ApplicationContext;
  * @author Justin Deoliveira, OpenGEO
  */
 public class DescribeProcess {
+    static final Logger LOGGER = org.geotools.util.logging.Logging.getLogger(DescribeProcess.class);
+
     WPSInfo wps;
     ApplicationContext context;
     Locale locale;
@@ -101,8 +110,8 @@ public class DescribeProcess {
     
     void processDescription( CodeType id, ProcessDescriptionsType pds ) {
         Name name = Ows11Util.name(id);
-        ProcessFactory pf = Processors.createProcessFactory(name);
-        if ( pf == null ) {
+        ProcessFactory pf = GeoServerProcessors.createProcessFactory(name);
+        if ( pf == null || pf.create(name) == null) {
             throw new WPSException( "No such process: " + id.getValue() );
         }
         
@@ -116,7 +125,7 @@ public class DescribeProcess {
         pd.setStatusSupported(true);
         pd.setStoreSupported(true);
         
-        //data inputs
+        // data inputs
         DataInputsType inputs = wpsf.createDataInputsType();
         pd.setDataInputs(inputs);
         dataInputs( inputs, pf, name );
@@ -128,7 +137,14 @@ public class DescribeProcess {
      }
     
     void dataInputs( DataInputsType inputs, ProcessFactory pf, Name name) {
+        Collection<String> outputMimeParameters = AbstractRawData.getOutputMimeParameters(name, pf)
+                .values();
         for(Parameter<?> p : pf.getParameterInfo(name).values()) {
+            // skip the output mime choice params, they will be filled automatically by WPS
+            if (outputMimeParameters.contains(p.key)) {
+                continue;
+            }
+
             InputDescriptionType input = wpsf.createInputDescriptionType();
             inputs.getInput().add( input );
             
@@ -165,20 +181,25 @@ public class DescribeProcess {
                         literal.setDataType(Ows11Util.type("xs:" + typeName.getLocalPart()));        
                     }    
                 }
-                if(lppio.getType().isEnum()) {
+                if (p.metadata.get(Parameter.OPTIONS) != null) {
+                    List<Object> options = (List<Object>) p.metadata.get(Parameter.OPTIONS);
+                    Object[] optionsArray = options.toArray(new Object[options.size()]);
+                    addAllowedValues(literal, optionsArray);
+                } else if (lppio.getType().isEnum()) {
                 	Object[] enumValues = lppio.getType().getEnumConstants();
-                	AllowedValuesType allowed = owsf.createAllowedValuesType();
-                	for (Object value : enumValues) {
-                		ValueType vt = owsf.createValueType();
-                		vt.setValue(value.toString());
-						allowed.getValue().add(vt);
-					}
-                	literal.setAllowedValues(allowed);
+                    addAllowedValues(literal, enumValues);
                 } else {
                 	literal.setAnyValue( owsf.createAnyValueType() );
                 }
 
-                //TODO: output the default value and see if we can output a valid range as well
+                try {
+                    if (p.sample != null) {
+                        literal.setDefaultValue(lppio.encode(p.sample));
+                    }
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "Failed to fill the default value for input " + p.key
+                            + " of process " + name, e);
+                }
             } else if(ppios.get( 0 ) instanceof BoundingBoxPPIO) {
                 input.setBoundingBoxData(buildSupportedCRSType());
             } else {
@@ -190,11 +211,36 @@ public class DescribeProcess {
                 for ( ProcessParameterIO ppio : ppios ) {
                     ComplexPPIO cppio = (ComplexPPIO) ppio;
 
-                    ComplexDataDescriptionType format = wpsf.createComplexDataDescriptionType();
-                    format.setMimeType( cppio.getMimeType() );
+                    ComplexDataDescriptionType format = null;
+
+                    if (ppio instanceof RawDataPPIO) {
+                        String[] mimeTypes = AbstractRawData.getMimeTypes(p);
+                        for (String mimeType : mimeTypes) {
+                            ComplexDataDescriptionType ddt = wpsf
+                                    .createComplexDataDescriptionType();
+                            ddt.setMimeType(mimeType);
+                            // heuristic to figure out if a format is text based, or not, we
+                            // might want to expose this as a separate annotation/property down the
+                            // road
+                            if (!mimeType.contains("json") && !mimeType.contains("text")
+                                    && !mimeType.contains("xml") && !mimeType.contains("gml")) {
+                                ddt.setEncoding("base64");
+                            }
+                            complex.getSupported().getFormat().add(ddt);
+                            if (format == null) {
+                                format = ddt;
+                            }
+                        }
+                    } else {
+                        format = wpsf.createComplexDataDescriptionType();
+                        format.setMimeType(cppio.getMimeType());
+                        if (cppio instanceof BinaryPPIO) {
+                            format.setEncoding("base64");
+                        }
+                        // add to supported
+                        complex.getSupported().getFormat().add(format);
+                    }
                     
-                    //add to supported
-                    complex.getSupported().getFormat().add( format );
                     
                     //handle the default    
                     if ( complex.getDefault() == null ) {
@@ -207,6 +253,16 @@ public class DescribeProcess {
                 }
             }
         }
+    }
+
+    private void addAllowedValues(LiteralInputType literal, Object[] values) {
+        AllowedValuesType allowed = owsf.createAllowedValuesType();
+        for (Object value : values) {
+            ValueType vt = owsf.createValueType();
+            vt.setValue(value.toString());
+            allowed.getValue().add(vt);
+        }
+        literal.setAllowedValues(allowed);
     }
 
     private SupportedCRSsType buildSupportedCRSType() {
@@ -264,11 +320,25 @@ public class DescribeProcess {
                 for ( ProcessParameterIO ppio : ppios ) {
                     ComplexPPIO cppio = (ComplexPPIO) ppio;
 
-                    ComplexDataDescriptionType format = wpsf.createComplexDataDescriptionType();
-                    format.setMimeType( cppio.getMimeType() );
-                    
-                    //add to supported
-                    complex.getSupported().getFormat().add( format );
+                    ComplexDataDescriptionType format = null;
+
+                    if (ppio instanceof RawDataPPIO) {
+                        String[] mimeTypes = AbstractRawData.getMimeTypes(p);
+                        for (String mimeType : mimeTypes) {
+                            ComplexDataDescriptionType ddt = wpsf
+                                    .createComplexDataDescriptionType();
+                            ddt.setMimeType(mimeType);
+                            complex.getSupported().getFormat().add(ddt);
+                            if (format == null) {
+                                format = ddt;
+                            }
+                        }
+                    } else {
+                        format = wpsf.createComplexDataDescriptionType();
+                        format.setMimeType(cppio.getMimeType());
+                        // add to supported
+                        complex.getSupported().getFormat().add(format);
+                    }
                     
                     //handle the default    
                     if ( complex.getDefault() == null ) {

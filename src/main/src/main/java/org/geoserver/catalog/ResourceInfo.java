@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -23,10 +24,27 @@ public interface ResourceInfo extends CatalogInfo {
      * The time dimension
      */
     static final String TIME = "time";
+    
     /**
      * The elevation dimension
      */
     static final String ELEVATION = "elevation";
+    
+    /**
+     * Prefix for custom dimensions
+     */
+    public static final String CUSTOM_DIMENSION_PREFIX = "custom_dimension_";
+    
+    /**
+     * Key for the HTTP caching max age value in the metadata map
+     */
+    public static final String CACHE_AGE_MAX = "cacheAgeMax";
+    
+    /**
+     * Key for enabling/disabling HTTP caching flag in the metadata map
+     */
+    public static final String CACHING_ENABLED = "cachingEnabled";
+    
 
     /**
      * The catalog the resource is part of.
@@ -80,6 +98,11 @@ public interface ResourceInfo extends CatalogInfo {
     void setNativeName( String nativeName );
     
     /**
+     * @deprecated use {@link #prefixedName()}
+     */
+    String getPrefixedName();
+
+    /**
      * Returns the prefixed name for the resource.
      * <p>
      * This method is a convenience for:
@@ -89,8 +112,8 @@ public interface ResourceInfo extends CatalogInfo {
      * </p>
      * @return
      */
-    String getPrefixedName();
-    
+    String prefixedName();
+
     /**
      * A set of aliases or alternative names that the resource is also known by. 
      */

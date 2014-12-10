@@ -1,5 +1,6 @@
-/* Copyright (c) 2010 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.kvp;
@@ -47,11 +48,11 @@ public class MapLayerInfoKvpParser extends KvpParser {
             LayerInfo layerInfo = wms.getLayerByName(layerName);
             if (layerInfo == null) {
                 LayerGroupInfo groupInfo = wms.getLayerGroupByName(layerName);
-                if (groupInfo == null) {
+                if (groupInfo == null || LayerGroupInfo.Mode.CONTAINER.equals(groupInfo.getMode())) {
                     throw new ServiceException(layerName + ": no such layer on this server",
                             "LayerNotDefined", getClass().getSimpleName());
                 } else {
-                    for (LayerInfo li : groupInfo.getLayers()) {
+                    for (LayerInfo li : groupInfo.layers()) {
                         layer = new MapLayerInfo(li);
                         layers.add(layer);
                     }

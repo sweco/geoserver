@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.xml.v1_0_0;
@@ -77,7 +78,7 @@ public class XmlSchemaEncoder extends WFSDescribeFeatureTypeOutputFormat {
         //generates response, using general function
         String xmlResponse = generateTypes(featureTypeInfos, (DescribeFeatureTypeType) describeFeatureType.getParameters()[0]);
 
-        if (!wfs.getGeoServer().getGlobal().isVerbose()) {
+        if (!wfs.getGeoServer().getSettings().isVerbose()) {
             //strip out the formatting.  This is pretty much the only way we
             //can do this, as the user files are going to have newline
             //characters and whatnot, unless we can get rid of formatting
@@ -87,7 +88,7 @@ public class XmlSchemaEncoder extends WFSDescribeFeatureTypeOutputFormat {
             xmlResponse = xmlResponse.replaceAll("\n[ \\t\\n]*", " ");
         }
 
-        Writer writer = new OutputStreamWriter(output, wfs.getGeoServer().getGlobal().getCharset());
+        Writer writer = new OutputStreamWriter(output, wfs.getGeoServer().getSettings().getCharset());
         writer.write(xmlResponse);
         writer.flush();
     }
@@ -107,7 +108,7 @@ public class XmlSchemaEncoder extends WFSDescribeFeatureTypeOutputFormat {
         // Initialize return information and intermediate return objects
         StringBuffer tempResponse = new StringBuffer();
 
-        tempResponse.append("<?xml version=\"1.0\" encoding=\"" + getInfo().getGeoServer().getGlobal().getCharset()
+        tempResponse.append("<?xml version=\"1.0\" encoding=\"" + getInfo().getGeoServer().getSettings().getCharset()
             + "\"?>" + "\n<xs:schema ");
 
         //allSameType will throw WFSException if there are types that are not found.

@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.security;
@@ -12,8 +13,10 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.security.core.Authentication;
+import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.ResourceInfo;
+import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geotools.factory.CommonFactoryFinder;
 import org.opengis.filter.Filter;
@@ -195,7 +198,8 @@ public abstract class ResourceAccessManagerWrapper implements ResourceAccessMana
 
     protected WorkspaceAccessLimits intersection(WorkspaceAccessLimits a, WorkspaceAccessLimits b) {
         CatalogMode mode = intersection(a.getMode(), b.getMode());
-        return new WorkspaceAccessLimits(mode, a.isReadable() && b.isReadable(), a.isWritable() && b.isWritable());
+        return new WorkspaceAccessLimits(mode, a.isReadable() && b.isReadable(), 
+            a.isWritable() && b.isWritable(), a.isAdminable() && b.isAdminable());
     }
 
     public void setDelegate(ResourceAccessManager delegate) {
@@ -212,5 +216,13 @@ public abstract class ResourceAccessManagerWrapper implements ResourceAccessMana
 
     public WorkspaceAccessLimits getAccessLimits(Authentication user, WorkspaceInfo workspace) {
         return delegate.getAccessLimits(user, workspace);
+    }
+
+    public StyleAccessLimits getAccessLimits(Authentication user, StyleInfo style) {
+        return delegate.getAccessLimits(user, style);
+    }
+
+    public LayerGroupAccessLimits getAccessLimits(Authentication user, LayerGroupInfo layerGroup) {
+        return delegate.getAccessLimits(user, layerGroup);
     }
 }

@@ -1,38 +1,60 @@
-/* Copyright (c) 2011 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.gwc.layer;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+import static org.geoserver.gwc.GWC.tileLayerName;
+
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.commons.httpclient.util.LangUtils;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CatalogException;
 import org.geoserver.catalog.CatalogInfo;
 import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.catalog.FeatureTypeInfo;
+import org.geoserver.catalog.LayerGroupHelper;
 import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
+import org.geoserver.catalog.LayerInfo.Type;
+import org.geoserver.catalog.MetadataMap;
 import org.geoserver.catalog.NamespaceInfo;
+import org.geoserver.catalog.Predicates;
 import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.WMSLayerInfo;
+import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.catalog.event.CatalogAddEvent;
 import org.geoserver.catalog.event.CatalogListener;
 import org.geoserver.catalog.event.CatalogModifyEvent;
 import org.geoserver.catalog.event.CatalogPostModifyEvent;
 import org.geoserver.catalog.event.CatalogRemoveEvent;
+import org.geoserver.catalog.util.CloseableIterator;
 import org.geoserver.gwc.GWC;
 import org.geoserver.gwc.config.GWCConfig;
 import org.geotools.util.logging.Logging;
 import org.geowebcache.filter.parameters.StringParameterFilter;
+import org.geowebcache.grid.GridSetBroker;
+import org.geowebcache.layer.TileLayer;
+import org.geowebcache.locks.LockProvider;
 import org.geowebcache.storage.StorageBroker;
 
+import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+
 /**
- * Listens to {@link Catalog}'s layer added/removed events and adds/removes
+ * Listens to {@link Catalog} layers added/removed events and adds/removes
  * {@link GeoServerTileLayer}s to/from the {@link CatalogConfiguration}
  * <p>
  * Handles the following cases:
@@ -48,14 +70,17 @@ import org.geowebcache.storage.StorageBroker;
  * <li><b>Layer renamed</b>: a {@link LayerInfo} or {@link LayerGroupInfo} has been renamed. GWC is
  * {@link StorageBroker#rename instructed to rename} the corresponding tile layer preserving the
  * cache and any other information (usage statistics, disk quota usage, etc).</li>
+ * <li><b>Workspace renamed</b>: a {@link WorkspaceInfo} as been renamed. GWC is
+ * {@link StorageBroker#rename instructed to rename} all the corresponding tile layer associated to 
+ * the workspace, preserving the cache and any other information (usage statistics, disk quota usage, etc).</li>
  * <li><b>Namespace changed</b>: a {@link ResourceInfo} has been assigned to a different
  * {@link NamespaceInfo namespace}. As the GWC tile layers are named after the resource's
- * {@link ResourceInfo#getPrefixedName() prefixed name} and not only after the
+ * {@link ResourceInfo#prefixedName() prefixed name} and not only after the
  * {@link LayerInfo#getName()} (at least until GeoServer separates out data from publication - the
  * famous data/publish split), GWC is instructed to rename the layer preserving the cache and any
  * other information for the layer.</li>
- * <li><b>LayerGroupInfo modified</b>: either the {@link LayerGroupInfo#getLayers() layers} or
- * {@link LayerGroupInfo#getStyles() styles} changed for a {@code LayerGroupInfo}. It's cache is
+ * <li><b>LayerGroupInfo modified</b>: either the {@link LayerGroupInfo#layers() layers} or
+ * {@link LayerGroupInfo#styles() styles} changed for a {@code LayerGroupInfo}. It's cache is
  * truncated.</li>
  * <li><b>LayerInfo default style replaced</b>: a {@code LayerInfo} has been assigned a different
  * {@link LayerInfo#getDefaultStyle() default style}. The corresponding tile layer's cache is
@@ -64,9 +89,9 @@ import org.geowebcache.storage.StorageBroker;
  * {@link LayerInfo#getStyles() alternate styles} has been modified. For any added style, if the
  * {@link GeoServerTileLayer} is configured to {@link GeoServerTileLayerInfo#isAutoCacheStyles()
  * automatically cache all styles}, the style name is added to the set of
- * {@link GeoServerTileLayerInfo#getCachedStyles() cached styles}. For any <b>removed</b> style, if
- * it was one of the {@link GeoServerTileLayerInfo#getCachedStyles() cached styles}, the layer's
- * cache for that style is truncated, and it's removed from the tile layer's set of cached styles.
+ * {@link GeoServerTileLayerInfo#cachedStyles() cached styles}. For any <b>removed</b> style, if it
+ * was one of the {@link GeoServerTileLayerInfo#cachedStyles() cached styles}, the layer's cache for
+ * that style is truncated, and it's removed from the tile layer's set of cached styles.
  * Subsequently, the {@link GeoServerTileLayer} will create a {@link StringParameterFilter "STYLES"
  * parameter filter} for all the cached styles on demand</li>
  * </ul>
@@ -79,7 +104,9 @@ public class CatalogLayerEventListener implements CatalogListener {
 
     private static Logger log = Logging.getLogger(CatalogLayerEventListener.class);
 
-    private final CatalogConfiguration catalogConfig;
+    private final GWC mediator;
+
+    private final Catalog catalog;
 
     /**
      * Holds the CatalogModifyEvent from {@link #handleModifyEvent} to be taken after the change was
@@ -88,29 +115,72 @@ public class CatalogLayerEventListener implements CatalogListener {
      */
     private static ThreadLocal<CatalogModifyEvent> PRE_MODIFY_EVENT = new ThreadLocal<CatalogModifyEvent>();
 
-    public CatalogLayerEventListener(final CatalogConfiguration catalogConfiguration) {
-        this.catalogConfig = catalogConfiguration;
+    private static ThreadLocal<GeoServerTileLayerInfo> PRE_MODIFY_TILELAYER = new ThreadLocal<GeoServerTileLayerInfo>();
+
+    public CatalogLayerEventListener(final GWC mediator, Catalog catalog) {
+        this.mediator = mediator;
+        this.catalog = catalog;
     }
 
     /**
      * If either a {@link LayerInfo} or {@link LayerGroupInfo} has been added to the {@link Catalog}
-     * , create a corresponding GWC TileLayer.
+     * , create a corresponding GWC TileLayer depending on the value of
+     * {@link GWCConfig#isCacheLayersByDefault()}.
      * 
      * @see org.geoserver.catalog.event.CatalogListener#handleAddEvent
      * @see GWC#createLayer(LayerInfo)
      * @see GWC#createLayer(LayerGroupInfo)
      */
     public void handleAddEvent(CatalogAddEvent event) throws CatalogException {
+        GWCConfig config = mediator.getConfig();
+        boolean sane = config.isSane();
+        boolean cacheLayersByDefault = config.isCacheLayersByDefault();
+        if (!cacheLayersByDefault) {
+            return;
+        }
+        if (!sane) {
+            log.info("Ignoring auto-creation of tile layer for " + event.getSource()
+                    + ": global gwc settings are not sane");
+        }
         Object obj = event.getSource();
         // We only handle layers here. Layer groups are initially empty
         if (obj instanceof LayerInfo) {
             log.finer("Handling add event: " + obj);
             LayerInfo layerInfo = (LayerInfo) obj;
-            catalogConfig.createLayer(layerInfo);
+            createTileLayer(layerInfo);
         } else if (obj instanceof LayerGroupInfo) {
             LayerGroupInfo lgi = (LayerGroupInfo) obj;
-            catalogConfig.createLayer(lgi);
+            createTileLayer(lgi);
         }
+    }
+
+    /**
+     * LayerInfo has been created, add a matching {@link GeoServerTileLayer}
+     * 
+     * @see CatalogLayerEventListener#handleAddEvent
+     * @see GWC#add(GeoServerTileLayer)
+     */
+    void createTileLayer(final LayerInfo layerInfo) {
+        GWCConfig defaults = mediator.getConfig();
+        if (defaults.isSane() && defaults.isCacheLayersByDefault()) {
+            GridSetBroker gridSetBroker = mediator.getGridSetBroker();
+            GeoServerTileLayer tileLayer = new GeoServerTileLayer(layerInfo, defaults,
+                    gridSetBroker);
+            mediator.add(tileLayer);
+        }
+    }
+
+    /**
+     * LayerGroupInfo has been created, add a matching {@link GeoServerTileLayer}
+     * 
+     * @see CatalogLayerEventListener#handleAddEvent
+     * @see GWC#add(GeoServerTileLayer)
+     */
+    public void createTileLayer(LayerGroupInfo lgi) {
+        GWCConfig defaults = mediator.getConfig();
+        GridSetBroker gridSetBroker = mediator.getGridSetBroker();
+        GeoServerTileLayer tileLayer = new GeoServerTileLayer(lgi, defaults, gridSetBroker);
+        mediator.add(tileLayer);
     }
 
     /**
@@ -121,8 +191,18 @@ public class CatalogLayerEventListener implements CatalogListener {
         CatalogInfo source = event.getSource();
         if (source instanceof LayerInfo || source instanceof LayerGroupInfo
                 || source instanceof FeatureTypeInfo || source instanceof CoverageInfo
-                || source instanceof WMSLayerInfo) {
+                || source instanceof WMSLayerInfo || source instanceof WorkspaceInfo) {
             PRE_MODIFY_EVENT.set(event);
+
+            if (mediator.hasTileLayer(source)) {
+                try {
+                    GeoServerTileLayer tileLayer = mediator.getTileLayer(source);
+                    GeoServerTileLayerInfo tileLayerInfo = tileLayer.getInfo();
+                    PRE_MODIFY_TILELAYER.set(tileLayerInfo);
+                } catch (RuntimeException e) {
+                    log.info("Ignoring misconfigured tile layer info for " + source);
+                }
+            }
         }
     }
 
@@ -138,18 +218,26 @@ public class CatalogLayerEventListener implements CatalogListener {
      * @see org.geoserver.catalog.event.CatalogListener#handlePostModifyEvent(org.geoserver.catalog.event.CatalogPostModifyEvent)
      */
     public void handlePostModifyEvent(final CatalogPostModifyEvent event) throws CatalogException {
-        final Object source = event.getSource();
+        final CatalogInfo source = event.getSource();
         if (!(source instanceof LayerInfo || source instanceof LayerGroupInfo
-                || source instanceof FeatureTypeInfo || source instanceof CoverageInfo || source instanceof WMSLayerInfo)) {
+                || source instanceof FeatureTypeInfo || source instanceof CoverageInfo 
+                || source instanceof WMSLayerInfo || source instanceof WorkspaceInfo)) {
             return;
         }
 
+        final GeoServerTileLayerInfo tileLayerInfo = PRE_MODIFY_TILELAYER.get();
+        PRE_MODIFY_TILELAYER.remove();
+
         final CatalogModifyEvent preModifyEvent = PRE_MODIFY_EVENT.get();
+        PRE_MODIFY_EVENT.remove();
+
+        if (tileLayerInfo == null && !(source instanceof WorkspaceInfo)) {
+            return;// no tile layer assiociated, no need to continue
+        }
         if (preModifyEvent == null) {
             throw new IllegalStateException(
                     "PostModifyEvent called without having called handlePreModify first?");
         }
-        PRE_MODIFY_EVENT.remove();
 
         final List<String> changedProperties = preModifyEvent.getPropertyNames();
         final List<Object> oldValues = preModifyEvent.getOldValues();
@@ -161,31 +249,39 @@ public class CatalogLayerEventListener implements CatalogListener {
             /*
              * Handle the rename case. For LayerInfos it's actually the related ResourceInfo what
              * gets renamed, at least until the data/publish split is implemented in GeoServer. For
-             * LayerGroupInfo it's the group itself
+             * LayerGroupInfo it's either the group name itself or its workspace
              */
-            if (changedProperties.contains("name") || changedProperties.contains("namespace")) {
-                handleRename(source, changedProperties, oldValues, newValues);
+            if (changedProperties.contains("name") || changedProperties.contains("namespace")
+                    || changedProperties.contains("workspace")) {
+                handleRename(tileLayerInfo, source, changedProperties, oldValues, newValues);
+            }
+        } else if(source instanceof WorkspaceInfo) {
+            if (changedProperties.contains("name")) {
+                handleWorkspaceRename(source, changedProperties, oldValues, newValues);
             }
         }
 
         if (source instanceof LayerInfo) {
-            if (changedProperties.contains("defaultStyle") || changedProperties.contains("styles")) {
-                // REVISIT: what about truncating the LayerGroups containing the modified layer?
-                // checking the style applies of course
-                final LayerInfo li = (LayerInfo) source;
-                handleLayerInfo(changedProperties, oldValues, newValues, li);
-            }
+            final LayerInfo li = (LayerInfo) source;
+
+            handleLayerInfoChange(changedProperties, oldValues, newValues, li, tileLayerInfo);
 
         } else if (source instanceof LayerGroupInfo) {
-            if (changedProperties.contains("layers") || changedProperties.contains("styles")) {
-                LayerGroupInfo lgInfo = (LayerGroupInfo) source;
-                handleLayerGroupInfo(changedProperties, oldValues, newValues, lgInfo);
-            }
+            LayerGroupInfo lgInfo = (LayerGroupInfo) source;
+            handleLayerGroupInfoChange(changedProperties, oldValues, newValues, lgInfo,
+                    tileLayerInfo);
         }
     }
 
-    private void handleLayerGroupInfo(final List<String> changedProperties,
-            final List<Object> oldValues, final List<Object> newValues, LayerGroupInfo lgInfo) {
+    private void handleLayerGroupInfoChange(final List<String> changedProperties,
+            final List<Object> oldValues, final List<Object> newValues,
+            final LayerGroupInfo lgInfo, final GeoServerTileLayerInfo tileLayerInfo) {
+
+        checkNotNull(lgInfo);
+        checkNotNull(tileLayerInfo);
+
+        final String layerName = tileLayerName(lgInfo);
+
         boolean truncate = false;
         if (changedProperties.contains("layers")) {
             final int layersIndex = changedProperties.indexOf("layers");
@@ -201,78 +297,197 @@ public class CatalogLayerEventListener implements CatalogListener {
             truncate = !oldStyles.equals(newStyles);
         }
         if (truncate) {
-            log.info("Truncating TileLayer for layer group '" + lgInfo.getName()
+            log.info("Truncating TileLayer for layer group '" + layerName
                     + "' due to a change in its layers or styles");
-            String layerName = lgInfo.getName();
-            catalogConfig.truncate(layerName);
+            mediator.truncate(layerName);
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private void handleLayerInfo(final List<String> changedProperties,
-            final List<Object> oldValues, final List<Object> newValues, final LayerInfo li) {
-        final String layerName = li.getResource().getPrefixedName();
-        final GeoServerTileLayer tileLayer;
-        tileLayer = (GeoServerTileLayer) catalogConfig.getTileLayer(layerName);
+    /**
+     * Handles changes of interest to GWC on a {@link LayerInfo}.
+     * <ul>
+     * <li>If the name of the default style changed, then the layer's cache for the default style is
+     * truncated. This method doesn't check if the contents of the styles are equal. That is handled
+     * by {@link CatalogStyleChangeListener} whenever a style is modified.
+     * <li>If the tile layer is {@link GeoServerTileLayerInfo#isAutoCacheStyles() auto caching
+     * styles} and the layerinfo's "styles" list changed, the tile layer's STYLE parameter filter is
+     * updated to match the actual list of layer styles and any removed style is truncated.
+     * </ul>
+     * 
+     * @param changedProperties
+     * @param oldValues
+     * @param newValues
+     * @param li
+     * @param tileLayerInfo
+     */
+    private void handleLayerInfoChange(final List<String> changedProperties,
+            final List<Object> oldValues, final List<Object> newValues, final LayerInfo li,
+            final GeoServerTileLayerInfo tileLayerInfo) {
+        checkNotNull(tileLayerInfo);
+
+        final String layerName = tileLayerName(li);
 
         boolean save = false;
+        boolean defaultStyleChanged = false;
+
+        final String defaultStyle;
+
+        /*
+         * If default style name changed
+         */
         if (changedProperties.contains("defaultStyle")) {
             final int propIndex = changedProperties.indexOf("defaultStyle");
             final StyleInfo oldStyle = (StyleInfo) oldValues.get(propIndex);
             final StyleInfo newStyle = (StyleInfo) newValues.get(propIndex);
+
             final String oldStyleName = oldStyle.getName();
-            final String newStyleName = newStyle.getName();
-            if (!oldStyleName.equals(newStyleName)) {
+            defaultStyle = newStyle.getName();
+            if (!Objects.equal(oldStyleName, defaultStyle)) {
                 save = true;
-                catalogConfig.truncate(layerName, oldStyleName);
+                defaultStyleChanged = true;
+                log.info("Truncating default style for layer " + layerName
+                        + ", as it changed from " + oldStyleName + " to " + defaultStyle);
+                mediator.truncateByLayerAndStyle(layerName, oldStyleName);
+            }
+        } else {
+            StyleInfo styleInfo = li.getDefaultStyle();
+            defaultStyle = styleInfo == null ? null : styleInfo.getName();
+        }
+
+        if (tileLayerInfo.isAutoCacheStyles()) {
+            Set<String> styles = new HashSet<String>();
+            for (StyleInfo s : li.getStyles()) {
+                styles.add(s.getName());
+            }
+            ImmutableSet<String> cachedStyles = tileLayerInfo.cachedStyles();
+            if (!styles.equals(cachedStyles)) {
+                // truncate no longer existing cached styles
+                Set<String> notCachedAnyMore = Sets.difference(cachedStyles, styles);
+                for (String oldCachedStyle : notCachedAnyMore) {
+                    log.info("Truncating cached style " + oldCachedStyle + " of layer " + layerName
+                            + " as it's no longer one of the layer's styles");
+                    mediator.truncateByLayerAndStyle(layerName, oldCachedStyle);
+                }
+                // reset STYLES parameter filter
+                final boolean createParamIfNotExists = true;
+                TileLayerInfoUtil.updateStringParameterFilter(tileLayerInfo, "STYLES",
+                        createParamIfNotExists, defaultStyle, styles);
+                save = true;
             }
         }
-        if (changedProperties.contains("styles")) {
-            final GeoServerTileLayerInfo info = tileLayer.getInfo();
-            final int propIndex = changedProperties.indexOf("styles");
-            final Set<StyleInfo> oldStyles = (Set<StyleInfo>) oldValues.get(propIndex);
-            final Set<StyleInfo> currentStyles = (Set<StyleInfo>) newValues.get(propIndex);
-            Set<String> newStyleSet = new HashSet<String>(info.getCachedStyles());
-            if (!oldStyles.equals(currentStyles)) {
-                Set<StyleInfo> removed = new HashSet<StyleInfo>(oldStyles);
-                removed.removeAll(currentStyles);
+        
+        // check the caching settings, have they changed?
+        boolean cachingInfoChanged = false;
+        int metadataIdx = changedProperties.indexOf("metadata");
+        if(metadataIdx >= 0) {
+            MetadataMap oldMetadata = (MetadataMap) oldValues.get(metadataIdx);
+            MetadataMap newMetadata = (MetadataMap) newValues.get(metadataIdx);
+            boolean cachingEnabledChanged = LangUtils.equals(oldMetadata.get(ResourceInfo.CACHING_ENABLED, Boolean.class), 
+                    newMetadata.get(ResourceInfo.CACHING_ENABLED, Boolean.class));
+            boolean cachingMaxAgeChanged = LangUtils.equals(oldMetadata.get(ResourceInfo.CACHE_AGE_MAX, Boolean.class), 
+                    newMetadata.get(ResourceInfo.CACHE_AGE_MAX, Boolean.class));
+            // we do we don't need to truncate the layer, but we need to update
+            // its LayerInfo so that the resulting caching headers get updated
+            if(cachingEnabledChanged || cachingMaxAgeChanged) {
+                cachingInfoChanged = true;
+                save = true;
+            }
+        }
 
-                // remove any style detacched from the layer
-                for (StyleInfo deletedStyle : removed) {
-                    String styleName = deletedStyle.getName();
-                    newStyleSet.remove(styleName);
-                    catalogConfig.truncate(layerName, styleName);
-                }
-                // add new cached styles if tilelayer is configured to do so
-                if (info.isAutoCacheStyles()) {
-                    Set<StyleInfo> added = new HashSet<StyleInfo>(currentStyles);
-                    added.removeAll(oldStyles);
-                    for (StyleInfo addedStyle : added) {
-                        String styleName = addedStyle.getName();
-                        newStyleSet.add(styleName);
+        if (save) {
+            GridSetBroker gridSetBroker = mediator.getGridSetBroker();
+            GeoServerTileLayer tileLayer = new GeoServerTileLayer(li, gridSetBroker, tileLayerInfo);
+            mediator.save(tileLayer);
+        }
+        // caching info and default style changes affect also the layer groups containing the layer 
+        if( cachingInfoChanged || defaultStyleChanged) {
+            List<LayerGroupInfo> groups = catalog.getLayerGroups();
+            for (LayerGroupInfo lg : groups) {
+                GeoServerTileLayer tileLayer = mediator.getTileLayer(lg);
+                if(tileLayer != null) {
+                    LayerGroupHelper helper = new LayerGroupHelper(lg);
+                    int idx = helper.allLayers().indexOf(li);
+                    if(idx >= 0) {
+                        // we need to save in case something changed in one of the layer
+                        GridSetBroker gridSetBroker = mediator.getGridSetBroker();
+                        GeoServerTileLayerInfo groupTileLayerInfo = tileLayer.getInfo();
+                        GeoServerTileLayer newTileLayer = new GeoServerTileLayer(lg, gridSetBroker, groupTileLayerInfo);
+                        mediator.save(newTileLayer);
+                        
+                        // we also need to truncate the group if the layer default style changed,
+                        // and the layer group was using 
+                        if(defaultStyleChanged && lg.getStyles().get(idx) == null) {
+                            mediator.truncate(groupTileLayerInfo.getName());
+                        }
                     }
                 }
             }
-            // prune any tangling style from info
-            Set<String> currentStyleNames = new HashSet<String>();
-            for (StyleInfo current : currentStyles) {
-                currentStyleNames.add(current.getName());
-            }
-            newStyleSet.retainAll(currentStyleNames);
-            // recreate parameter filters if need be
-            if (!newStyleSet.equals(info.getCachedStyles())) {
-                save = true;
-                info.setCachedStyles(newStyleSet);
-                tileLayer.resetParameterFilters();
-            }
-        }
-        if (save) {
-            catalogConfig.save(tileLayer);
+            
         }
     }
+    
+    private void handleWorkspaceRename(final CatalogInfo source,
+            final List<String> changedProperties, final List<Object> oldValues,
+            final List<Object> newValues) {
+        final int nameIndex = changedProperties.indexOf("name");
+        final String oldWorkspaceName = (String) oldValues.get(nameIndex);
+        final String newWorkspaceName = (String) newValues.get(nameIndex);
+        
+        CloseableIterator<LayerInfo> layers = catalog.list(LayerInfo.class, Predicates.equal("resource.store.workspace.name", newWorkspaceName));
+        try {
+            while(layers.hasNext()) {
+                LayerInfo layer = layers.next();
+                String oldName = oldWorkspaceName + ":" + layer.getName();
+                String newName = newWorkspaceName + ":" + layer.getName();
+                
+                // see if the tile layer existed and it is one that we can rename (admin
+                // could have overwritten it with a direct layer in geowebcache.xml)
+                TileLayer tl;
+                try {
+                    tl = mediator.getTileLayerByName(oldName);
+                    if(!(tl instanceof GeoServerTileLayer)) {
+                        continue;
+                    }
+                } catch(IllegalArgumentException e) {
+                    // this happens if the layer is not there, move on
+                    continue;
+                }
+                
+                try {
+                    if(layer.getType() == Type.VECTOR && 
+                            ((FeatureTypeInfo) layer.getResource()).getFeatureType().getGeometryDescriptor() == null) {
+                        // skip geometryless layers
+                        continue;
+                    }
+                } catch(IOException e) {
+                    // this should not happen...
+                    log.log(Level.FINE, "Failed to determine if layer" 
+                            + layer + " is geometryless while renaming tile layers for workspace name change " 
+                            + oldName + " -> " + newName, e);
+                }
+                    
+                try {
+                    if(tl instanceof GeoServerTileLayer) {
+                        GeoServerTileLayer gstl = (GeoServerTileLayer) tl;
+                        renameTileLayer(gstl.getInfo(), oldName, newName);
+                    }
+                } catch(Exception e) {
+                    // this should not happen, but we don't want to 
+                    log.log(Level.WARNING, "Failed to rename tile layer for geoserver layer " 
+                            + layer + " while renaming tile layers for workspace name change " 
+                            + oldName + " -> " + newName, e);
+                }
+            }
+        } finally {
+            layers.close();
+        }
+            
+    }
 
-    private void handleRename(final Object source, final List<String> changedProperties,
-            final List<Object> oldValues, final List<Object> newValues) {
+    private void handleRename(final GeoServerTileLayerInfo tileLayerInfo, final CatalogInfo source,
+            final List<String> changedProperties, final List<Object> oldValues,
+            final List<Object> newValues) {
+
         final int nameIndex = changedProperties.indexOf("name");
         final int namespaceIndex = changedProperties.indexOf("namespace");
 
@@ -290,7 +505,7 @@ public class CatalogLayerEventListener implements CatalogListener {
                 oldNamespace = currNamespace;
             }
 
-            newLayerName = resourceInfo.getPrefixedName();
+            newLayerName = resourceInfo.prefixedName();
             if (nameIndex > -1) {
                 oldLayerName = (String) oldValues.get(nameIndex);
             } else {
@@ -299,35 +514,68 @@ public class CatalogLayerEventListener implements CatalogListener {
             oldLayerName = oldNamespace.getPrefix() + ":" + oldLayerName;
         } else {
             // it's a layer group, no need to worry about namespace
-            oldLayerName = (String) oldValues.get(nameIndex);
-            newLayerName = (String) newValues.get(nameIndex);
+            oldLayerName = tileLayerInfo.getName();
+            newLayerName = tileLayerName((LayerGroupInfo) source);
         }
 
         if (!oldLayerName.equals(newLayerName)) {
-            catalogConfig.renameTileLayer(oldLayerName, newLayerName);
+            renameTileLayer(tileLayerInfo, oldLayerName, newLayerName);
         }
+    }
+
+    private void renameTileLayer(final GeoServerTileLayerInfo tileLayerInfo, String oldLayerName,
+            String newLayerName) {
+        tileLayerInfo.setName(newLayerName);
+
+        // notify the mediator of the rename so it changes the name of the layer in GWC without
+        // affecting its caches
+        GridSetBroker gridSetBroker = mediator.getGridSetBroker();
+
+        final GeoServerTileLayer oldTileLayer = (GeoServerTileLayer) mediator
+                .getTileLayerByName(oldLayerName);
+
+        checkState(null != oldTileLayer, "handleRename: old tile layer not found: '"
+                + oldLayerName + "'. New name: '" + newLayerName + "'");
+
+        final GeoServerTileLayer modifiedTileLayer;
+
+        if (oldTileLayer.getLayerInfo() != null) {
+            LayerInfo layerInfo = oldTileLayer.getLayerInfo();
+            modifiedTileLayer = new GeoServerTileLayer(layerInfo, gridSetBroker, tileLayerInfo);
+        } else {
+            LayerGroupInfo layerGroup = oldTileLayer.getLayerGroupInfo();
+            modifiedTileLayer = new GeoServerTileLayer(layerGroup, gridSetBroker, tileLayerInfo);
+        }
+        mediator.save(modifiedTileLayer);
     }
 
     /**
      * 
      * @see org.geoserver.catalog.event.CatalogListener#handleRemoveEvent(org.geoserver.catalog.event.CatalogRemoveEvent)
-     * @see GWC#removeLayer(String)
+     * @see GWC#removeTileLayers(List)
      */
     public void handleRemoveEvent(CatalogRemoveEvent event) throws CatalogException {
-        Object obj = event.getSource();
+        CatalogInfo obj = event.getSource();
+        if (!(obj instanceof LayerInfo || obj instanceof LayerGroupInfo)) {
+            return;
+        }
+        if (!mediator.hasTileLayer(obj)) {
+            return;
+        }
 
         String prefixedName = null;
 
         if (obj instanceof LayerGroupInfo) {
             LayerGroupInfo lgInfo = (LayerGroupInfo) obj;
-            prefixedName = lgInfo.getName();
+            prefixedName = tileLayerName(lgInfo);
         } else if (obj instanceof LayerInfo) {
             LayerInfo layerInfo = (LayerInfo) obj;
-            prefixedName = layerInfo.getResource().getPrefixedName();
+            prefixedName = tileLayerName(layerInfo);
         }
 
         if (null != prefixedName) {
-            catalogConfig.removeLayer(prefixedName);
+            // notify the layer has been removed
+            mediator.removeTileLayers(Arrays.asList(prefixedName));
         }
     }
 

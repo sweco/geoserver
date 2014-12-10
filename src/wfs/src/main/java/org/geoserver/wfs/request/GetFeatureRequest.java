@@ -1,13 +1,20 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wfs.request;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import net.opengis.wfs.GetFeatureType;
 import net.opengis.wfs.GetFeatureWithLockType;
 import net.opengis.wfs.ResultTypeType;
 import net.opengis.wfs.WfsFactory;
+import net.opengis.wfs20.ResolveValueType;
 import net.opengis.wfs20.Wfs20Factory;
 
 import org.eclipse.emf.ecore.EObject;
@@ -38,6 +45,20 @@ public abstract class GetFeatureRequest extends RequestObject {
         return eGet(adaptee, "startIndex", BigInteger.class);
     }
 
+    public List<Map<String,String>> getViewParams() {
+        return eGet(adaptee, "viewParams", List.class);
+    }
+    
+    public void setViewParams(List<Map<String,String>> viewParams) {
+        List l = eGet(adaptee, "viewParams", List.class);
+        l.clear();
+        l.addAll(viewParams);
+        
+        List check = eGet(adaptee, "viewParams", List.class);
+        
+        
+    }
+    
     public abstract List<Query> getQueries();
     
     public abstract List<Object> getAdaptedQueries();
@@ -61,6 +82,10 @@ public abstract class GetFeatureRequest extends RequestObject {
     public abstract LockFeatureRequest createLockRequest();
     
     public abstract FeatureCollectionResponse createResponse();
+    
+    public abstract ResolveValueType getResolve();
+    
+    public abstract BigInteger getResolveTimeOut();
     
     //
     // GetFeatureWithLock
@@ -144,6 +169,17 @@ public abstract class GetFeatureRequest extends RequestObject {
             return new FeatureCollectionResponse.WFS11(
                 ((WfsFactory)getFactory()).createFeatureCollectionType());
         }
+
+        @Override
+        public ResolveValueType getResolve() {
+            return ResolveValueType.ALL;
+        }
+
+        @Override
+        public BigInteger getResolveTimeOut() {
+            BigInteger seconds = eGet(adaptee, "traverseXlinkExpiry", BigInteger.class);
+            return seconds == null ? null : BigInteger.valueOf(60).multiply(seconds);
+        }
     }
 
     public static class WFS20 extends GetFeatureRequest {
@@ -219,5 +255,16 @@ public abstract class GetFeatureRequest extends RequestObject {
             return new FeatureCollectionResponse.WFS20(
                 ((Wfs20Factory)getFactory()).createFeatureCollectionType());
         }
+        
+        @Override
+        public ResolveValueType getResolve() {
+            return eGet(adaptee, "resolve", ResolveValueType.class);
+        }
+
+        @Override
+        public BigInteger getResolveTimeOut() {
+            return eGet(adaptee, "resolveTimeOut", BigInteger.class);
+        }
+
     }
 }

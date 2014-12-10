@@ -1,41 +1,40 @@
-/* Copyright (c) 2010 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
 
-import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
 
 import org.geoserver.platform.ServiceException;
-import org.geoserver.wms.describelayer.DescribeLayerTransformer;
+import org.geoserver.wms.describelayer.DescribeLayerModel;
+import org.geotools.data.ows.LayerDescription;
+import org.geotools.util.logging.Logging;
 
 /**
  * DescribeLayer WMS operation default implementation.
  * 
- * @author Gabriel Roldan
+ * @author carlo cancellieri
  */
 public class DescribeLayer {
 
-    private WMS wms;
-
-    public DescribeLayer(final WMS wms) {
-        this.wms = wms;
+private static final Logger LOGGER = Logging.getLogger(DescribeLayerModel.class);
+    
+    public DescribeLayer() {
+    	
     }
 
-    /**
-     * @see org.geoserver.wms.DescribeLayer#run(org.geoserver.wms.DescribeLayerRequest)
-     */
-    public DescribeLayerTransformer run(DescribeLayerRequest request) throws ServiceException {
-        String baseURL = request.getBaseUrl();
+	private final List<LayerDescription> layerDescriptions=new ArrayList<LayerDescription>();
 
-        DescribeLayerTransformer transformer;
-        transformer = new DescribeLayerTransformer(baseURL);
-        Charset encoding = wms.getCharSet();
-        transformer.setEncoding(encoding);
-        if (wms.getGeoServer().getGlobal().isVerbose()) {
-            transformer.setIndentation(2);
-        }
-        return transformer;
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static DescribeLayerModel run(final DescribeLayerRequest request) throws ServiceException {
+
+        return new DescribeLayerModel(request);
+
     }
+
 
 }

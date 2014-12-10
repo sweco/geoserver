@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+ Copyright (C) 2014 - Open Source Geospatial Foundation. All rights reserved.
+ This code is licensed under the GPL 2.0 license, available at the root
+ application directory.
+ -->
 <!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
 
 <beans>
@@ -40,5 +45,19 @@
     <property name="titleKey" value="SRSListPage.title"/>
     <property name="descriptionKey" value="SRSListPage.shortDescription"/>
     <property name="componentClass" value="org.geoserver.web.demo.SRSListPage"/>
+  </bean>
+  
+  <bean id="reprojectionConsole" class="org.geoserver.web.DemoLinkInfo">
+    <property name="id" value="reprojectionConsole"/>
+    <property name="titleKey" value="ReprojectPage.title"/>
+    <property name="descriptionKey" value="ReprojectPage.description"/>
+    <property name="componentClass" value="org.geoserver.web.demo.ReprojectPage"/>
+  </bean>
+
+  <bean id="CatalogStresser" class="org.geoserver.web.ToolLinkInfo">
+    <property name="id" value="CatalogStressTester" />
+    <property name="titleKey" value="CatalogStressTester.title" />
+    <property name="descriptionKey" value="CatalogStressTester.description" />
+    <property name="componentClass" value="org.geoserver.web.catalogstresstool.CatalogStressTester" />
   </bean>
 </beans>

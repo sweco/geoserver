@@ -1,5 +1,5 @@
-/* 
- * Copyright (c) 2001 - 20089 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -8,13 +8,19 @@ package org.geoserver.template;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
+import org.geotools.util.logging.Logging;
+
 import freemarker.ext.beans.BeansWrapper;
 import freemarker.template.TemplateCollectionModel;
 import freemarker.template.TemplateModel;
 import freemarker.template.TemplateModelException;
 import freemarker.template.TemplateModelIterator;
+import freemarker.template.TemplateSequenceModel;
 
 /**
  * 
@@ -25,26 +31,50 @@ import freemarker.template.TemplateModelIterator;
  * @author Niels Charlier, Curtin University of Technology
  * 
  */
-public class DirectTemplateFeatureCollectionFactory implements FeatureWrapper.TemplateFeatureCollectionFactory {
+public class DirectTemplateFeatureCollectionFactory implements FeatureWrapper.TemplateFeatureCollectionFactory<DirectTemplateFeatureCollectionFactory.TemplateFeatureCollection> {
 
-    protected List<FeatureIterator> openIterators = new LinkedList<FeatureIterator>();
+    static Logger LOGGER = Logging.getLogger(DirectTemplateFeatureCollectionFactory.class);
+
+    /**
+     * thread local to track open iterators
+     */
+    static ThreadLocal<List<TemplateFeatureIterator>> ITERATORS = 
+            new ThreadLocal<List<TemplateFeatureIterator>>();
 
     public void purge() {
-        while (!openIterators.isEmpty()) {
-            openIterators.get(0).close();
-            openIterators.remove(0);
+        List<TemplateFeatureIterator> its = ITERATORS.get();
+        if (its != null) {
+            for (TemplateFeatureIterator it : its) {
+                try {
+                    it.close();
+                }
+                catch(Throwable t) {
+                    LOGGER.log(Level.WARNING, "Error closing iterator", t);
+                }
+            }
+            its.clear();
+            ITERATORS.remove();
         }
+    }
+    
+    public DirectTemplateFeatureCollectionFactory() {
     }
 
     public TemplateCollectionModel createTemplateFeatureCollection(FeatureCollection collection,
             BeansWrapper wrapper) {
         return new TemplateFeatureCollection(collection, wrapper);
     }
-
-    protected class TemplateFeatureCollection implements TemplateCollectionModel {
+    
+    protected class TemplateFeatureCollection implements TemplateCollectionModel, TemplateSequenceModel {
         protected BeansWrapper wrapper;
 
         protected FeatureCollection collection;
+        
+        protected TemplateFeatureIterator indexIterator = null;
+        
+        protected int currentIndex = -1;
+        
+        protected TemplateModel currentItem = null;
 
         public TemplateFeatureCollection(FeatureCollection collection, BeansWrapper wrapper) {
             this.collection = collection;
@@ -52,7 +82,47 @@ public class DirectTemplateFeatureCollectionFactory implements FeatureWrapper.Te
         }
 
         public TemplateModelIterator iterator() throws TemplateModelException {
-            return new TemplateFeatureIterator(collection.features(), wrapper);
+            TemplateFeatureIterator it = new TemplateFeatureIterator(collection.features(), wrapper);
+            List<TemplateFeatureIterator> open = ITERATORS.get();
+            if (open == null) {
+                open = new LinkedList();
+                ITERATORS.set(open);
+            }
+            open.add(it);
+            return it;
+        }
+
+        @Override
+        public TemplateModel get(int index) throws TemplateModelException {
+            if (currentIndex > index ) {
+                //we have gone backwards, close iterator and clean up as we will need to start over
+                if (indexIterator != null) {
+                    ITERATORS.get().remove(indexIterator);
+                    try {
+                        indexIterator.close();
+                    }
+                    catch(Throwable t) {
+                        LOGGER.log(Level.WARNING, "Error closing iterator", t);
+                    }
+                    indexIterator = null;
+                }
+                currentIndex = -1;
+                currentItem = null;
+            }
+            if (indexIterator == null) {
+                indexIterator = (TemplateFeatureIterator) iterator();
+            }
+            while (currentIndex < index && indexIterator.hasNext()) {
+                //forward to correct index
+                currentItem = indexIterator.next();
+                currentIndex++;
+            }
+            return index == currentIndex ? currentItem : null;
+        }
+
+        @Override
+        public int size() throws TemplateModelException {
+            return collection.size();
         }
 
     }
@@ -74,6 +144,10 @@ public class DirectTemplateFeatureCollectionFactory implements FeatureWrapper.Te
 
         public boolean hasNext() throws TemplateModelException {
             return iterator.hasNext();
+        }
+
+        public void close() {
+            iterator.close();
         }
 
     }

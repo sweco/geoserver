@@ -1,12 +1,18 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.security;
 
+import static org.geoserver.catalog.Predicates.acceptAll;
+import static org.geoserver.catalog.Predicates.or;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+
+import javax.annotation.Nonnull;
 
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CatalogFacade;
@@ -21,6 +27,8 @@ import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.MapInfo;
 import org.geoserver.catalog.NamespaceInfo;
+import org.geoserver.catalog.Predicates;
+import org.geoserver.catalog.PublishedInfo;
 import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.catalog.ResourcePool;
 import org.geoserver.catalog.StoreInfo;
@@ -28,8 +36,11 @@ import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.WMSLayerInfo;
 import org.geoserver.catalog.WMSStoreInfo;
 import org.geoserver.catalog.WorkspaceInfo;
+import org.geoserver.catalog.ValidationResult;
 import org.geoserver.catalog.event.CatalogListener;
 import org.geoserver.catalog.impl.AbstractDecorator;
+import org.geoserver.catalog.util.CloseableIterator;
+import org.geoserver.catalog.util.CloseableIteratorAdapter;
 import org.geoserver.ows.Dispatcher;
 import org.geoserver.ows.Request;
 import org.geoserver.platform.GeoServerExtensions;
@@ -43,12 +54,21 @@ import org.geoserver.security.decorators.SecuredLayerInfo;
 import org.geoserver.security.decorators.SecuredWMSLayerInfo;
 import org.geoserver.security.impl.DataAccessRuleDAO;
 import org.geoserver.security.impl.DefaultDataAccessManager;
+import org.geotools.filter.expression.InternalVolatileFunction;
 import org.opengis.feature.type.Name;
 import org.opengis.filter.Filter;
+import org.opengis.filter.FilterFactory;
+import org.opengis.filter.sort.SortBy;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.Assert;
+
+import com.google.common.base.Function;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterators;
 
 /**
  * Wraps the catalog and applies the security directives provided by a {@link ResourceAccessManager}
@@ -59,7 +79,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Catalog {
 
     protected ResourceAccessManager accessManager;
-
+    
     public SecureCatalogImpl(Catalog catalog) throws Exception {
         this(catalog, lookupResourceAccessManager());
     }
@@ -68,6 +88,10 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         return delegate.getId();
     }
     
+    public ResourceAccessManager getResourceAccessManager() {
+        return accessManager;
+    }
+
     static ResourceAccessManager lookupResourceAccessManager() throws Exception {
         ResourceAccessManager manager = GeoServerExtensions.bean(ResourceAccessManager.class);
         if (manager == null) {
@@ -275,20 +299,54 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         return checkAccess(user(), delegate.getLayerGroupByName(name));
     }
 
+    public LayerGroupInfo getLayerGroupByName(String workspaceName, String name) {
+        return checkAccess(user(), delegate.getLayerGroupByName(workspaceName, name));
+    }
+
+    public LayerGroupInfo getLayerGroupByName(WorkspaceInfo workspace,
+            String name) {
+        return checkAccess(user(), delegate.getLayerGroupByName(workspace, name));
+    }
+
     public List<LayerGroupInfo> getLayerGroups() {
         return filterGroups(user(), delegate.getLayerGroups());
     }
 
+    public List<LayerGroupInfo> getLayerGroupsByWorkspace(String workspaceName) {
+        return filterGroups(user(), delegate.getLayerGroupsByWorkspace(workspaceName));
+    }
+
+    public List<LayerGroupInfo> getLayerGroupsByWorkspace(
+            WorkspaceInfo workspace) {
+        return filterGroups(user(), delegate.getLayerGroupsByWorkspace(workspace));
+    }
+
     public List<LayerInfo> getLayers() {
-        return filterLayers(user(), delegate.getLayers());
+        return filterLayers(acceptAll());
     }
 
     public List<LayerInfo> getLayers(ResourceInfo resource) {
-        return filterLayers(user(), delegate.getLayers(unwrap(resource)));
+        return filterLayers(Predicates.equal("resource.id", resource.getId()));
     }
     
     public List<LayerInfo> getLayers(StyleInfo style) {
-        return filterLayers(user(), delegate.getLayers(style));
+
+        String id = style.getId();
+        Filter filter = or(Predicates.equal("defaultStyle.id", id),
+                Predicates.equal("styles.id", id));
+
+        return filterLayers(filter);
+    }
+
+    private List<LayerInfo> filterLayers(final Filter filter) {
+
+        CloseableIterator<LayerInfo> iterator;
+        iterator = list(LayerInfo.class, filter);
+        try {
+            return ImmutableList.copyOf(iterator);
+        } finally {
+            iterator.close();
+        }
     }
 
     public NamespaceInfo getNamespace(String id) {
@@ -404,6 +462,30 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         return SecurityContextHolder.getContext().getAuthentication();
     }
 
+    @SuppressWarnings("unchecked")
+    protected <T extends CatalogInfo> T checkAccess(Authentication user, T info) {
+        if (info instanceof WorkspaceInfo) {
+            return (T) checkAccess(user, (WorkspaceInfo) info);
+        }
+        if (info instanceof NamespaceInfo) {
+            return (T) checkAccess(user, (NamespaceInfo) info);
+        }
+        if (info instanceof StoreInfo) {
+            return (T) checkAccess(user, (StoreInfo) info);
+        }
+        if (info instanceof ResourceInfo) {
+            return (T) checkAccess(user, (ResourceInfo) info);
+        }
+        if (info instanceof LayerInfo) {
+            return (T) checkAccess(user, (LayerInfo) info);
+        }
+        if (info instanceof LayerGroupInfo) {
+            return (T) checkAccess(user, (LayerGroupInfo) info);
+        }
+
+        return info;
+    }
+
     /**
      * Given a {@link FeatureTypeInfo} and a user, returns it back if the user
      * can access it in write mode, makes it read only if the user can access it
@@ -439,6 +521,25 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
    }
 
     /**
+     * Given a {@link StyleInfo} and a user, returns it back if the user can access it.
+     * 
+     * @return <code>null</code> if the user can't acess the style, otherwise the original style.
+     */
+    protected StyleInfo checkAccess(Authentication user, StyleInfo style) {
+        if (style == null)
+            return null;
+        
+        WrapperPolicy policy = buildWrapperPolicy(user, style, style.getName());
+        
+        // if we don't need to hide it, then we can return it as is since it
+        // can only provide metadata.
+        if(policy.level == AccessLevel.HIDDEN)
+            return null;
+        else 
+            return style;
+    }
+
+    /**
      * Given a store and a user, returns it back if the user can access its
      * workspace in read mode, null otherwise
      * @return
@@ -456,13 +557,15 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
                 (policy.level == AccessLevel.READ_ONLY && store instanceof CoverageStoreInfo))
             return store;
 
-        // otherwise we are in a mixed case where the user can read but not write, or
-        // cannot read but is allowed by the operation mode to access the metadata
-        if(store instanceof DataStoreInfo) { 
+        // otherwise we are in a mixed case where the user can read but not
+        // write, or
+        // cannot read but is allowed by the operation mode to access the
+        // metadata
+        if (store instanceof DataStoreInfo) {
             return (T) new SecuredDataStoreInfo((DataStoreInfo) store, policy);
         } else if(store instanceof CoverageStoreInfo) {
             return (T) new SecuredCoverageStoreInfo((CoverageStoreInfo) store, policy);
-        } else if(store instanceof WMSStoreInfo) {
+        } else if (store instanceof WMSStoreInfo) {
             // TODO: implement WMSStoreInfo wrappring if necessary
             return store;
         } else {
@@ -502,24 +605,46 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         if (group == null)
             return null;
 
-        // scan thru the layers, if any cannot be accessed, we hide the group, otherwise
-        // we return the group back, eventually wrapping the read only layers
-        final List<LayerInfo> layers = group.getLayers();
-        ArrayList<LayerInfo> wrapped = new ArrayList<LayerInfo>(layers.size());
+        //first check the layer group itself
+        WrapperPolicy policy = buildWrapperPolicy(user, group, group.getName());
+        if(policy.level == AccessLevel.HIDDEN) {
+            return null;
+        }
+
         boolean needsWrapping = false;
-        for (LayerInfo layer : layers) {
-            LayerInfo checked = checkAccess(user, layer);
-            if(checked == null)
+        
+        LayerInfo rootLayer = group.getRootLayer();
+        if (LayerGroupInfo.Mode.EO.equals(group.getMode())) {
+            LayerInfo checked = checkAccess(user, rootLayer);
+            if (checked != null) {
+                if (checked != rootLayer) {
+                    needsWrapping = true;
+                    rootLayer = checked;
+                }
+            } else {
                 return null;
-            else if(checked != null && checked != layer) 
-                needsWrapping = true;
-            wrapped.add(checked);
+            }
+        }
+        
+        // scan thru the layers
+        final List<PublishedInfo> layers = group.getLayers();
+        ArrayList<PublishedInfo> wrapped = new ArrayList<PublishedInfo>(layers.size());        
+        for (PublishedInfo layer : layers) {
+            PublishedInfo checked = checkAccess(user, layer);
+            if (checked != null) {
+                if (checked != layer) {
+                    needsWrapping = true;
+                }
+                wrapped.add(checked);
+            } else {
+                needsWrapping = true; 
+            }
         }
         
         if(needsWrapping)
-            return new SecuredLayerGroupInfo(group, wrapped);
+            return new SecuredLayerGroupInfo(group, rootLayer, wrapped);
         else
-            return group;
+            return group;            
     }
 
     /**
@@ -564,9 +689,76 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         else 
             return ws;
     }
+
+    /**
+     * Check how an access manager responds to a user accessing a catalog object and return the result.
+     * @param accessManager the access manager to ask
+     * @param user the user accessing the object
+     * @param info the catalog object being accessed
+     * @return the combination of access level and response policy to apply to the request
+     */
+    WrapperPolicy buildWrapperPolicy(@Nonnull ResourceAccessManager accessManager, Authentication user, @Nonnull CatalogInfo info) {
+        Assert.notNull(info);
+
+        if (info instanceof NamespaceInfo) {
+            // route the security check thru the associated workspace info
+            WorkspaceInfo ws = delegate.getWorkspaceByName(((NamespaceInfo) info).getPrefix());
+            if (ws == null) {
+                // temporary workaround, build a fake workspace, as we're
+                // probably
+                // in between a change of workspace/namespace name
+                ws = delegate.getFactory().createWorkspace();
+                ws.setName(((NamespaceInfo) info).getPrefix());
+            }
+            return buildWrapperPolicy(accessManager, user, ws, ws.getName());
+
+        }
+
+        if (info instanceof WorkspaceInfo) {
+            return buildWrapperPolicy(accessManager, user, info, ((WorkspaceInfo) info).getName());
+        }
+
+        if (info instanceof StoreInfo) {
+            return buildWrapperPolicy(accessManager, user, ((StoreInfo) info).getWorkspace(),
+                    ((StoreInfo) info).getName());
+        }
+
+        if (info instanceof ResourceInfo) {
+            return buildWrapperPolicy(accessManager, user, info, ((ResourceInfo) info).getName());
+        }
+
+        if (info instanceof LayerInfo) {
+            return buildWrapperPolicy(accessManager, user, info, ((LayerInfo) info).getName());
+        }
+
+        if (info instanceof LayerGroupInfo) {
+            // return the most restrictive policy that's not HIDDEN, or the
+            // first HIDDEN one
+            WrapperPolicy mostRestrictive = WrapperPolicy.readWrite(null);
+
+            for (PublishedInfo layer : ((LayerGroupInfo) info).getLayers()) {
+                WrapperPolicy policy = buildWrapperPolicy(accessManager, user, layer, layer.getName());
+                if (AccessLevel.HIDDEN.equals(policy.getAccessLevel())) {
+                    return policy;
+                }
+                int comparison = policy.compareTo(mostRestrictive);
+                boolean thisOneIsMoreRestrictive = comparison < 0;
+                if (thisOneIsMoreRestrictive) {
+                    mostRestrictive = policy;
+                }
+            }
+
+            return mostRestrictive;
+        }
+
+        throw new IllegalArgumentException("Can't build wrapper policy for objects of type "
+                + info.getClass().getName());
+    }
     
-    
-    
+    protected WrapperPolicy buildWrapperPolicy(Authentication user, @Nonnull CatalogInfo info) {
+        return buildWrapperPolicy(accessManager, user, info);
+    }
+
     /**
      * Factors out the policy that decides what access level the current user
      * has to a specific resource considering the read/write access, the security
@@ -579,8 +771,14 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
      */
     public WrapperPolicy buildWrapperPolicy(Authentication user,
             CatalogInfo info, String resourceName) {
+        return SecureCatalogImpl.buildWrapperPolicy(accessManager, user, info, resourceName);
+    }
+    
+    static WrapperPolicy buildWrapperPolicy(ResourceAccessManager accessManager, 
+            Authentication user, CatalogInfo info, String resourceName) {
         boolean canRead = true;
         boolean canWrite = true;
+
         AccessLimits limits;
 
         if(info instanceof WorkspaceInfo) {
@@ -590,15 +788,32 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
             limits = accessManager.getAccessLimits(user, (WorkspaceInfo) info);
             WorkspaceAccessLimits wl = (WorkspaceAccessLimits) limits;
             if(wl != null) {
-                canRead = wl.isReadable();
-                canWrite = wl.isWritable();
+                if (wl.isAdminable()) {
+                    canRead = canWrite = true;
+                }
+                else {
+                    canRead = wl.isReadable();
+                    canWrite = wl.isWritable();
+                }
+            }
+            if (AdminRequest.get() != null) {
+                //admin request
+                if (wl == null || !wl.isAdminable()) {
+                    canRead = canWrite = false;
+                }
             }
         } else if(info instanceof LayerInfo || info instanceof ResourceInfo) {
             DataAccessLimits dl;
+            WorkspaceAccessLimits wl;
+            
             if(info instanceof LayerInfo) {
                 dl = accessManager.getAccessLimits(user, (LayerInfo) info);
+                wl = accessManager.getAccessLimits(user, 
+                    ((LayerInfo)info).getResource().getStore().getWorkspace());
             } else {
                 dl = accessManager.getAccessLimits(user, (ResourceInfo) info);
+                wl = accessManager.getAccessLimits(user, 
+                    ((ResourceInfo)info).getStore().getWorkspace());
             }
             if(dl != null) {
                 canRead = dl.getReadFilter() != Filter.EXCLUDE;
@@ -609,7 +824,36 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
                 }
             }
             limits = dl;
-        } else {
+
+            if (AdminRequest.get() != null) {
+                if (wl != null && !wl.isAdminable()) {
+                    canRead = false;
+                }
+            }
+        } else if (info instanceof StyleInfo || info instanceof LayerGroupInfo) {
+            WorkspaceInfo ws = null;
+            if (info instanceof StyleInfo) {
+                limits = accessManager.getAccessLimits(user, (StyleInfo) info);
+                ws = ((StyleInfo)info).getWorkspace();
+            }
+            else {
+                limits = accessManager.getAccessLimits(user, (LayerGroupInfo) info);
+                ws = ((LayerGroupInfo)info).getWorkspace();
+            }
+            
+            if (limits != null) {
+                canRead = false;
+            }
+
+            if (ws != null && AdminRequest.get() != null) {
+                WorkspaceAccessLimits wl = accessManager.getAccessLimits(user,  ws);
+                if (wl != null) {
+                    if (!wl.isAdminable()) {
+                        canRead = false;
+                    }
+                }
+            }
+        }else {
             throw new IllegalArgumentException("Can't build the wrapper policy for objects " +
             		"other than workspace, layer or resource: " + info);
         }
@@ -639,6 +883,7 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
                 return WrapperPolicy.readOnlyChallenge(limits);
             }
         }
+
         return WrapperPolicy.readWrite(limits);
     }
 
@@ -735,6 +980,20 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         List<LayerInfo> result = new ArrayList<LayerInfo>();
         for (LayerInfo original : layers) {
             LayerInfo secured = checkAccess(user, original);
+            if (secured != null)
+                result.add(secured);
+        }
+        return result;
+    }
+
+    /**
+     * Given a list of styles, returns a copy of it containing only the styles the user can access.
+     * 
+     */
+    protected List<StyleInfo> filterStyles(Authentication user, List<StyleInfo> styles) {
+        List<StyleInfo> result = new ArrayList<StyleInfo>();
+        for (StyleInfo original : styles) {
+            StyleInfo secured = checkAccess(user, original);
             if (secured != null)
                 result.add(secured);
         }
@@ -853,7 +1112,7 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         delegate.add(unwrap(layerGroup));
     }
 
-    public List<RuntimeException> validate(LayerGroupInfo layerGroup, boolean isNew) {
+    public ValidationResult validate(LayerGroupInfo layerGroup, boolean isNew) {
         return delegate.validate(unwrap(layerGroup), isNew);
     }
 
@@ -865,7 +1124,7 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         delegate.add(unwrap(layer));
     }
 
-    public List<RuntimeException> validate(LayerInfo layer, boolean isNew) {
+    public ValidationResult validate(LayerInfo layer, boolean isNew) {
         return delegate.validate(unwrap(layer), isNew);
     }
 
@@ -885,7 +1144,7 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         delegate.add(namespace);
     }
 
-    public List<RuntimeException> validate(NamespaceInfo namespace, boolean isNew) {
+    public ValidationResult validate(NamespaceInfo namespace, boolean isNew) {
         return delegate.validate(namespace, isNew);
     }
 
@@ -897,7 +1156,7 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         delegate.add(unwrap(resource));
     }
 
-    public List<RuntimeException> validate(ResourceInfo resource, boolean isNew) {
+    public ValidationResult validate(ResourceInfo resource, boolean isNew) {
         return delegate.validate(unwrap(resource), isNew);
     }
 
@@ -909,10 +1168,9 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         delegate.add(unwrap(store));
     }
 
-    public List<RuntimeException> validate(StoreInfo store, boolean isNew) {
+    public ValidationResult validate(StoreInfo store, boolean isNew) {
         return delegate.validate(unwrap(store), isNew);
     }
-
     
     public <T extends StoreInfo> T detach(T store) {
         return delegate.detach(store);
@@ -922,7 +1180,7 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         delegate.add(style);
     }
 
-    public List<RuntimeException> validate(StyleInfo style, boolean isNew) {
+    public ValidationResult validate(StyleInfo style, boolean isNew) {
         return delegate.validate(style, isNew);
     }
 
@@ -934,7 +1192,7 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         delegate.add(workspace);
     }
 
-    public List<RuntimeException> validate(WorkspaceInfo workspace, boolean isNew) {
+    public ValidationResult validate(WorkspaceInfo workspace, boolean isNew) {
         return delegate.validate(workspace, isNew);
     }
 
@@ -989,11 +1247,27 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
     }
 
     public StyleInfo getStyleByName(String name) {
-        return delegate.getStyleByName(name);
+        return checkAccess(user(), delegate.getStyleByName(name));
+    }
+
+    public StyleInfo getStyleByName(String workspaceName, String name) {
+        return checkAccess(user(), delegate.getStyleByName(workspaceName, name)); 
+    }
+
+    public StyleInfo getStyleByName(WorkspaceInfo workspace, String name) {
+        return checkAccess(user(), delegate.getStyleByName(workspace, name));
     }
 
     public List<StyleInfo> getStyles() {
-        return delegate.getStyles();
+        return filterStyles(user(),delegate.getStyles());
+    }
+
+    public List<StyleInfo> getStylesByWorkspace(String workspaceName) {
+        return filterStyles(user(),delegate.getStylesByWorkspace(workspaceName));
+    }
+
+    public List<StyleInfo> getStylesByWorkspace(WorkspaceInfo workspace) {
+        return filterStyles(user(),delegate.getStylesByWorkspace(workspace));
     }
 
     public void remove(LayerGroupInfo layerGroup) {
@@ -1096,4 +1370,119 @@ public class SecureCatalogImpl extends AbstractDecorator<Catalog> implements Cat
         delegate.setDefaultDataStore(workspace, defaultStore);
     }
 
+    @Override
+    public <T extends CatalogInfo> int count(Class<T> of, Filter filter) {
+        Filter securityFilter = securityFilter(of, filter);
+        final int count = delegate.count(of, securityFilter);
+        return count;
+    }
+
+    @Override
+    public <T extends CatalogInfo> T get(Class<T> type, Filter filter)
+            throws IllegalArgumentException {
+
+        Filter securityFilter = securityFilter(type, filter);
+        T result = delegate.get(type, securityFilter);
+        return result;
+    }
+
+    @Override
+    public <T extends CatalogInfo> CloseableIterator<T> list(Class<T> of, Filter filter) {
+        return list(of, filter, null, null, null);
+    }
+
+    @Override
+    public <T extends CatalogInfo> CloseableIterator<T> list(Class<T> of, Filter filter,
+            Integer offset, Integer count, SortBy sortBy) {
+
+        Filter securityFilter = securityFilter(of, filter);
+
+        CloseableIterator<T> filtered;
+        filtered = delegate.list(of, securityFilter, offset, count, sortBy);
+
+        // create secured decorators on-demand
+        final Function<T, T> securityWrapper = securityWrapper(of);
+        final CloseableIterator<T> filteredWrapped;
+        filteredWrapped = CloseableIteratorAdapter.transform(filtered, securityWrapper);
+
+        // wrap the iterator in a notNull filter to ensure any filtered
+        // layers (result is null) don't get passed on from the securityWrapper
+        // Function. When the AccessLevel is HIDDEN and a layer gets filtered 
+        // out via a CatalogFilter - for example, this can happen with a
+        // LocalWorkspaceCatalogFilter and a virtual service request
+        return new CloseableIteratorAdapter(Iterators.filter(filteredWrapped,
+                com.google.common.base.Predicates.notNull()));
+    }
+
+    /**
+     * @return a Function that applies a security wrapper over the catalog object given to it as
+     *         input
+     * @see #checkAccess(Authentication, CatalogInfo)
+     */
+    private <T extends CatalogInfo> Function<T, T> securityWrapper(final Class<T> forClass) {
+
+        final Authentication user = user();
+        return new Function<T, T>() {
+
+            @Override
+            public T apply(T input) {
+                T checked = checkAccess(user, input);
+                return checked;
+            }
+        };
+    }
+
+    /**
+     * Returns a predicate that checks whether the current user has access to a given object of type
+     * {@code infoType}.
+     * <p>
+     * IMPLEMENTATION NOTE: the predicate returned evaluates in-process and hence can't be encoded
+     * to the catalog's native query language, if any. It calls
+     * {@link #buildWrapperPolicy(Authentication, CatalogInfo)} to check if the returned access
+     * level is not "hidden" on a case by case basis. Perhaps, the check for whether a given
+     * resource is accessible to the current user can be encoded as a "well known" predicate that
+     * uses one or a combination of the property equals/isnull/contains/exists verbs in the
+     * {@link Predicates} utility. I (GR), at the time of writing, don't know how to do that, so any
+     * help would be much appreciated. Nonetheless, this predicate is meant to be "and'ed" with any
+     * other predicate this catalog wrapper is called with, giving the Catalog backend a chance to
+     * at least encode the "well known" part of the resulting filter, and separate out the
+     * in-process evaluation of access credentials from the construction of the security wrapper for
+     * each object.
+     * 
+     * @return a catalog Predicate that evaluates if an object of the required type is accessible to
+     *         the given user
+     */
+    private <T extends CatalogInfo> Filter securityFilter(final Class<T> infoType,
+            final Filter filter) {
+
+        final Authentication user = user();
+        if (isAdmin(user)) {
+            // no need to check for credentials if user is _the_ administrator
+            return filter;
+        }
+
+        if (StyleInfo.class.isAssignableFrom(infoType) || MapInfo.class.isAssignableFrom(infoType)) {
+            // these kind of objects are not secured
+            return filter;
+        }
+        
+        Filter securityFilter = this.accessManager.getSecurityFilter(user, infoType);
+        
+        // create a filter combined with the security credentials check
+        return Predicates.and(filter, securityFilter);
+    }
+
+    /**
+     * Checks if the current user is authenticated and is the administrator.
+     * Protected to allow overriding in tests.
+     */
+    protected boolean isAdmin(Authentication authentication) {
+        
+        return GeoServerExtensions.bean(GeoServerSecurityManager.class).
+                checkAuthenticationForAdminRole(authentication);
+    }
+
+    public void removeListeners(Class listenerClass) {
+        delegate.removeListeners(listenerClass);
+    }
 }

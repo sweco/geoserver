@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.config;
 
 import java.util.Collection;
@@ -31,6 +36,26 @@ public interface GeoServerFacade {
      * Saves the global geoserver configuration after modification.
      */
     void save(GeoServerInfo geoServer);
+
+    /**
+     * The settings configuration for the specified workspoace, or <code>null</code> if non exists.
+     */
+    SettingsInfo getSettings(WorkspaceInfo workspace);
+
+    /**
+     * Adds a settings configuration for the specified workspace.
+     */
+    void add(SettingsInfo settings);
+
+    /**
+     * Saves the settings configuration for the specified workspace.
+     */
+    void save(SettingsInfo settings);
+
+    /**
+     * Removes the settings configuration for the specified workspace.
+     */
+    void remove(SettingsInfo settings);
 
     /**
      * The logging configuration.
@@ -74,10 +99,10 @@ public interface GeoServerFacade {
     Collection<? extends ServiceInfo> getServices(WorkspaceInfo workspace);
 
     /**
-     * GeoServer services filtered by class.
+     * GeoServer global service filtered by class.
      * 
      * @param clazz
-     *                The class of the services to return.
+     *                The class of the service to return.
      */
     <T extends ServiceInfo> T getService(Class<T> clazz);
 

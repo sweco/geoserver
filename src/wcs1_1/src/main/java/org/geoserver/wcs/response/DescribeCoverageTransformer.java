@@ -1,15 +1,13 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wcs.response;
 
 import static org.geoserver.ows.util.ResponseUtils.buildSchemaURL;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,6 +24,8 @@ import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.MetadataLinkInfo;
 import org.geoserver.wcs.WCSInfo;
 import org.geoserver.wcs.kvp.GridType;
+import org.geoserver.wcs.responses.CoverageResponseDelegate;
+import org.geoserver.wcs.responses.CoverageResponseDelegateFinder;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.operation.LinearTransform;
@@ -38,8 +38,6 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.Matrix;
 import org.vfny.geoserver.wcs.WcsException;
 import org.vfny.geoserver.wcs.WcsException.WcsExceptionCode;
-import org.vfny.geoserver.wcs.responses.CoverageResponseDelegate;
-import org.vfny.geoserver.wcs.responses.CoverageResponseDelegateFactory;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.helpers.AttributesImpl;
 
@@ -50,16 +48,16 @@ import org.xml.sax.helpers.AttributesImpl;
  * @author Andrea Aime, TOPP
  */
 public class DescribeCoverageTransformer extends TransformerBase {
-    private static final Logger LOGGER = Logging.getLogger(DescribeCoverageTransformer.class
+    protected static final Logger LOGGER = Logging.getLogger(DescribeCoverageTransformer.class
             .getPackage().getName());
 
-    private static final String WCS_URI = "http://www.opengis.net/wcs/1.1.1";
+    protected static final String WCS_URI = "http://www.opengis.net/wcs/1.1.1";
 
-    private static final String XSI_PREFIX = "xsi";
+    protected static final String XSI_PREFIX = "xsi";
 
-    private static final String XSI_URI = "http://www.w3.org/2001/XMLSchema-instance";
+    protected static final String XSI_URI = "http://www.w3.org/2001/XMLSchema-instance";
 
-    private static final Map<String, String> METHOD_NAME_MAP = new HashMap<String, String>();
+    protected static final Map<String, String> METHOD_NAME_MAP = new HashMap<String, String>();
 
     static {
         METHOD_NAME_MAP.put("nearest neighbor", "nearest");
@@ -67,17 +65,20 @@ public class DescribeCoverageTransformer extends TransformerBase {
         METHOD_NAME_MAP.put("bicubic", "cubic");
     }
 
-    private WCSInfo wcs;
+    protected WCSInfo wcs;
 
-    private Catalog catalog;
+    protected Catalog catalog;
+
+    protected CoverageResponseDelegateFinder responseFactory;
 
     /**
      * Creates a new WFSCapsTransformer object.
      */
-    public DescribeCoverageTransformer(WCSInfo wcs, Catalog catalog) {
+    public DescribeCoverageTransformer(WCSInfo wcs, Catalog catalog, CoverageResponseDelegateFinder responseFactory) {
         super();
         this.wcs = wcs;
         this.catalog = catalog;
+        this.responseFactory = responseFactory;
         setNamespaceDeclarationEnabled(false);
     }
 
@@ -85,10 +86,10 @@ public class DescribeCoverageTransformer extends TransformerBase {
         return new WCS111DescribeCoverageTranslator(handler);
     }
 
-    private class WCS111DescribeCoverageTranslator extends TranslatorSupport {
-        private DescribeCoverageType request;
+    protected class WCS111DescribeCoverageTranslator extends TranslatorSupport {
+        protected DescribeCoverageType request;
 
-        private String proxifiedBaseUrl;
+        protected String proxifiedBaseUrl;
 
         /**
          * Creates a new WFSCapsTranslator object.
@@ -134,7 +135,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             final String locationAtt = new StringBuffer(XSI_PREFIX).append(":schemaLocation")
                     .toString();
 
-             final String locationDef = buildSchemaURL(request.getBaseUrl(),  "wcs/1.1.1/wcsDescribeCoverage.xsd");
+             final String locationDef = WCS_URI + " " + buildSchemaURL(request.getBaseUrl(),  "wcs/1.1.1/wcsDescribeCoverage.xsd");
             
             attributes.addAttribute("", locationAtt, locationAtt, "", locationDef);
 
@@ -161,7 +162,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             end("wcs:CoverageDescriptions");
         }
 
-        void handleCoverageDescription(CoverageInfo ci) throws Exception {
+        protected void handleCoverageDescription(CoverageInfo ci) throws Exception {
             start("wcs:CoverageDescription");
             element("ows:Title", ci.getTitle());
             element("ows:Abstract", ci.getDescription());
@@ -176,28 +177,42 @@ public class DescribeCoverageTransformer extends TransformerBase {
         }
 
         // TODO: find a way to share this with the capabilities transfomer
-        private void handleMetadataLinks(List<MetadataLinkInfo> links, String linkType) {
+        protected void handleMetadataLinks(List<MetadataLinkInfo> links, String linkType) {
         	for (MetadataLinkInfo mdl : links) {
         		if (mdl != null) {
-                    AttributesImpl attributes = new AttributesImpl();
-
-                    if ((mdl.getAbout() != null) && (mdl.getAbout() != "")) {
-                        attributes.addAttribute("", "about", "about", "", mdl.getAbout());
-                    }
-
-                    if ((mdl.getMetadataType() != null) && (mdl.getMetadataType() != "")) {
-                        attributes.addAttribute("", "xlink:type", "xlink:type", "", linkType);
-                    }
-
-                    if (attributes.getLength() > 0) {
-                        element("ows:Metadata", null, attributes);
-                    }
+                    handleMetadataLink(mdl, linkType);
                 }
 			}
         }
 
+        protected void handleMetadataLink(MetadataLinkInfo mdl, String linkType) {
+            AttributesImpl attributes = new AttributesImpl();
+
+            if ((mdl.getAbout() != null) && (mdl.getAbout() != "")) {
+                attributes.addAttribute("", "about", "about", "", mdl.getAbout());
+            }
+            
+            if ((mdl.getMetadataType() != null) && (mdl.getMetadataType() != "")) {
+                attributes.addAttribute("", "metadataType", "metadataType", "", mdl
+                        .getMetadataType());
+            }
+
+            if ((linkType != null) && (linkType != "")) {
+                attributes.addAttribute("", "xlink:type", "xlink:type", "", linkType);
+            }
+
+            if ((mdl.getContent() != null) && (mdl.getContent() != "")) {
+                attributes.addAttribute("", "xlink:href", "xlink:href", 
+                        "", mdl.getContent());
+            }
+
+            if (attributes.getLength() > 0) {
+                element("ows:Metadata", null, attributes);
+            }
+        }
+
         // TODO: find a way to share this with the capabilities transfomer
-        private void handleKeywords(List kwords) {
+        protected void handleKeywords(List kwords) {
             start("ows:Keywords");
 
             if (kwords != null) {
@@ -209,7 +224,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             end("ows:Keywords");
         }
 
-        private void handleDomain(CoverageInfo ci) throws Exception {
+        protected void handleDomain(CoverageInfo ci) throws Exception {
             start("wcs:Domain");
             start("wcs:SpatialDomain");
             handleBoundingBox(ci.getLatLonBoundingBox(), true);
@@ -219,7 +234,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             end("wcs:Domain");
         }
 
-        private void handleGridCRS(CoverageInfo ci) throws Exception {
+        protected void handleGridCRS(CoverageInfo ci) throws Exception {
             start("wcs:GridCRS");
             element("wcs:GridBaseCRS", urnIdentifier(ci.getCRS()));
             element("wcs:GridType", GridType.GT2dGridIn2dCrs.getXmlConstant());
@@ -251,7 +266,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             end("wcs:GridCRS");
         }
 
-        private void handleBoundingBox(ReferencedEnvelope encodedEnvelope, boolean wgsLonLat)
+        protected void handleBoundingBox(ReferencedEnvelope encodedEnvelope, boolean wgsLonLat)
                 throws Exception {
             final AttributesImpl attributes = new AttributesImpl();
             final CoordinateReferenceSystem crs = encodedEnvelope.getCoordinateReferenceSystem();
@@ -260,8 +275,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             } else {
                 String urnIdentifier = urnIdentifier(crs);
                 CoordinateReferenceSystem latlonCrs = CRS.decode(urnIdentifier);
-                encodedEnvelope = new ReferencedEnvelope(CRS.transform(CRS.findMathTransform(crs, latlonCrs, true),
-                        encodedEnvelope));
+                encodedEnvelope = new ReferencedEnvelope(CRS.transform(encodedEnvelope, latlonCrs));
                 attributes.addAttribute("", "crs", "crs", "", urnIdentifier);
             }
             attributes.addAttribute("", "dimensions", "dimensions", "", Integer.toString(crs
@@ -276,7 +290,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             end("ows:BoundingBox");
         }
 
-        private void handleRange(CoverageInfo ci) {
+        protected void handleRange(CoverageInfo ci) {
             start("wcs:Range");
             // at the moment we only handle single field coverages
             start("wcs:Field");
@@ -303,7 +317,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             end("wcs:Range");
         }
 
-        private void handleAxis(CoverageInfo ci) {
+        protected void handleAxis(CoverageInfo ci) {
             final AttributesImpl attributes = new AttributesImpl();
             attributes.addAttribute("", "identifier", "identifier", "", "Bands");
             start("wcs:Axis", attributes);
@@ -323,7 +337,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
          * @param dimensions
          * @return
          */
-        private NumberRange getCoverageRange(List<CoverageDimensionInfo> dimensions) {
+        protected NumberRange getCoverageRange(List<CoverageDimensionInfo> dimensions) {
             NumberRange range = null;
             for (CoverageDimensionInfo dimension : dimensions) {
             	if (dimension.getRange() == null)
@@ -336,7 +350,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             return range;
         }
 
-        private void handleNullValues(List<CoverageDimensionInfo> dimensions) {
+        protected void handleNullValues(List<CoverageDimensionInfo> dimensions) {
         	for (CoverageDimensionInfo cd : dimensions) {
                 List<Double> nulls = cd.getNullValues();
                 if(nulls == null)
@@ -353,7 +367,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             }
         }
 
-        private void handleInterpolationMethods(CoverageInfo ci) {
+        protected void handleInterpolationMethods(CoverageInfo ci) {
             start("wcs:InterpolationMethods");
             for (Iterator it = ci.getInterpolationMethods().iterator(); it.hasNext();) {
                 String method = (String) it.next();
@@ -366,16 +380,15 @@ public class DescribeCoverageTransformer extends TransformerBase {
             end("wcs:InterpolationMethods");
         }
 
-        private void handleSupportedFormats(CoverageInfo ci) throws Exception {
+        protected void handleSupportedFormats(CoverageInfo ci) throws Exception {
             // gather all the formats for this coverage 
             Set<String> formats = new LinkedHashSet<String>();
             for (Iterator it = ci.getSupportedFormats().iterator(); it.hasNext();) {
                 String format = (String) it.next();
                 // wcs 1.1 requires mime types, not format names
                 try  {
-                    CoverageResponseDelegate delegate = CoverageResponseDelegateFactory
-                            .encoderFor(format);
-                    String formatMime = delegate.getMimeFormatFor(format);
+                    CoverageResponseDelegate delegate = responseFactory.encoderFor(format);
+                    String formatMime = delegate.getMimeType(format);
                     if(formatMime != null)
                         formats.add(formatMime);
                 } catch(Exception e) {
@@ -391,7 +404,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             
         }
 
-        private void handleSupportedCRSs(CoverageInfo ci) throws Exception {
+        protected void handleSupportedCRSs(CoverageInfo ci) throws Exception {
             Set supportedCRSs = new LinkedHashSet();
             if (ci.getRequestSRS() != null)
                 supportedCRSs.addAll(ci.getRequestSRS());
@@ -405,7 +418,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
             }
         }
 
-        private String urnIdentifier(final CoordinateReferenceSystem crs) throws FactoryException {
+        protected String urnIdentifier(final CoordinateReferenceSystem crs) throws FactoryException {
             String authorityAndCode = CRS.lookupIdentifier(crs, false);
             String code = authorityAndCode.substring(authorityAndCode.lastIndexOf(":") + 1);
             // we don't specify the version, but we still need to put a space
@@ -420,7 +433,7 @@ public class DescribeCoverageTransformer extends TransformerBase {
          * @param elementName
          * @param content
          */
-        private void elementIfNotEmpty(String elementName, String content) {
+        protected void elementIfNotEmpty(String elementName, String content) {
             if (content != null && !"".equals(content.trim()))
                 element(elementName, content);
         }

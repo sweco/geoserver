@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.data.util;
 
 import java.io.BufferedOutputStream;
@@ -23,6 +28,9 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import org.apache.commons.io.FileUtils;
+import org.geoserver.config.util.XStreamPersister;
+import org.geoserver.platform.resource.Resource;
 import org.geotools.util.logging.Logging;
 
 /**
@@ -31,7 +39,7 @@ import org.geotools.util.logging.Logging;
  * @author Andrea Aime - TOPP
  * 
  */
-public class IOUtils {
+public final class IOUtils {
     private static final Logger LOGGER = Logging.getLogger(IOUtils.class);
     
     private IOUtils() {
@@ -201,7 +209,7 @@ public class IOUtils {
      * and finally wipes out the directory itself. For each
      * file that cannot be deleted a warning log will be issued. 
      * 
-     * @param dir
+     * @param directory Directory to delete
      * @throws IOException
      * @returns true if the directory could be deleted, false otherwise
      */
@@ -277,7 +285,9 @@ public class IOUtils {
             if (file.exists()) {
                 if(file.isDirectory()) {
                     // recurse and append
-                    zipDirectory(file, prefix + file.getName() + "/", zipout, filter);
+                    String newPrefix = prefix + file.getName() + "/";
+                    zipout.putNextEntry(new ZipEntry(newPrefix));
+                    zipDirectory(file, newPrefix, zipout, filter);
                 } else {
                     ZipEntry entry = new ZipEntry(prefix  + file.getName());
                     zipout.putNextEntry(entry);
@@ -377,8 +387,119 @@ public class IOUtils {
             out.flush();
             out.close();
             IOException ioe = new IOException("Not valid archive file type.");
-            ioe.initCause(e);
-            throw ioe;
+        ioe.initCause(e);
+        throw ioe;
+    }
+}
+
+    /**
+     * Performs serialization with an {@link XStreamPersister} in a safe manner in
+     * which a temp file is used for the serialization so that the true destination
+     * file is not partially written in the case of an error.
+     * 
+     * @param f The file to write to, only modified if the temp file serialization
+     *        was error free.
+     * @param obj The object to serialize.
+     * @param xp The persister.
+     * @throws Exception
+     */
+    public static void xStreamPersist(File f, Object obj, XStreamPersister xp)
+            throws IOException {
+        // first save to a temp file
+        final File temp = File.createTempFile(f.getName(), null, f.getParentFile());
+    
+        BufferedOutputStream out = null;
+        try {
+            out = new BufferedOutputStream(new FileOutputStream(temp));
+            xp.save(obj, out);
+            out.flush();
+        } finally {
+            if (out != null)
+                org.apache.commons.io.IOUtils.closeQuietly(out);
+        }
+    
+        // no errors, overwrite the original file
+        try {
+            rename(temp, f);
+        } finally {
+            if (temp.exists()) {
+                temp.delete();
+            }
+        }
+    }
+    
+    /**
+     * Performs serialization with an {@link XStreamPersister} in a safe manner in
+     * which a temp file is used for the serialization so that the true destination
+     * file is not partially written in the case of an error.
+     * 
+     * @param r The resource to write to, only modified if the temp file serialization
+     *        was error free.
+     * @param obj The object to serialize.
+     * @param xp The persister.
+     * @throws Exception
+     */
+    public static void xStreamPersist(Resource r, Object obj, XStreamPersister xp)
+            throws IOException {
+        
+        try(OutputStream out = r.out()) {
+            xp.save(obj, out);
+            out.flush();
+        }
+    }
+
+    /**
+     * Backs up a directory <tt>dir</tt> by creating a .bak next to it.
+     *  
+     * @param dir The directory to back up.
+     */
+    public static void backupDirectory(File dir) throws IOException {
+        File bak = new File( dir.getCanonicalPath() + ".bak");
+        if ( bak.exists() ) {
+            FileUtils.deleteDirectory( bak );
+        }
+        dir.renameTo( bak );
+    }
+
+    /**
+     * Renames a file.
+     *  
+     * @param f The file to rename.
+     * @param newName The new name of the file.
+     */
+    public static void rename(File f, String newName) throws IOException {
+        rename( f, new File( f.getParentFile(), newName ) );
+    }
+    
+    /**
+     * Renames a file.
+     *  
+     * @param source The file to rename.
+     * @param dest The file to rename to. 
+     */
+    public static void rename( File source, File dest ) throws IOException {
+        // same path? Do nothing
+        if (source.getCanonicalPath().equalsIgnoreCase(dest.getCanonicalPath()))
+            return;
+
+        // windows needs special treatment, we cannot rename onto an existing file
+        boolean win = System.getProperty("os.name").startsWith("Windows");
+        if ( win && dest.exists() ) {
+            // windows does not do atomic renames, and can not rename a file if the dest file
+            // exists
+            if (!dest.delete()) {
+                throw new IOException("Could not delete: " + dest.getCanonicalPath());
+            }
+        }
+        // make sure the rename actually succeeds
+        if(!source.renameTo(dest)) {
+            FileUtils.deleteQuietly(dest);
+            if( source.isDirectory() ){
+                FileUtils.moveDirectory(source, dest );
+            }
+            else {
+                FileUtils.moveFile(source, dest);
+            }
         }
     }
 }

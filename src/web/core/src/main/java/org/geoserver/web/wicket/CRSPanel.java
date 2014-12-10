@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -9,6 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.wicket.AttributeModifier;
+import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.form.AjaxFormComponentUpdatingBehavior;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
@@ -48,19 +50,19 @@ public class CRSPanel extends FormComponentPanel {
     private static IBehavior READ_ONLY = new AttributeModifier("readonly", true, new Model("readonly"));
 
     /** pop-up window for WKT and SRS list */
-    ModalWindow popupWindow;
+    protected ModalWindow popupWindow;
     
     /** srs/epsg code text field */
-    TextField srsTextField;
+    protected TextField srsTextField;
     
     /** find link */
-    AjaxLink findLink;
+    protected AjaxLink findLink;
     
     /** wkt label */
-    Label wktLabel;
+    protected Label wktLabel;
 
     /** the wkt link that contains the wkt label **/
-    GeoServerAjaxFormLink wktLink;
+    protected GeoServerAjaxFormLink wktLink;
     
     /**
      * Constructs the CRS panel.
@@ -133,6 +135,8 @@ public class CRSPanel extends FormComponentPanel {
                     wktLink.setEnabled(false);
                 }
                 target.addComponent(wktLink);
+                
+                onSRSUpdated(toSRS(crs), target);
             }
         });
         
@@ -179,7 +183,7 @@ public class CRSPanel extends FormComponentPanel {
         
         super.onBeforeRender();
     }
-
+    
     @Override
     protected void convertInput() {
         String srs = srsTextField.getInput();
@@ -195,6 +199,16 @@ public class CRSPanel extends FormComponentPanel {
             crs = fromSRS( srs );
         }
         setConvertedInput( crs );
+    }
+    
+    
+    /**
+     * Subclasses can override to perform custom behaviors when the SRS is updated, which happens
+     * either when the text field is left or when the find dialog returns
+     * @param target 
+     */
+    protected void onSRSUpdated(String srs, AjaxRequestTarget target) {
+        // do nothing by default
     }
     
     /**
@@ -228,8 +242,12 @@ public class CRSPanel extends FormComponentPanel {
      */
     String toSRS( CoordinateReferenceSystem crs ) {
         try {
-            Integer epsgCode = CRS.lookupEpsgCode(crs, false);
-            return epsgCode != null ? "EPSG:" + epsgCode : "UNKNOWN";
+            if(crs != null) {
+                Integer epsgCode = CRS.lookupEpsgCode(crs, false);
+                return epsgCode != null ? "EPSG:" + epsgCode : "UNKNOWN";
+            } else {
+                return "UNKNOWN";
+            }
         } 
         catch (Exception e) {
             LOGGER.log(Level.WARNING, "Could not succesffully lookup an EPSG code", e);
@@ -240,7 +258,7 @@ public class CRSPanel extends FormComponentPanel {
     /*
      * Goes from SRS to CRS.
      */
-    CoordinateReferenceSystem fromSRS( String srs ) {
+    protected CoordinateReferenceSystem fromSRS( String srs ) {
         try {
             return CRS.decode( srs );
         } 
@@ -254,7 +272,7 @@ public class CRSPanel extends FormComponentPanel {
      * Builds the srs list panel component.
      */
     @SuppressWarnings("serial")
-    SRSListPanel srsListPanel() {
+    protected SRSListPanel srsListPanel() {
         SRSListPanel srsList = new SRSListPanel(popupWindow.getContentId()) {
             
             @Override
@@ -269,6 +287,8 @@ public class CRSPanel extends FormComponentPanel {
                 wktLabel.setDefaultModelObject( crs.getName().toString() );
                 wktLink.setEnabled(true);
                 target.addComponent( wktLink );
+                
+                onSRSUpdated(srs, target);
             }
         };
         srsList.setCompactMode(true);

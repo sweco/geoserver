@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.vfny.geoserver.util;
@@ -80,7 +81,7 @@ public final class Requests {
         // try with the web interface configuration, if it fails, look into
         // web.xml just to keep compatibility (should be removed next version)
         // and finally, if nothing is found, give up and return the default base URL
-        String url = ((geoserver != null) ? geoserver.getGlobal().getProxyBaseUrl() : null);
+        String url = ((geoserver != null) ? geoserver.getSettings().getProxyBaseUrl() : null);
 
         //if ((geoserver != null) && (url != null)) {
         //    url = appendContextPath(url, httpServletRequest.getContextPath());
@@ -116,7 +117,7 @@ public final class Requests {
         // try with the web interface configuration, if it fails, look into
         // web.xml just to keep compatibility (should be removed next version)
         // and finally, if nothing is found, give up and return the default base URL
-        String url = geoserver.getGlobal().getProxyBaseUrl();
+        String url = geoserver.getSettings().getProxyBaseUrl();
 
         if ((geoserver != null) && (url != null)) {
             url = appendContextPath(url, httpServletRequest.getRequestURI());

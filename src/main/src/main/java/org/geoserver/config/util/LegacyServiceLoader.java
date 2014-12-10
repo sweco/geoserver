@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -118,5 +119,9 @@ public abstract class LegacyServiceLoader<T extends ServiceInfo> implements Serv
     public void save(T service, GeoServer gs) throws Exception {
         //do nothing, saving implemented elsewhere
     }
-    
+
+    @Override
+    public T create(GeoServer gs) throws Exception {
+        throw new UnsupportedOperationException("Use xstream loader equivalent instead");
+    }
 }

@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -6,7 +7,6 @@ package org.geoserver.web.wicket;
 
 import java.io.Serializable;
 import java.util.Arrays;
-import java.util.List;
 
 import org.apache.wicket.Component;
 import org.apache.wicket.Page;
@@ -23,7 +23,6 @@ import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.Panel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
-import org.apache.wicket.model.StringResourceModel;
 
 /**
  * An abstract OK/cancel dialog, subclasses will have to provide the actual contents and behavior
@@ -33,7 +32,7 @@ import org.apache.wicket.model.StringResourceModel;
 public class GeoServerDialog extends Panel {
 
     ModalWindow window;
-
+    Component userPanel;
     DialogDelegate delegate;
 
     public GeoServerDialog(String id) {
@@ -110,7 +109,8 @@ public class GeoServerDialog extends Panel {
         window.setPageCreator(new ModalWindow.PageCreator() {
 
             public Page createPage() {
-                return new ContentsPage(delegate.getContents("userPanel"));
+                userPanel = delegate.getContents("userPanel");
+                return new ContentsPage(userPanel);
             }
         });
         // make sure close == cancel behavior wise
@@ -159,8 +159,22 @@ public class GeoServerDialog extends Panel {
     public void close(AjaxRequestTarget target) {
         window.close(target);
         delegate = null;
+        userPanel = null;
     }
-    
+
+    /**
+     * Submits the dialog.
+     */
+    public void submit(AjaxRequestTarget target) {
+        submit(target, userPanel);
+    }
+
+    void submit(AjaxRequestTarget target, Component contents) {
+        if (delegate.onSubmit(target, contents)) {
+            close(target);
+        }
+    }
+
     /**
      * Submit link that will forward to the {@link DialogDelegate}
      * 
@@ -171,9 +185,7 @@ public class GeoServerDialog extends Panel {
 
             @Override
             protected void onSubmit(AjaxRequestTarget target, Form form) {
-                if (delegate.onSubmit(target, (Component) this.getDefaultModelObject())) {
-                    close(target);
-                }
+                submit(target, (Component) this.getDefaultModelObject());
             }
             
             @Override
@@ -232,7 +244,7 @@ public class GeoServerDialog extends Panel {
             add(new ListView<IModel>("messages", Arrays.asList(messages)) {
                 @Override
                 protected void populateItem(ListItem<IModel> item) {
-                    item.add(new Label("message", item.getModelObject()));
+                    item.add(new Label("message", item.getModelObject()).setEscapeModelStrings(false));
                 }
             });
         }
@@ -303,6 +315,10 @@ public class GeoServerDialog extends Panel {
         protected boolean onCancel(AjaxRequestTarget target) {
             return true;
         }
+    }
+
+    public void setResizable(boolean resizable) {
+        window.setResizable(resizable);
     }
 
 }

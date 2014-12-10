@@ -1,11 +1,14 @@
-/* Copyright (c) 2010 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2014 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.geoserver.catalog.AuthorityURLInfo;
 import org.geoserver.catalog.LayerIdentifierInfo;
@@ -19,7 +22,15 @@ public class WMSInfoImpl extends ServiceInfoImpl implements WMSInfo {
 
     WatermarkInfo watermark = new WatermarkInfoImpl();
 
-    WMSInterpolation interpolation;
+    WMSInterpolation interpolation = WMSInterpolation.Nearest;
+    
+    
+    boolean getFeatureInfoMimeTypeCheckingEnabled;
+    Set<String> getFeatureInfoMimeTypes = new HashSet<String>();
+    
+    boolean getMapMimeTypeCheckingEnabled;
+    Set<String> getMapMimeTypes = new HashSet<String>();
+    
     
 
     /**
@@ -47,8 +58,9 @@ public class WMSInfoImpl extends ServiceInfoImpl implements WMSInfo {
 
     int maxRenderingErrors;
 
+    private String capabilitiesErrorHandling;
+
     public WMSInfoImpl() {
-        setId("wms");
         authorityURLs = new ArrayList<AuthorityURLInfo>(2);
         identifiers = new ArrayList<LayerIdentifierInfo>(2);
     }
@@ -141,4 +153,35 @@ public class WMSInfoImpl extends ServiceInfoImpl implements WMSInfo {
         this.identifiers = identifiers;
     }
 
+    public Set<String> getGetFeatureInfoMimeTypes() {
+        return getFeatureInfoMimeTypes;
+    }
+
+    public void setGetFeatureInfoMimeTypes(Set<String> getFeatureInfoMimeTypes) {
+        this.getFeatureInfoMimeTypes = getFeatureInfoMimeTypes;
+    }
+
+    public Set<String> getGetMapMimeTypes() {
+        return getMapMimeTypes;
+    }
+
+    public void setGetMapMimeTypes(Set<String> getMapMimeTypes) {
+        this.getMapMimeTypes = getMapMimeTypes;
+    }
+
+    public boolean isGetFeatureInfoMimeTypeCheckingEnabled() {
+        return getFeatureInfoMimeTypeCheckingEnabled;
+    }
+
+    public void setGetFeatureInfoMimeTypeCheckingEnabled(boolean getFeatureInfoMimeTypeCheckingEnabled) {
+        this.getFeatureInfoMimeTypeCheckingEnabled = getFeatureInfoMimeTypeCheckingEnabled;
+    }
+
+    public boolean isGetMapMimeTypeCheckingEnabled() {
+        return getMapMimeTypeCheckingEnabled;
+    }
+
+    public void setGetMapMimeTypeCheckingEnabled(boolean getMapMimeTypeCheckingEnabled) {
+        this.getMapMimeTypeCheckingEnabled = getMapMimeTypeCheckingEnabled;
+    }
 }

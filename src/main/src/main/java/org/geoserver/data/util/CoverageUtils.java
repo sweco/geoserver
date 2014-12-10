@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.data.util;
@@ -18,10 +19,12 @@ import java.util.logging.Logger;
 
 import org.geotools.coverage.grid.GeneralGridGeometry;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
+import org.geotools.filter.text.ecql.ECQL;
 import org.geotools.geometry.GeneralEnvelope;
 import org.geotools.parameter.DefaultParameterDescriptor;
 import org.geotools.referencing.CRS;
 import org.geotools.util.Converters;
+import org.opengis.filter.Filter;
 import org.opengis.parameter.GeneralParameterDescriptor;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterDescriptor;
@@ -128,9 +131,9 @@ public class CoverageUtils {
             }
 
             return (!parameters.isEmpty())? 
-            		(GeneralParameterValue[]) parameters.toArray(new GeneralParameterValue[parameters.size()]): null;
+            		(GeneralParameterValue[]) parameters.toArray(new GeneralParameterValue[parameters.size()]): new GeneralParameterValue[0];
         } else {
-            return null;
+            return new GeneralParameterValue[0];
         }
     }
 
@@ -325,7 +328,7 @@ public class CoverageUtils {
                     value = params.get(key);
                 }
             } else {
-                final Class<? extends Object> target = param.getClass();
+                final Class<? extends Object> target = param.getDescriptor().getValueClass();
                 if (key.equalsIgnoreCase("InputTransparentColor")
                         || key.equalsIgnoreCase("OutputTransparentColor")) {
                     if (params.get(key) != null) {
@@ -345,13 +348,24 @@ public class CoverageUtils {
                         value=backgroundValues;
                         
                     } 
-                } 
-                else if (key.equalsIgnoreCase("InputImageThresholdValue")) {
+                } else if (key.equalsIgnoreCase("InputImageThresholdValue")) {
                     if (params.get(key) != null) {
                         String temp = (String) params.get(key);
                         value=Double.valueOf(temp);
                         
                     } 
+                } else if (key.equalsIgnoreCase("Filter")) {
+    	            	Object sfilter=params.get(key);
+    	            	if (sfilter!=null){
+    	            		if (sfilter instanceof String){
+    	            			value=ECQL.toFilter((String)sfilter);
+    	            		} else if (sfilter instanceof Filter){
+    	            			value=(Filter)sfilter;
+    	            		}
+    	        		} else {
+    	        			value=param.getValue();
+    	        		}
+            		 
                 } else {
                     value = params.get(key);
                     if(value != null) {

@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -14,6 +15,8 @@ import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.LayerInfo.Type;
+import org.geoserver.ows.URLMangler.URLType;
+import org.geoserver.ows.util.ResponseUtils;
 import org.geoserver.web.CatalogIconFactory;
 import org.geoserver.web.GeoServerApplication;
 import org.geoserver.wms.DefaultWebMapService;
@@ -23,6 +26,7 @@ import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.gml2.bindings.GML2EncodingUtils;
 import org.geotools.util.logging.Logging;
 
+import com.google.common.collect.Iterables;
 import com.vividsolutions.jts.geom.Envelope;
 
 /**
@@ -52,7 +56,7 @@ public class PreviewLayer {
 
     public String getName() {
         if (layerInfo != null) {
-            return layerInfo.getResource().getPrefixedName();
+            return layerInfo.getResource().prefixedName();
         } else {
             return groupInfo.getName();
         }
@@ -61,9 +65,10 @@ public class PreviewLayer {
     public String getWorkspace() {
         if (layerInfo != null) {
             return layerInfo.getResource().getStore().getWorkspace().getName();
-        } else {
-            return null;
+        } else if (groupInfo != null && groupInfo.getWorkspace() != null){
+            return groupInfo.getWorkspace().getName();
         }
+        return null;
     }
     
     public ResourceReference getIcon() {
@@ -81,24 +86,31 @@ public class PreviewLayer {
     }
     
     public String getTitle() {
-        if(layerInfo != null)
+        if(layerInfo != null) {
             return layerInfo.getResource().getTitle();
-        else
+        } else if(groupInfo != null) {
+            return groupInfo.getTitle();
+        } else {
             return "";
+        }
     }
     
     public String getAbstract() {
-        if(layerInfo != null)
+        if(layerInfo != null) {
             return layerInfo.getResource().getAbstract();
-        else
+        } else if(groupInfo != null) {
+            return groupInfo.getAbstract();
+        } else {
             return "";
+        }
     }
     
     public String getKeywords() {
-        if(layerInfo != null)
+        if(layerInfo != null) {
             return layerInfo.getResource().getKeywords().toString();
-        else
+        } else {
             return "";
+        }
     }
 
     public PreviewLayer.PreviewLayerType getType() {
@@ -161,7 +173,7 @@ public class PreviewLayer {
         if (layerInfo != null) {
             layers.add(new MapLayerInfo(layerInfo));
         } else {
-            for (LayerInfo l : groupInfo.getLayers()) {
+            for (LayerInfo l : Iterables.filter(groupInfo.getLayers(), LayerInfo.class)) {
                 layers.add(new MapLayerInfo(l));
             }
         }
@@ -172,12 +184,12 @@ public class PreviewLayer {
         String ws = getWorkspace();
         if(ws == null) {
             // global reference
-            return "../" + service;
+            return ResponseUtils.buildURL("../", service, null, URLType.SERVICE);
         } else {
-            return "../" + ws + "/" + service;
+            return ResponseUtils.buildURL("../", ws + "/" + service, null, URLType.SERVICE);
         }
     }
-
+    
     /**
      * Given a request and a target format, builds the WMS request
      * 

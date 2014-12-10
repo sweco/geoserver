@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -8,39 +9,24 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.geoserver.catalog.MetadataMap;
+import org.geoserver.config.ResourceErrorHandling;
 import org.geoserver.config.ContactInfo;
 import org.geoserver.config.CoverageAccessInfo;
 import org.geoserver.config.GeoServer;
 import org.geoserver.config.GeoServerInfo;
 import org.geoserver.config.JAIInfo;
+import org.geoserver.config.SettingsInfo;
 
 public class GeoServerInfoImpl implements GeoServerInfo {
 
     protected String id;
 
-    protected ContactInfo contact = new ContactInfoImpl();
+    protected SettingsInfo settings = new SettingsInfoImpl();
 
     protected JAIInfo jai = new JAIInfoImpl();
     
     protected CoverageAccessInfo coverageAccess = new CoverageAccessInfoImpl();
     
-    // Charset charSet = Charset.forName("UTF-8");
-    protected String charset = "UTF-8";
-
-    protected String title;
-
-    protected int numDecimals = 4;
-
-    protected String onlineResource;
-
-    protected String schemaBaseUrl;
-
-    protected String proxyBaseUrl;
-
-    protected boolean verbose = true;
-
-    protected boolean verboseExceptions = false;
-
     protected MetadataMap metadata = new MetadataMap();
 
     protected Map<Object, Object> clientProperties = new HashMap<Object, Object>();
@@ -58,11 +44,37 @@ public class GeoServerInfoImpl implements GeoServerInfo {
 
     protected Integer xmlPostRequestLogBufferSize = 1024;
 
+    protected Boolean xmlExternalEntitiesEnabled = Boolean.FALSE;
+    
+    protected String lockProviderName;
+    
+    //deprecated members, kept around to maintain xstream persistence backward compatability
+    @Deprecated
+    protected ContactInfo contact;
+    @Deprecated
+    protected String charset;
+    @Deprecated
+    protected String title;
+    @Deprecated
+    protected Integer numDecimals;
+    @Deprecated
+    protected String onlineResource;
+    @Deprecated
+    protected String schemaBaseUrl;
+    @Deprecated
+    protected String proxyBaseUrl;
+    @Deprecated
+    protected Boolean verbose;
+    @Deprecated
+    protected Boolean verboseExceptions;
+
+    private ResourceErrorHandling resourceErrorHandling;
+
     public GeoServerInfoImpl(GeoServer geoServer) {
         this.geoServer = geoServer;
     }
 
-    protected GeoServerInfoImpl() {
+    public GeoServerInfoImpl() {
     }
     
     public String getId() {
@@ -77,12 +89,22 @@ public class GeoServerInfoImpl implements GeoServerInfo {
         this.geoServer = geoServer;
     }
 
+    @Override
+    public SettingsInfo getSettings() {
+        return settings;
+    }
+
+    @Override
+    public void setSettings(SettingsInfo settings) {
+        this.settings = settings;
+    }
+
     public void setContact(ContactInfo contactInfo) {
-        this.contact = contactInfo;
+        getSettings().setContact(contactInfo);
     }
 
     public ContactInfo getContact() {
-        return contact;
+        return getSettings().getContact();
     }
     
     public JAIInfo getJAI() {
@@ -103,67 +125,67 @@ public class GeoServerInfoImpl implements GeoServerInfo {
     }
     
     public void setTitle(String title) {
-        this.title = title;
+        getSettings().setTitle(title);
     }
 
     public String getTitle() {
-        return title;
+        return getSettings().getTitle();
     }
 
     public String getCharset() {
-        return charset;
+        return getSettings().getCharset();
     }
 
     public void setCharset(String charset) {
-        this.charset = charset;
+        getSettings().setCharset(charset);
     }
 
     public int getNumDecimals() {
-        return numDecimals;
+        return getSettings().getNumDecimals();
     }
 
     public void setNumDecimals(int numDecimals) {
-        this.numDecimals = numDecimals;
+        getSettings().setNumDecimals(numDecimals);
     }
 
     public String getOnlineResource() {
-        return onlineResource;
+        return getSettings().getOnlineResource();
     }
 
     public void setOnlineResource(String onlineResource) {
-        this.onlineResource = onlineResource;
+        getSettings().setOnlineResource(onlineResource);
     }
 
     public String getProxyBaseUrl() {
-        return proxyBaseUrl;
+        return getSettings().getProxyBaseUrl();
     }
 
     public void setProxyBaseUrl(String proxyBaseUrl) {
-        this.proxyBaseUrl = proxyBaseUrl;
+        getSettings().setProxyBaseUrl(proxyBaseUrl);
     }
 
     public String getSchemaBaseUrl() {
-        return schemaBaseUrl;
+        return getSettings().getSchemaBaseUrl();
     }
 
     public void setSchemaBaseUrl(String schemaBaseUrl) {
-        this.schemaBaseUrl = schemaBaseUrl;
+        getSettings().setSchemaBaseUrl(schemaBaseUrl);
     }
 
     public boolean isVerbose() {
-        return verbose;
+        return getSettings().isVerbose();
     }
 
     public void setVerbose(boolean verbose) {
-        this.verbose = verbose;
+        getSettings().setVerbose(verbose);
     }
 
     public boolean isVerboseExceptions() {
-        return verboseExceptions;
+        return getSettings().isVerboseExceptions();
     }
 
     public void setVerboseExceptions(boolean verboseExceptions) {
-        this.verboseExceptions = verboseExceptions;
+        getSettings().setVerboseExceptions(verboseExceptions);
     }
 
     public long getUpdateSequence() {
@@ -189,7 +211,7 @@ public class GeoServerInfoImpl implements GeoServerInfo {
     public void setAdminUsername(String adminUsername) {
         this.adminUsername = adminUsername;
     }
-    
+
     public int getFeatureTypeCacheSize() {
         return featureTypeCacheSize;
     }
@@ -215,6 +237,24 @@ public class GeoServerInfoImpl implements GeoServerInfo {
         return this.xmlPostRequestLogBufferSize;
     }
 
+    /**
+     * If true it enables evaluation of XML entities contained in XML files received in a service (WMS, WFS, ...) request.
+     * Default is FALSE.
+     * Enabling this feature is a security risk.
+     */
+    public void setXmlExternalEntitiesEnabled(Boolean xmlExternalEntitiesEnabled) {
+        this.xmlExternalEntitiesEnabled = xmlExternalEntitiesEnabled;
+    }
+    
+    /**
+     * If true it enables evaluation of XML entities contained in XML files received in a service (WMS, WFS, ...) request.
+     * Default is FALSE.
+     * Enabling this feature is a security risk.
+     */
+    public Boolean isXmlExternalEntitiesEnabled() {
+        return this.xmlExternalEntitiesEnabled;
+    }
+    
     public MetadataMap getMetadata() {
         return metadata;
     }
@@ -231,6 +271,14 @@ public class GeoServerInfoImpl implements GeoServerInfo {
         this.clientProperties = properties;
     }
     
+    public String getLockProviderName() {
+        return this.lockProviderName;
+    }
+    
+    public void setLockProviderName(String lockProviderName) {
+        this.lockProviderName = lockProviderName;
+    }
+    
     public void dispose() {
         if (coverageAccess != null){
             coverageAccess.dispose();
@@ -241,31 +289,23 @@ public class GeoServerInfoImpl implements GeoServerInfo {
         final int prime = 31;
         int result = 1;
         result = prime * result
+                + ((settings == null) ? 0 : settings.hashCode());
+        result = prime * result
                 + ((adminPassword == null) ? 0 : adminPassword.hashCode());
         result = prime * result
                 + ((adminUsername == null) ? 0 : adminUsername.hashCode());
-        result = prime * result + ((charset == null) ? 0 : charset.hashCode());
         result = prime
                 * result
                 + ((clientProperties == null) ? 0 : clientProperties.hashCode());
-        result = prime * result
-                + ((contact == null) ? 0 : contact.hashCode());
         result = prime * result + ((id == null) ? 0 : id.hashCode());
         result = prime * result
                 + ((metadata == null) ? 0 : metadata.hashCode());
-        result = prime * result + numDecimals;
-        result = prime * result
-                + ((onlineResource == null) ? 0 : onlineResource.hashCode());
-        result = prime * result
-                + ((proxyBaseUrl == null) ? 0 : proxyBaseUrl.hashCode());
-        result = prime * result
-                + ((schemaBaseUrl == null) ? 0 : schemaBaseUrl.hashCode());
-        result = prime * result + ((title == null) ? 0 : title.hashCode());
         result = prime * result + new Long(updateSequence).hashCode();
-        result = prime * result + (verbose ? 1231 : 1237);
-        result = prime * result + (verboseExceptions ? 1231 : 1237);
         result = prime * result + (globalServices ? 1231 : 1237);
         result = prime * result + xmlPostRequestLogBufferSize;
+        result = prime * result + 
+                ((resourceErrorHandling == null) ? 0 : resourceErrorHandling.hashCode());
+        result = prime * result + ((lockProviderName == null) ? 0 : lockProviderName.hashCode());
         return result;
     }
 
@@ -288,49 +328,19 @@ public class GeoServerInfoImpl implements GeoServerInfo {
                 return false;
         } else if (!adminUsername.equals(other.getAdminUsername()))
             return false;
-        if (charset == null) {
-            if (other.getCharset() != null)
+        if (settings == null) {
+            if (other.getSettings() != null)
                 return false;
-        } else if (!charset.equals(other.getCharset()))
-            return false;
-        if (contact == null) {
-            if (other.getContact() != null)
-                return false;
-        } else if (!contact.equals(other.getContact()))
+        } else if (!settings.equals(other.getSettings()))
             return false;
         if (id == null) {
             if (other.getId() != null)
                 return false;
         } else if (!id.equals(other.getId()))
             return false;
-        if (numDecimals != other.getNumDecimals())
-            return false;
-        if (onlineResource == null) {
-            if (other.getOnlineResource() != null)
-                return false;
-        } else if (!onlineResource.equals(other.getOnlineResource()))
-            return false;
-        if (proxyBaseUrl == null) {
-            if (other.getProxyBaseUrl() != null)
-                return false;
-        } else if (!proxyBaseUrl.equals(other.getProxyBaseUrl()))
-            return false;
-        if (schemaBaseUrl == null) {
-            if (other.getSchemaBaseUrl() != null)
-                return false;
-        } else if (!schemaBaseUrl.equals(other.getSchemaBaseUrl()))
-            return false;
-        if (title == null) {
-            if (other.getTitle() != null)
-                return false;
-        } else if (!title.equals(other.getTitle()))
-            return false;
         if (updateSequence != other.getUpdateSequence())
             return false;
-        if (verbose != other.isVerbose())
-            return false;
-        if (verboseExceptions != other.isVerboseExceptions())
-            return false;
+      
         if (globalServices != other.isGlobalServices())
             return false;
         if (xmlPostRequestLogBufferSize == null) {
@@ -341,17 +351,31 @@ public class GeoServerInfoImpl implements GeoServerInfo {
         else if (!xmlPostRequestLogBufferSize.equals(other.getXmlPostRequestLogBufferSize())) {
             return false;
         }
+        
+        if (resourceErrorHandling == null) {
+            if (other.getResourceErrorHandling() != null) return false;
+        } else {
+            if (!resourceErrorHandling.equals(other.getResourceErrorHandling())) return false;
+        }
+        
+        if (lockProviderName == null) {
+            if (other.getLockProviderName() != null) return false;
+        } else {
+            if (!lockProviderName.equals(other.getLockProviderName())) return false;
+        }
+
         return true;
     }
 
     @Override
     public String toString() {
-        return new StringBuilder(getClass().getSimpleName()).append('[').append(title).append(']')
+        return new StringBuilder(getClass().getSimpleName()).append('[').append(getTitle()).append(']')
                 .toString();
     }
 
     /*
-     * XStream specific method, needed to initialize members that are added over time.
+     * XStream specific method, needed to initialize members that are added over time and to cleanly
+     * handle deprecated members.
      */
     public Object readResolve() {
         if (this.globalServices == null) {
@@ -360,7 +384,57 @@ public class GeoServerInfoImpl implements GeoServerInfo {
         if (this.xmlPostRequestLogBufferSize == null) {
             this.xmlPostRequestLogBufferSize = 1024;
         }
+        if (this.settings == null) {
+            this.settings = new SettingsInfoImpl();
+        }
+
+        //handle deprecated members, forward values onto the setter methods
+        if (contact != null) {
+            setContact(contact);
+            contact = null;
+        }
+        if (charset != null) {
+            setCharset(charset);
+            charset = null;
+        }
+        if (title != null) {
+            setTitle(title);
+            title = null;
+        }
+        if (numDecimals != null) {
+            setNumDecimals(numDecimals);
+            numDecimals = null;
+        }
+        if (onlineResource != null) {
+            setOnlineResource(onlineResource);
+            onlineResource = null;
+        }
+        if (schemaBaseUrl != null) {
+            setSchemaBaseUrl(schemaBaseUrl);
+            schemaBaseUrl = null;
+        }
+        if (proxyBaseUrl != null) {
+            setProxyBaseUrl(proxyBaseUrl);
+            proxyBaseUrl = null;
+        }
+        if (verbose != null) {
+            setVerbose(verbose);
+            verbose = null;
+        }
+        if (verboseExceptions != null) {
+            setVerboseExceptions(verboseExceptions);
+            verboseExceptions = null;
+        }
+        
         return this;
+    }
+
+    public void setResourceErrorHandling(ResourceErrorHandling mode) {
+        this.resourceErrorHandling = mode;
+    }
+
+    public ResourceErrorHandling getResourceErrorHandling() {
+        return this.resourceErrorHandling;
     }
 
 }

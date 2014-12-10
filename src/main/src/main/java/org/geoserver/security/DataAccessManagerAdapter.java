@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -7,9 +8,11 @@ package org.geoserver.security;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.geoserver.catalog.CatalogInfo;
 import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.LayerInfo;
+import org.geoserver.catalog.Predicates;
 import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.catalog.WMSLayerInfo;
 import org.geoserver.catalog.WorkspaceInfo;
@@ -23,7 +26,7 @@ import org.springframework.security.core.Authentication;
  * @author Andrea Aime - GeoSolutions
  * 
  */
-public class DataAccessManagerAdapter implements ResourceAccessManager {
+public class DataAccessManagerAdapter extends AbstractResourceAccessManager {
     static final Logger LOGGER = Logging.getLogger(DataAccessManagerAdapter.class);
 
     DataAccessManager delegate;
@@ -42,7 +45,7 @@ public class DataAccessManagerAdapter implements ResourceAccessManager {
         boolean write = delegate.canAccess(user, layer, AccessMode.WRITE);
         Filter readFilter = read ? Filter.INCLUDE : Filter.EXCLUDE;
         Filter writeFilter = write ? Filter.INCLUDE : Filter.EXCLUDE;
-        return buildLimits(layer.getResource(), readFilter, writeFilter);
+        return buildLimits(layer.getResource().getClass(), readFilter, writeFilter);
     }
 
     public DataAccessLimits getAccessLimits(Authentication user, ResourceInfo resource) {
@@ -50,30 +53,30 @@ public class DataAccessManagerAdapter implements ResourceAccessManager {
         boolean write = delegate.canAccess(user, resource, AccessMode.WRITE);
         Filter readFilter = read ? Filter.INCLUDE : Filter.EXCLUDE;
         Filter writeFilter = write ? Filter.INCLUDE : Filter.EXCLUDE;
-        return buildLimits(resource, readFilter, writeFilter);
+        return buildLimits(resource.getClass(), readFilter, writeFilter);
     }
 
-    DataAccessLimits buildLimits(ResourceInfo resource, Filter readFilter, Filter writeFilter) {
+    DataAccessLimits buildLimits(Class<? extends ResourceInfo> resourceClass, Filter readFilter, Filter writeFilter) {
         CatalogMode mode = delegate.getMode();
 
         // allow the secure catalog to avoid any kind of wrapping if there are no limits
         if ((readFilter == null || readFilter == Filter.INCLUDE)
                 && (writeFilter == null || writeFilter == Filter.INCLUDE
-                        || resource instanceof WMSLayerInfo || resource instanceof CoverageInfo)) {
+                        || WMSLayerInfo.class.isAssignableFrom(resourceClass) || CoverageInfo.class.isAssignableFrom(resourceClass))) {
             return null;
         }
 
         // build the appropriate limit class
-        if (resource instanceof FeatureTypeInfo) {
+        if (FeatureTypeInfo.class.isAssignableFrom(resourceClass)) {
             return new VectorAccessLimits(mode, null, readFilter, null, writeFilter);
-        } else if (resource instanceof CoverageInfo) {
+        } else if (CoverageInfo.class.isAssignableFrom(resourceClass)) {
             return new CoverageAccessLimits(mode, readFilter, null, null);
-        } else if (resource instanceof WMSLayerInfo) {
+        } else if (WMSLayerInfo.class.isAssignableFrom(resourceClass)) {
             return new WMSAccessLimits(mode, readFilter, null, true);
         } else {
             LOGGER.log(Level.INFO,
                     "Warning, adapting to generic access limits for unrecognized resource type "
-                            + resource);
+                            + resourceClass);
             return new DataAccessLimits(mode, readFilter);
         }
     }
@@ -81,13 +84,28 @@ public class DataAccessManagerAdapter implements ResourceAccessManager {
     public WorkspaceAccessLimits getAccessLimits(Authentication user, WorkspaceInfo workspace) {
         boolean readable = delegate.canAccess(user, workspace, AccessMode.READ);
         boolean writable = delegate.canAccess(user, workspace, AccessMode.WRITE);
+        boolean adminable = delegate.canAccess(user, workspace, AccessMode.ADMIN);
+        
         CatalogMode mode = delegate.getMode();
 
         if (readable && writable) {
-            return null;
-        } else {
-            return new WorkspaceAccessLimits(mode, readable, writable);
+            if (AdminRequest.get() == null) {
+                //not admin request, read+write means full acesss
+                return null;
+            }
         }
+        return new WorkspaceAccessLimits(mode, readable, writable, adminable);
     }
 
+    @SuppressWarnings("deprecation")
+    @Override
+    public Filter getSecurityFilter(Authentication user,
+            Class<? extends CatalogInfo> clazz) {
+        
+        if(delegate.getMode()==CatalogMode.CHALLENGE)
+            // If we're in CHALLENGE mode, everything should be visible
+            return Predicates.acceptAll();
+        else
+            return super.getSecurityFilter(user, clazz);
+    }
 }

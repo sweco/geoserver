@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -14,8 +15,6 @@ import org.apache.wicket.PageParameters;
 import org.apache.wicket.WicketRuntimeException;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.form.AjaxFormComponentUpdatingBehavior;
-import org.apache.wicket.ajax.markup.html.AjaxLink;
-import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Button;
 import org.apache.wicket.markup.html.form.CheckBox;
@@ -30,23 +29,18 @@ import org.apache.wicket.markup.html.panel.Panel;
 import org.apache.wicket.model.CompoundPropertyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.LoadableDetachableModel;
-import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.model.StringResourceModel;
 import org.apache.wicket.validation.validator.UrlValidator;
-import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.config.GeoServer;
 import org.geoserver.config.ServiceInfo;
-import org.geoserver.config.impl.ServiceInfoImpl;
-import org.geoserver.ows.LocalWorkspace;
-import org.geoserver.ows.util.OwsUtils;
 import org.geoserver.web.GeoServerHomePage;
 import org.geoserver.web.GeoServerSecuredPage;
 import org.geoserver.web.data.workspace.WorkspaceChoiceRenderer;
-import org.geoserver.web.data.workspace.WorkspaceDetachableModel;
 import org.geoserver.web.data.workspace.WorkspacesModel;
 import org.geoserver.web.wicket.GeoServerDialog;
+import org.geoserver.web.wicket.HelpLink;
 import org.geoserver.web.wicket.KeywordsEditor;
 import org.geoserver.web.wicket.LiveCollectionModel;
 
@@ -76,8 +70,6 @@ import org.geoserver.web.wicket.LiveCollectionModel;
  */
 public abstract class BaseServiceAdminPage<T extends ServiceInfo> extends GeoServerSecuredPage {
 
-    protected Page responsePage;
-    
     protected GeoServerDialog dialog;
 
     public BaseServiceAdminPage() {
@@ -96,6 +88,9 @@ public abstract class BaseServiceAdminPage<T extends ServiceInfo> extends GeoSer
     void init(final IModel<T> infoModel) {
         T service = infoModel.getObject();
 
+        dialog = new GeoServerDialog("dialog");
+        add(dialog);
+
         Form form = new Form( "form", new CompoundPropertyModel(infoModel));
         add(form);
 
@@ -108,16 +103,7 @@ public abstract class BaseServiceAdminPage<T extends ServiceInfo> extends GeoSer
             form.add(new LocalWorkspacePanel("workspace", service));
         }
 
-        form.add(new AjaxLink("workspaceHelp") {
-            @Override
-            public void onClick(AjaxRequestTarget target) {
-                dialog.showInfo(target, 
-                    new StringResourceModel("workspaceHelp.title",BaseServiceAdminPage.this, null), 
-                    new StringResourceModel("workspaceHelp.message.1",BaseServiceAdminPage.this, null),
-                    new StringResourceModel("workspaceHelp.message.2",BaseServiceAdminPage.this, null),
-                    new StringResourceModel("workspaceHelp.message.3",BaseServiceAdminPage.this, null));
-            }
-        });
+        form.add(new HelpLink("workspaceHelp").setDialog(dialog));
 
         form.add(new Label("service.enabled", new StringResourceModel("service.enabled", this, null, new Object[]{
             getServiceName()
@@ -138,6 +124,7 @@ public abstract class BaseServiceAdminPage<T extends ServiceInfo> extends GeoSer
         
         //add the extension panels
         ListView extensionPanels = createExtensionPanelList("extensions", infoModel);
+        extensionPanels.setReuseItems(true);
         form.add(extensionPanels);
         
         SubmitLink submit = new SubmitLink("submit",new StringResourceModel( "save", (Component)null, null) ) {
@@ -145,12 +132,7 @@ public abstract class BaseServiceAdminPage<T extends ServiceInfo> extends GeoSer
             public void onSubmit() {
                 try {
                     handleSubmit((T)infoModel.getObject());
-                    if (responsePage != null) {
-                        setResponsePage(responsePage);
-                    }
-                    else {
-                        setResponsePage(GeoServerHomePage.class);
-                    }
+                    doReturn();
                 }
                 catch(Exception e) {
                     error(e);
@@ -161,32 +143,14 @@ public abstract class BaseServiceAdminPage<T extends ServiceInfo> extends GeoSer
         
         Button cancel = new Button( "cancel", new StringResourceModel( "cancel", (Component)null, null) ) {
             public void onSubmit() {
-                if (responsePage != null) {
-                    setResponsePage(responsePage);
-                }
-                else {
-                    setResponsePage(GeoServerHomePage.class);
-                }
+                doReturn();
             }
         };
         form.add( cancel );
         //cancel.setDefaultFormProcessing( false );
-
-        dialog = new GeoServerDialog("dialog");
-        add(dialog);
     }
 
-    /**
-     * Sets the response page that will be returned to when the user submits/or cancels.
-     * <p>
-     * If unset, GeoServerHomePage is used.
-     * </p>
-     */
-    public void responsePage(Page responsePage) {
-        this.responsePage = responsePage;
-    }
-
-    protected ListView createExtensionPanelList(String id, final IModel infoModel) {
+   protected ListView createExtensionPanelList(String id, final IModel infoModel) {
         List<AdminPagePanelInfo> panels = 
             getGeoServerApplication().getBeansOfType(AdminPagePanelInfo.class);
         for (Iterator<AdminPagePanelInfo> it = panels.iterator(); it.hasNext();) {

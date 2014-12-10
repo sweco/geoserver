@@ -1,7 +1,13 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wfs.request;
 
 import java.util.List;
 
+import net.opengis.wfs.IdentifierGenerationOptionType;
 import net.opengis.wfs.InsertElementType;
 import net.opengis.wfs.WfsFactory;
 import net.opengis.wfs20.InsertType;
@@ -20,7 +26,11 @@ public abstract class Insert extends TransactionElement {
     }
     
     public abstract List getFeatures();
-    
+
+    public boolean isIdGenUseExisting() {
+        return false;
+    }
+
     public static class WFS11 extends Insert {
 
         public WFS11(EObject adaptee) {
@@ -30,6 +40,12 @@ public abstract class Insert extends TransactionElement {
         @Override
         public List getFeatures() {
             return eGet(adaptee, "feature", List.class);
+        }
+
+        @Override
+        public boolean isIdGenUseExisting() {
+            return ((InsertElementType)adaptee).getIdgen() 
+                    == IdentifierGenerationOptionType.USE_EXISTING_LITERAL;
         }
 
         public static InsertElementType unadapt(Insert insert) {

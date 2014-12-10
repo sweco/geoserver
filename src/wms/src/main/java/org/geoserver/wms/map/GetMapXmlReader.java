@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.map;
@@ -21,6 +22,7 @@ import java.util.logging.Logger;
 
 import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
+import org.geoserver.catalog.StyleInfo;
 import org.geoserver.ows.xml.v1_0.OWS;
 import org.geoserver.platform.ServiceException;
 import org.geoserver.wms.GetMapRequest;
@@ -318,12 +320,19 @@ public class GetMapXmlReader extends org.geoserver.ows.XmlRequestReader {
             } else {
 
                 LayerGroupInfo layerGroup = getWMS().getLayerGroupByName(layerName);
-
+                
                 if (layerGroup != null) {
-                    for (LayerInfo layer : layerGroup.getLayers()) {
+                    List<LayerInfo> layerGroupLayers = layerGroup.layers();
+                    List<StyleInfo> layerGroupStyles = layerGroup.getStyles();
+                    for (int j = 0; j < layerGroupStyles.size(); j++) {
+                        StyleInfo si = layerGroupStyles.get(j);
+                        LayerInfo layer = layerGroupLayers.get(j);
                         currLayer = new MapLayerInfo(layer);
+                        if (si != null){
+                            currLayer.setStyle(si.getStyle());
+                        }
                         addStyles(wms, getMapRequest, currLayer, styledLayers[i], layers, styles);
-                    }
+                    }                    
                 } else {
                     LayerInfo layerInfo = getWMS().getLayerByName(layerName);
                     if (layerInfo == null) {
@@ -371,6 +380,9 @@ public class GetMapXmlReader extends org.geoserver.ows.XmlRequestReader {
         if (layer instanceof NamedLayer) {
             ftcs = ((NamedLayer) layer).getLayerFeatureConstraints();
             layerStyles = ((NamedLayer) layer).getStyles();
+            if (shouldUseLayerStyle(layerStyles, currLayer)) {
+                layerStyles = new Style[]{currLayer.getStyle()};
+            }
         } else if (layer instanceof UserLayer) {
             ftcs = ((UserLayer) layer).getLayerFeatureConstraints();
             layerStyles = ((UserLayer) layer).getUserStyles();
@@ -432,6 +444,21 @@ public class GetMapXmlReader extends org.geoserver.ows.XmlRequestReader {
                 styles.add(layerStyles[t]);
             }
         }
+    }
+
+    /**
+     * Performs a check to see if we should use the style from the layer 
+     * info or from the given set of styles from the request.
+     * @param layerStyles
+     * @param currLayer
+     * @return
+     */
+    private static boolean shouldUseLayerStyle(Style[] layerStyles,
+            MapLayerInfo currLayer) {
+        boolean noSldLayerStyles = (layerStyles == null || layerStyles.length == 0);
+        boolean layerHasStyle = currLayer.getStyle() != null;
+        boolean shouldUseLayerStyle = noSldLayerStyles && layerHasStyle;
+        return shouldUseLayerStyle;
     }
 
     private static MapLayerInfo initializeInlineFeatureLayer(UserLayer ul,
@@ -772,6 +799,11 @@ public class GetMapXmlReader extends org.geoserver.ows.XmlRequestReader {
 
             throw new ServiceException(e, msg, "GETMAP validator");
         }
+    }
+
+    public GetMapRequest createRequest() {
+        GetMapRequest request = new GetMapRequest();
+        return request;
     }
 
 }

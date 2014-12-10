@@ -1,18 +1,23 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
+import javax.annotation.Nullable;
+import javax.annotation.ParametersAreNonnullByDefault;
+
 import org.geoserver.catalog.event.CatalogListener;
-import org.geoserver.catalog.event.impl.CatalogAddEventImpl;
-import org.geoserver.catalog.event.impl.CatalogModifyEventImpl;
-import org.geoserver.catalog.event.impl.CatalogPostModifyEventImpl;
+import org.geoserver.catalog.util.CloseableIterator;
 import org.geoserver.platform.GeoServerResourceLoader;
 import org.opengis.feature.type.Name;
+import org.opengis.filter.Filter;
+import org.opengis.filter.sort.SortBy;
 
 /**
  * The GeoServer catalog which provides access to meta information about the 
@@ -127,6 +132,7 @@ import org.opengis.feature.type.Name;
  * 
  * @author Justin Deoliveira, The Open Planning project
  */
+@ParametersAreNonnullByDefault
 public interface Catalog extends CatalogInfo {
     
     /**
@@ -159,7 +165,7 @@ public interface Catalog extends CatalogInfo {
      * 
      * @returns List<RuntimeException> non-empty if validation fails
      */
-    List<RuntimeException> validate(StoreInfo store, boolean isNew);
+    ValidationResult validate(StoreInfo store, boolean isNew);
 
     /**
      * Removes an existing store.
@@ -625,7 +631,7 @@ public interface Catalog extends CatalogInfo {
      * 
      * @returns List<RuntimeException> non-empty if validation fails
      */
-    List<RuntimeException> validate(ResourceInfo resource, boolean isNew);
+    ValidationResult validate(ResourceInfo resource, boolean isNew);
 
     /**
      * Removes an existing resource.
@@ -1063,7 +1069,7 @@ public interface Catalog extends CatalogInfo {
      * 
      * @returns List<RuntimeException> non-empty if validation fails
      */
-    List<RuntimeException> validate(LayerInfo layer, boolean isNew);
+    ValidationResult validate(LayerInfo layer, boolean isNew);
 
     /**
      * Removes an existing layer.
@@ -1203,7 +1209,7 @@ public interface Catalog extends CatalogInfo {
      * 
      * @returns List<RuntimeException> non-empty if validation fails
      */
-    List<RuntimeException> validate(LayerGroupInfo layerGroup, boolean isNew);
+    ValidationResult validate(LayerGroupInfo layerGroup, boolean isNew);
     
     /**
      * Removes a layer group from the catalog.
@@ -1234,16 +1240,59 @@ public interface Catalog extends CatalogInfo {
     List<LayerGroupInfo> getLayerGroups();
 
     /**
+     * All layer groups in the specified workspace.
+     * 
+     * @param workspaceName The name of the workspace containing layer groups.
+     */
+    List<LayerGroupInfo> getLayerGroupsByWorkspace(String workspaceName);
+
+    /**
+     * All layer groups in the specified workspace.
+     * 
+     * @param workspace The workspace containing layer groups.
+     */
+    List<LayerGroupInfo> getLayerGroupsByWorkspace(WorkspaceInfo workspace);
+
+    /**
      * Returns the layer group matching a particular id, or <code>null</code> if no
      * such group could be found.
      */
     LayerGroupInfo getLayerGroup(String id);
     
     /**
-     * Returns the layer group matching a particular name, or <code>null</code> if no
-     * such group could be found.
+     * Returns the global layer group matching a particular name, or <code>null</code> if no such
+     * style could be found.
+     * <p>
+     * If {@code prefixedName} contains a workspace name prefix (like in {@code topp:tasmania}, the
+     * layer group will be looked up on that specific workspace ({@code topp}), otherwise it is
+     * assumed a global (with no workspace) layer group.
+     * </p>
+     * 
+     * @param name the name of the layer group, may include a workspace name prefix or not.
+     * @return the global layer group matching a particular name, or <code>null</code> if no such
+     *         group could be found.
      */
     LayerGroupInfo getLayerGroupByName(String name);
+    
+    /**
+     * Returns the layer group matching a particular name in the specified workspace, or
+     * <code>null</code> if no such layer group could be found.
+     * 
+     * @param workspaceName The name of the workspace containing the layer group, {@code null} is
+     *        allowed, meaning to look up for a global layer group
+     * @param name The name of the layer group to return.
+     */
+    LayerGroupInfo getLayerGroupByName(String workspaceName, String name);
+
+    /**
+     * Returns the layer group matching a particular name in the specified workspace, or
+     * <code>null</code> if no such layer group could be found.
+     * 
+     * @param workspace The workspace containing the layer group, {@code null} is allowed, meaning
+     *        to look up for a global layer group.
+     * @param name The name of the layer group to return.
+     */
+    LayerGroupInfo getLayerGroupByName(WorkspaceInfo workspace, String name);
     
     /**
      * Adds a new style.
@@ -1260,7 +1309,7 @@ public interface Catalog extends CatalogInfo {
      * 
      * @returns List<RuntimeException> non-empty if validation fails
      */
-    List<RuntimeException> validate(StyleInfo style, boolean isNew);
+    ValidationResult validate(StyleInfo style, boolean isNew);
 
     /**
      * Removes a style.
@@ -1292,11 +1341,32 @@ public interface Catalog extends CatalogInfo {
     StyleInfo getStyle(String id);
 
     /**
-     * Returns the style matching a particular name, or <code>null</code> if
-     * no such style could be found.
+     * Returns the style matching a particular name in the specified workspace, or <code>null</code> 
+     * if no such style could be found.
      * 
-     * @param name
-     *                The name of the style to return.
+     * @param workspaceName The name of the workspace containing the style, {@code null} stands for a global style.
+     * @param name The name of the style to return.
+     */
+    StyleInfo getStyleByName(String workspaceName, String name);
+
+    /**
+     * Returns the style matching a particular name in the specified workspace, or <code>null</code> 
+     * if no such style could be found.
+     * 
+     * @param workspace The workspace containing the style, {@code null} stands for a global style.
+     * @param name The name of the style to return.
+     */
+    StyleInfo getStyleByName(WorkspaceInfo workspace, String name);
+    
+    /**
+     * Returns the global style matching a particular name, or <code>null</code> if no such style
+     * could be found.
+     * <p>
+     * Note this is a convenient method for {@link #getStyleByName(WorkspaceInfo, String)} with a
+     * {@code null} workspace argument.
+     * </p>
+     * 
+     * @param name The name of the style to return.
      */
     StyleInfo getStyleByName(String name);
 
@@ -1309,6 +1379,20 @@ public interface Catalog extends CatalogInfo {
      *  </p>
      */
     List<StyleInfo> getStyles();
+
+    /**
+     * All styles in the specified workspace.
+     * 
+     * @param workspaceName The name of the workspace containing styles.
+     */
+    List<StyleInfo> getStylesByWorkspace(String workspaceName);
+
+    /**
+     * All styles in the specified workspace.
+     * 
+     * @param workspace The workspace containing styles.
+     */
+    List<StyleInfo> getStylesByWorkspace(WorkspaceInfo workspace);
 
     /**
      * Adds a new namespace.
@@ -1324,7 +1408,7 @@ public interface Catalog extends CatalogInfo {
      * 
      * @returns List<RuntimeException> non-empty if validation fails
      */
-    List<RuntimeException> validate(NamespaceInfo namespace, boolean isNew);
+    ValidationResult validate(NamespaceInfo namespace, boolean isNew);
 
     /**
      * Removes an existing namespace.
@@ -1409,7 +1493,7 @@ public interface Catalog extends CatalogInfo {
      * 
      * @returns List<RuntimeException> non-empty if validation fails
      */
-    List<RuntimeException> validate(WorkspaceInfo workspace, boolean isNew);
+    ValidationResult validate(WorkspaceInfo workspace, boolean isNew);
 
     /**
      * Removes an existing workspace.
@@ -1548,4 +1632,144 @@ public interface Catalog extends CatalogInfo {
      * Disposes the catalog, freeing up any resources.
      */
     void dispose();
+    
+    /**
+     * Returns the number of catalog objects of the requested type that match the given query
+     * predicate.
+     * 
+     * @param of the type of catalog objects to return. Super interfaces of concrete catalog objects
+     *        are allowed (such as {@code StoreInfo.class} and {@code ResourceInfo.class}, although
+     *        the more generic {@code Info.class} and {@code CatalogInfo.class} are not.
+     * @param filter the query predicate, use {@link Filter#INCLUDE} if needed, {@code null} is not
+     *        accepted.
+     * @return the total number of catalog objects of the requested type that match the query
+     *         predicate.
+     */
+    public <T extends CatalogInfo> int count(final Class<T> of, final Filter filter);
+
+    /**
+     * Access to a single configuration object by the given predicate filter, fails if more than one
+     * object satisfies the filter criteria.
+     * <p>
+     * Generally useful for query by id or name where name is known to be unique, either globally or
+     * per workspace, although usage is not limited to those cases.
+     * <p>
+     * Examples:
+     * 
+     * <pre>
+     * <code>
+     * import static org.geoserver.catalog.Predicates.propertyEquals;
+     * import static org.geoserver.catalog.Predicates.and;
+     * import static org.geoserver.catalog.Predicates.isNull;
+     * ...
+     * Catalog catalog = ...
+     * LayerInfo layer = catalog.get(LayerInfo.class, propertyEquals("id", "layer1");
+     * WorkspaceInfo ws = catalog.get(WorkspaceInfo.class, propertyEquals("resource.store.workspace.name", layer.getResource().getStore().getWorkspace().getName);
+     * LayerGroupInfo wslg = catalog.get(LayerGroupInfo.class, and(propertyEquals("name", "lg1"), propertyEquals("workspace.name", "ws1"));
+     * LayerGroupInfo globallg = catalog.get(LayerGroupInfo.class, and(propertyEquals("name", "lg1"), isNull("workspace.id"));
+     * </code>
+     * </pre>
+     * 
+     * @return the single object of the given {@code type} that matches the given filter, or
+     *         {@code null} if no object matches the provided filter.
+     * @throws IllegalArgumentExeption if more than one object of type {@code T} match the provided
+     *         filter.
+     */
+    <T extends CatalogInfo> T get(Class<T> type, Filter filter) throws IllegalArgumentException;
+
+    /**
+     * Returns an {@link Iterator} over the catalog objects of the requested type that match the
+     * given query predicate, positioned at the specified {@code offset} and limited to the number
+     * requested number of elements.
+     * <p>
+     * The returned iterator <strong>shall</strong> be closed once it is no longer needed, to
+     * account for streaming implementations of this interface to release any needed resource such
+     * as database or remote service connections. Example usage:
+     * 
+     * <pre>
+     * <code>
+     * Catalog catalog = ...
+     * Filter filter = ...
+     * CloseableIterator<LayerInfo> iterator = catalog.list(LayerInfo.class, filter);
+     * try{
+     *   while(iterator.hasNext()){
+     *     iterator.next();
+     *   }
+     * }finally{
+     *   iterator.close();
+     * }
+     * </code>
+     * </pre>
+     * 
+     * @param of the type of catalog objects to return. Super interfaces of concrete catalog objects
+     *        are allowed (such as {@code StoreInfo.class} and {@code ResourceInfo.class}, although
+     *        the more generic {@code Info.class} and {@code CatalogInfo.class} are not.
+     * @param filter the query predicate, use {@link Filter#INCLUDE} if needed, {@code null} is not
+     *        accepted.
+     * 
+     * @return an iterator over the predicate matching catalog objects that must be closed once
+     *         consumed
+     * @throws IllegalArgumentException if {@code sortOrder != null} and {@link #canSort
+     *         !canSort(of, sortOrder)}
+     */
+    public <T extends CatalogInfo> CloseableIterator<T> list(final Class<T> of, final Filter filter);
+
+    /**
+     * Returns an {@link Iterator} over the catalog objects of the requested type that match the
+     * given query predicate, positioned at the specified {@code offset} and limited to the number
+     * requested number of elements.
+     * <p>
+     * Through the optional {@code offset} and {@code count} arguments, this method allows for paged
+     * queries over the catalog contents. Note that although there's no prescribed sort order,
+     * catalog back end implementations must provide a natural sort order (either based on id or
+     * otherwise), in order for paged queries to be consistent between calls for the same predicate.
+     * <p>
+     * The returned iterator <strong>shall</strong> be closed once it is no longer needed, to
+     * account for streaming implementations of this interface to release any needed resource such
+     * as database or remote service connections. Example usage:
+     * 
+     * <pre>
+     * <code>
+     * Catalog catalog = ...
+     * Filter filter = ...
+     * CloseableIterator<LayerInfo> iterator = catalog.list(LayerInfo.class, filter);
+     * try{
+     *   while(iterator.hasNext()){
+     *     iterator.next();
+     *   }
+     * }finally{
+     *   iterator.close();
+     * }
+     * </code>
+     * </pre>
+     * 
+     * @param of the type of catalog objects to return. Super interfaces of concrete catalog objects
+     *        are allowed (such as {@code StoreInfo.class} and {@code ResourceInfo.class}, although
+     *        the more generic {@code Info.class} and {@code CatalogInfo.class} are not.
+     * @param filter the query predicate, use {@link Predicates#ACCEPT_ALL} if needed, {@code null}
+     *        is not accepted.
+     * @param offset {@code null} to return an iterator starting at the first matching object,
+     *        otherwise an integer {@code >= 0} to return an iterator positioned at the specified
+     *        offset.
+     * @param count {@code null} to return a non limited in number of elements iterator, an integer
+     *        {@code >= 0} otherwise to specify the maximum number of elements the iterator shall
+     *        return.
+     * @param sortBy
+     * 
+     * @return an iterator over the predicate matching catalog objects that must be closed once
+     *         consumed
+     * @throws IllegalArgumentException if {@code sortOrder != null} and {@link #canSort
+     *         !canSort(of, sortOrder)}
+     */
+    public <T extends CatalogInfo> CloseableIterator<T> list(final Class<T> of,
+            final Filter filter, @Nullable Integer offset, @Nullable Integer count,
+            @Nullable SortBy sortBy);
+
+    /**
+     * Removes all the listeners which are instances of the specified class
+     * 
+     * @param listenerClass
+     */
+    public void removeListeners(Class listenerClass);
+
 }

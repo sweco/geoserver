@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
@@ -8,13 +9,19 @@ import java.awt.Color;
 import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
+import java.awt.image.IndexColorModel;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 
+import org.geoserver.platform.ServiceException;
 import org.geotools.geometry.jts.ReferencedEnvelope;
-import org.geotools.image.palette.InverseColorMapOp;
 import org.geotools.map.Layer;
 import org.geotools.map.MapContent;
+import org.geotools.referencing.operation.matrix.XAffineTransform;
 import org.geotools.renderer.lite.RendererUtilities;
+import org.geotools.renderer.lite.StreamingRenderer;
 
 /**
  * Extends DefaultMapContext to provide the whole set of request parameters a WMS GetMap request can
@@ -53,6 +60,8 @@ public class WMSMapContent extends MapContent {
 
     /** map rotation in degrees */
     private double angle;
+    
+    private List<GetMapCallback> callbacks;
 
     public int getTileSize() {
         return tileSize;
@@ -69,9 +78,9 @@ public class WMSMapContent extends MapContent {
     private int buffer;
 
     /**
-     * The {@link InverseColorMapOp} that actually does the color inversion.
+     * The {@link IndexColorModel} the user required for the resulting map
      */
-    private InverseColorMapOp paletteInverter;
+    private IndexColorModel icm;
 
     private GetMapRequest request; // hold onto it so we can grab info from it
 
@@ -86,13 +95,6 @@ public class WMSMapContent extends MapContent {
         request = req;
     }
 
-
-    public WMSMapContent(Layer[] layers) {
-        super();
-        for (Layer layer : layers) {
-            addLayer(layer);
-        }
-    }
 
     public Color getBgColor() {
         return this.bgColor;
@@ -142,12 +144,12 @@ public class WMSMapContent extends MapContent {
         this.buffer = buffer;
     }
 
-    public InverseColorMapOp getPaletteInverter() {
-        return paletteInverter;
+    public IndexColorModel getPalette() {
+        return icm;
     }
 
-    public void setPaletteInverter(InverseColorMapOp paletteInverter) {
-        this.paletteInverter = paletteInverter;
+    public void setPalette(IndexColorModel paletteInverter) {
+        this.icm = paletteInverter;
     }
 
     /**
@@ -161,6 +163,50 @@ public class WMSMapContent extends MapContent {
 
     public void setAngle(double rotation) {
         this.angle = rotation;
+    }
+    
+    @Override
+    public boolean addLayer(Layer layer) {
+        layer = fireLayerCallbacks(layer);
+        if(layer != null) {
+            return super.addLayer(layer);
+        } else {
+            return false;
+        }
+    }
+    
+    private Layer fireLayerCallbacks(Layer layer) {
+        // if no callbacks, return the layer as is
+        if(callbacks == null) {
+            return layer;
+        }
+        
+        // process through the callbacks
+        for (GetMapCallback callback : callbacks) {
+            layer = callback.beforeLayer(this, layer);
+            if(layer == null) {
+                return null;
+            }
+        }
+        
+        return layer;
+    }
+
+    @Override
+    public int addLayers(Collection<? extends Layer> layers) {
+        List<Layer> filtered = new ArrayList<Layer>(layers.size());
+        for (Layer layer : layers) {
+            layer = fireLayerCallbacks(layer);
+            if(layer != null) {
+                filtered.add(layer);
+            }
+        }
+        
+        if(filtered.size() > 0) {
+            return super.addLayers(filtered);
+        } else {
+            return 0;
+        }
     }
 
     /**
@@ -288,4 +334,57 @@ public class WMSMapContent extends MapContent {
         getUserData().put("abstract", contextAbstract);
     }
 
+    public void setGetMapCallbacks(final List<GetMapCallback> callbacks) {
+        this.callbacks = callbacks;
+    }
+    
+    public double getScaleDenominator() {
+        return getScaleDenominator(false);
+    }
+
+    public double getScaleDenominator(boolean considerDPI) {
+        java.util.Map hints = new HashMap();
+        if(considerDPI) {
+            // compute the DPI
+            if (request.getFormatOptions().get("dpi") != null) {
+                hints.put(StreamingRenderer.DPI_KEY, (request.getFormatOptions().get("dpi")));
+            }
+        }
+        if (request.getScaleMethod() == ScaleComputationMethod.Accurate) {
+            if (request.getAngle() != 0) {
+                throw new ServiceException(
+                        "Accurate scale computation is not supported when using the angle parameter. "
+                                + "This functionality could be added, please provide a pull request for it ;-)");
+            }
+            try {
+                return RendererUtilities.calculateScale(getViewport().getBounds(), getMapWidth(),
+                        getMapHeight(), hints);
+            } catch (Exception e) {
+                throw new ServiceException("Failed to compute accurate scale denominator", e);
+            }
+        } else {
+            AffineTransform at = getRenderingTransform();
+            if (Math.abs(XAffineTransform.getRotation(at)) != 0.0) {
+                return RendererUtilities.calculateOGCScaleAffine(getCoordinateReferenceSystem(),
+                        at, hints);
+            } else {
+                return RendererUtilities.calculateOGCScale(getViewport().getBounds(),
+                        getMapWidth(), hints);
+            }
+        }
+    }
+
+    /**
+     * Computes the StreamingRenderer scale computation method hint based on the current request
+     * 
+     * @param request
+     * @return
+     */
+    public String getRendererScaleMethod() {
+        if (request.getScaleMethod() == ScaleComputationMethod.Accurate) {
+            return StreamingRenderer.SCALE_ACCURATE;
+        } else {
+            return StreamingRenderer.SCALE_OGC;
+        }
+    }
 }

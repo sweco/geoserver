@@ -1,7 +1,15 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.security.impl;
+
+import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
@@ -10,6 +18,8 @@ import java.util.Set;
 import junit.framework.TestCase;
 
 import org.geoserver.security.PropertyFileWatcher;
+import org.junit.Before;
+import org.junit.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.GrantedAuthorityImpl;
@@ -17,9 +27,9 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
-public class GeoServerUserDaoTest extends TestCase {
+public class GeoServerUserDaoTest {
 
-    static class TestableUserDao extends GeoserverUserDao {
+    static class TestableUserDao extends GeoServerUserDao {
         
         public TestableUserDao(Properties p) throws IOException {
             userMap = loadUsersFromProperties(p);
@@ -38,8 +48,8 @@ public class GeoServerUserDaoTest extends TestCase {
     Properties props;
     TestableUserDao dao;
     
-    @Override
-    protected void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         props = new Properties();
         props.put("admin", "gs,ROLE_ADMINISTRATOR");
         props.put("wfs", "webFeatureService,ROLE_WFS_READ,ROLE_WFS_WRITE");
@@ -47,11 +57,13 @@ public class GeoServerUserDaoTest extends TestCase {
         dao = new TestableUserDao(props);
     }
     
+    @Test
     public void testGetUsers() throws Exception {
         List<User> users = dao.getUsers();
         assertEquals(3, users.size());
     }
     
+    @Test
     public void testLoadUser() throws Exception {
         UserDetails admin = dao.loadUserByUsername("admin");
         assertEquals("admin", admin.getUsername());
@@ -60,6 +72,7 @@ public class GeoServerUserDaoTest extends TestCase {
         assertEquals("ROLE_ADMINISTRATOR", admin.getAuthorities().iterator().next().getAuthority());
     }
     
+    @Test
     public void testMissingUser() throws Exception {
         try {
             dao.loadUserByUsername("notThere");
@@ -69,9 +82,10 @@ public class GeoServerUserDaoTest extends TestCase {
         }
     }
     
+    @Test
     public void testSetUser() throws Exception {
         dao.setUser(new User("wfs", "pwd", true, true, true, true, 
-                new GrantedAuthority[] {new GrantedAuthorityImpl("ROLE_WFS_ALL"), new GrantedAuthorityImpl("ROLE_WMS_ALL")}));
+                Arrays.asList(new GrantedAuthority[] {new GrantedAuthorityImpl("ROLE_WFS_ALL"), new GrantedAuthorityImpl("ROLE_WMS_ALL")})));
         UserDetails user = dao.loadUserByUsername("wfs");
         assertEquals("wfs", user.getUsername());
         assertEquals("pwd", user.getPassword());
@@ -85,32 +99,35 @@ public class GeoServerUserDaoTest extends TestCase {
         assertTrue(authorities.contains("ROLE_WMS_ALL"));
     }
     
+    @Test
     public void testSetMissingUser() throws Exception {
         try {
             dao.setUser(new User("notther", "pwd", true, true, true, true, 
-                    new GrantedAuthority[] {new GrantedAuthorityImpl("ROLE_WFS_ALL")}));
+                    Arrays.asList(new GrantedAuthority[] {new GrantedAuthorityImpl("ROLE_WFS_ALL")})));
             fail("The user is not there, setUser should fail");
         } catch(IllegalArgumentException e) {
             // cool
         }
     }
     
+    @Test
     public void testAddUser() throws Exception {
         dao.putUser(new User("newuser", "pwd", true, true, true, true, 
-                new GrantedAuthority[] {new GrantedAuthorityImpl("ROLE_WFS_ALL")}));
+                Arrays.asList(new GrantedAuthority[] {new GrantedAuthorityImpl("ROLE_WFS_ALL")})));
         assertNotNull(dao.loadUserByUsername("newuser"));
     }
     
     public void addExistingUser() throws Exception {
         try {
             dao.putUser(new User("admin", "pwd", true, true, true, true, 
-                    new GrantedAuthority[] {new GrantedAuthorityImpl("ROLE_WFS_ALL")}));
+                    Arrays.asList(new GrantedAuthority[] {new GrantedAuthorityImpl("ROLE_WFS_ALL")})));
             fail("The user is already there, addUser should fail");
         } catch(IllegalArgumentException e) {
             // cool
         }
     }
     
+    @Test
     public void testRemoveUser() throws Exception {
         assertFalse(dao.removeUser("notthere"));
         assertTrue(dao.removeUser("wfs"));
@@ -123,15 +140,15 @@ public class GeoServerUserDaoTest extends TestCase {
     }
     
     
+    @Test
     public void testStoreReload() throws Exception {
         File temp = File.createTempFile("sectest", "", new File("target"));
         temp.delete();
         temp.mkdir();
+        File propFile = new File(temp, "users.properties");
         try {
-            dao.securityDir = temp;
-            dao.storeUsers();
-            File propFile = new File(temp, "users.properties");
             dao.userDefinitionsFile = new PropertyFileWatcher(propFile);
+            dao.storeUsers();
             dao.userMap.clear();
             dao.loadUserMap();
         } finally {

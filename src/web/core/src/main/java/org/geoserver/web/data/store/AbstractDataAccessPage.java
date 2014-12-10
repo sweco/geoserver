@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -6,6 +7,8 @@ package org.geoserver.web.data.store;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.logging.Logger;
 
 import org.apache.wicket.Component;
@@ -28,6 +31,7 @@ import org.geoserver.catalog.DataStoreInfo;
 import org.geoserver.catalog.NamespaceInfo;
 import org.geoserver.catalog.ResourcePool;
 import org.geoserver.catalog.WorkspaceInfo;
+import org.geoserver.web.ComponentAuthorizer;
 import org.geoserver.web.GeoServerApplication;
 import org.geoserver.web.GeoServerSecuredPage;
 import org.geoserver.web.data.store.panel.CheckBoxParamPanel;
@@ -35,6 +39,7 @@ import org.geoserver.web.data.store.panel.NamespacePanel;
 import org.geoserver.web.data.store.panel.TextParamPanel;
 import org.geoserver.web.data.store.panel.WorkspacePanel;
 import org.geotools.data.DataAccessFactory;
+import org.geotools.data.DataAccessFactory.Param;
 import org.geotools.util.logging.Logging;
 
 /**
@@ -56,8 +61,6 @@ abstract class AbstractDataAccessPage extends GeoServerSecuredPage {
      * resource/publish split is finalized
      */
     protected WorkspacePanel workspacePanel;
-
-    private NamespacePanel namespacePanel;
 
     protected StoreEditPanel storeEditPanel;
 
@@ -166,7 +169,7 @@ abstract class AbstractDataAccessPage extends GeoServerSecuredPage {
         });
 
         // save the namespace panel as an instance variable. Needed as per GEOS-3149
-        makeNamespaceSyncUpWithWorkspace();
+        makeNamespaceSyncUpWithWorkspace(paramsForm);
     }
 
     /**
@@ -197,33 +200,65 @@ abstract class AbstractDataAccessPage extends GeoServerSecuredPage {
      * done.
      * </p>
      */
-    private void makeNamespaceSyncUpWithWorkspace() {
+    private void makeNamespaceSyncUpWithWorkspace(final Form paramsForm) {
 
         // do not allow the namespace choice to be manually changed
         final DropDownChoice wsDropDown = (DropDownChoice) workspacePanel.getFormComponent();
         // add an ajax onchange behaviour that keeps ws and ns in synch
         wsDropDown.add(new OnChangeAjaxBehavior() {
             private static final long serialVersionUID = 1L;
+            private NamespaceParamModel namespaceModel;
+            private NamespacePanel namespacePanel;
+            private boolean namespaceLookupOccurred;
 
             @Override
             protected void onUpdate(AjaxRequestTarget target) {
                 // see if the namespace param is tied to a NamespacePanel and save it
-                if (namespacePanel == null) {
+                if (!namespaceLookupOccurred) {
+                    // search for the panel
                     Component paramsPanel = AbstractDataAccessPage.this
                             .get("dataStoreForm:parametersPanel");
                     namespacePanel = findNamespacePanel((MarkupContainer) paramsPanel);
+                    
+                    // if the panel is not there search for the parameter and build a model around it
+                    if(namespacePanel == null) {
+                        final IModel model = paramsForm.getModel();
+                        final DataStoreInfo info = (DataStoreInfo) model.getObject();
+                        final Catalog catalog = getCatalog();
+                        final ResourcePool resourcePool = catalog.getResourcePool();
+                        DataAccessFactory dsFactory;
+                        try {
+                            dsFactory = resourcePool.getDataStoreFactory(info);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
 
-                    if (namespacePanel == null) {
-                        // nothing to do
-                        return;
+                        final Param[] dsParams = dsFactory.getParametersInfo();
+                        for (Param p : dsParams) {
+                            if("namespace".equals(p.getName())) {
+                                final IModel paramsModel = new PropertyModel(model, "connectionParameters");
+                                namespaceModel = new NamespaceParamModel(paramsModel, "namespace");
+                                break;
+                            }
+                        }
+                        
                     }
+                    namespaceLookupOccurred = true;
                 }
 
+                // get the namespace
                 WorkspaceInfo ws = (WorkspaceInfo) wsDropDown.getModelObject();
                 String prefix = ws.getName();
                 NamespaceInfo namespaceInfo = getCatalog().getNamespaceByPrefix(prefix);
-                namespacePanel.setDefaultModelObject(namespaceInfo);
-                target.addComponent(namespacePanel.getFormComponent());
+                if (namespacePanel != null) {
+                    // update the GUI
+                    namespacePanel.setDefaultModelObject(namespaceInfo);
+                    target.addComponent(namespacePanel.getFormComponent());
+                } else if(namespaceModel != null) {
+                    // update the model directly
+                    namespaceModel.setObject(namespaceInfo);
+                    // target.addComponent(AbstractDataAccessPage.this);
+                }
             }
         });
     }
@@ -254,5 +289,10 @@ abstract class AbstractDataAccessPage extends GeoServerSecuredPage {
 
         target.getConnectionParameters().clear();
         target.getConnectionParameters().putAll(source.getConnectionParameters());
+    }
+
+    @Override
+    protected ComponentAuthorizer getPageAuthorizer() {
+        return ComponentAuthorizer.WORKSPACE_ADMIN;
     }
 }

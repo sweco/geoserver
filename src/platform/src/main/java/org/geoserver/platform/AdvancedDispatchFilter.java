@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2010 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.platform;
@@ -64,6 +65,11 @@ public class AdvancedDispatchFilter implements Filter {
             }
             
             String path = delegate.getPathInfo();
+            
+            if (path == null) {
+                return;
+            }
+            
             int slash = path.indexOf('/', 1);
             if (slash > -1 ) {
                 this.servletPath = path.substring(0, slash);
@@ -81,7 +87,9 @@ public class AdvancedDispatchFilter implements Filter {
         
         public String getPathInfo() {
             HttpServletRequest delegate = (HttpServletRequest) getRequest();
-            if(delegate.getPathInfo().startsWith(servletPath))
+            if (servletPath != null &&
+                    delegate.getPathInfo() != null &&
+                    delegate.getPathInfo().startsWith(servletPath))
                 return delegate.getPathInfo().substring(servletPath.length());
             else
                 return delegate.getPathInfo();

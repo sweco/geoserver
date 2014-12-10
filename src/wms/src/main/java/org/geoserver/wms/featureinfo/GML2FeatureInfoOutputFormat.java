@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.featureinfo;
@@ -24,6 +25,7 @@ import org.geoserver.wfs.xml.GML2OutputFormat;
 import org.geoserver.wms.GetFeatureInfoRequest;
 import org.geoserver.wms.WMS;
 import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.feature.FeatureCollection;
 import org.geotools.gml2.bindings.GML2EncodingUtils;
 
 /**
@@ -42,7 +44,7 @@ public class GML2FeatureInfoOutputFormat extends GetFeatureInfoOutputFormat {
     /**
      * The MIME type of the format this response produces: <code>"application/vnd.ogc.gml"</code>
      */
-    private static final String FORMAT = "application/vnd.ogc.gml";
+    public static final String FORMAT = "application/vnd.ogc.gml";
 
     private WMS wms;
 
@@ -51,6 +53,11 @@ public class GML2FeatureInfoOutputFormat extends GetFeatureInfoOutputFormat {
      */
     public GML2FeatureInfoOutputFormat(final WMS wms) {
         super(FORMAT);
+        this.wms = wms;
+    }
+
+    protected GML2FeatureInfoOutputFormat(WMS wms, String format) {
+        super(format);
         this.wms = wms;
     }
 
@@ -74,7 +81,7 @@ public class GML2FeatureInfoOutputFormat extends GetFeatureInfoOutputFormat {
         gfreq.setBaseUrl(fInfoReq.getBaseUrl());
 
         for (Iterator i = results.getFeature().iterator(); i.hasNext();) {
-            SimpleFeatureCollection fc = (SimpleFeatureCollection) i.next();
+            FeatureCollection fc = (FeatureCollection) i.next();
             features.getFeature().add(fc);
 
             QueryType qt = WfsFactory.eINSTANCE.createQueryType();
@@ -85,9 +92,8 @@ public class GML2FeatureInfoOutputFormat extends GetFeatureInfoOutputFormat {
                     qt.setSrsName(new URI(srsName));
                 } catch (URISyntaxException e) {
                     throw new ServiceException(
-                            "Unable to determite coordinate system for featureType "
-                                    + fc.getSchema().getTypeName() + ".  Schema told us '"
-                                    + srsName + "'", e);
+                        "Unable to determite coordinate system for featureType " + 
+                            fc.getSchema().getName() + ".  Schema told us '" + srsName + "'", e);
                 }
             }
             gfreq.getQuery().add(qt);

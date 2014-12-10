@@ -1,11 +1,13 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 
 package org.geoserver.wps;
 
-import org.geoserver.catalog.MetadataMap;
+import java.util.List;
+
 import org.geoserver.config.ServiceInfo;
 
 /**
@@ -46,7 +48,7 @@ public interface WPSInfo extends ServiceInfo {
 
     /**
      * Returns the maximum number of processes that can run in synchronous mode in parallel.
-     * Defaults to the twice the number of available CPU cores
+     * Defaults to the number of available CPU cores
      * 
      * @return
      */
@@ -61,7 +63,7 @@ public interface WPSInfo extends ServiceInfo {
 
     /**
      * Returns the maximum number of processes that can run in asynchronous mode in parallel.
-     * Defaults to the twice the number of available CPU cores
+     * Defaults to the number of available CPU cores
      * 
      * @return
      */
@@ -73,5 +75,28 @@ public interface WPSInfo extends ServiceInfo {
      * @param maxAsynchronousProcesses
      */
     public void setMaxAsynchronousProcesses(int maxAsynchronousProcesses);
+    
+    /**
+     * Retrieves the process groups configurations
+     * 
+     * @return
+     */
+    public List<ProcessGroupInfo> getProcessGroups();
+
+    /**
+     * Gets the current output storage directory
+     * 
+     * @return
+     */
+    public String getStorageDirectory();
+
+    /**
+     * Sets the output storage directory, that is, the directory used to store the request, status
+     * and final response of asynch requests, as well as any output that is meant to be referred to
+     * by URL instead of being included inline in Execute the response.
+     * 
+     * @param storageDirectory
+     */
+    public void setStorageDirectory(String storageDirectory);
 
 }

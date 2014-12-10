@@ -1,5 +1,6 @@
-/* Copyright (c) 2010 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.capabilities;
@@ -12,12 +13,15 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
 import javax.xml.transform.Result;
 import javax.xml.transform.Source;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.sax.SAXSource;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 
@@ -30,6 +34,10 @@ import org.geoserver.wms.GetCapabilities;
 import org.geoserver.wms.GetCapabilitiesRequest;
 import org.geoserver.wms.GetMapRequest;
 import org.geoserver.wms.WMS;
+import org.xml.sax.EntityResolver;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
 
 /**
  * OWS {@link Response} bean to handle WMS {@link GetCapabilities} results.
@@ -66,7 +74,7 @@ import org.geoserver.wms.WMS;
  * @author groldan
  * 
  */
-public class GetCapabilitiesResponse extends Response {
+public class GetCapabilitiesResponse extends BaseCapabilitiesResponse {
 
     private WMS wms;
 
@@ -76,26 +84,10 @@ public class GetCapabilitiesResponse extends Response {
      *            check of internal DTD elements shall be added to the output document
      */
     public GetCapabilitiesResponse(final WMS wms) {
-        super(GetCapabilitiesTransformer.class);
+        super(GetCapabilitiesTransformer.class,GetCapabilitiesTransformer.WMS_CAPS_MIME);
         this.wms = wms;
     }
 
-    /**
-     * @return {@code "text/xml"}
-     * @see org.geoserver.ows.Response#getMimeType(java.lang.Object,
-     *      org.geoserver.platform.Operation)
-     */
-    @Override
-    public String getMimeType(final Object value, final Operation operation)
-            throws ServiceException {
-
-        if (value instanceof GetCapabilitiesTransformer) {
-            return GetCapabilitiesTransformer.WMS_CAPS_MIME;
-        }
-
-        throw new IllegalArgumentException(value == null ? "null" : value.getClass().getName()
-                + "/" + operation.getId());
-    }
 
     /**
      * @param value
@@ -155,9 +147,35 @@ public class GetCapabilitiesResponse extends Response {
 
             // Set the full DTD declaration, including internal elements provided by
             // ExtendedCapabilitiesProviders, as an stylesheet parameter
-            dtdIncludeTransformer.setParameter("DTDDeclaration", internalDTDDeclaration.toString());
+            dtdIncludeTransformer.setParameter("DTDDeclaration", internalDTDDeclaration);
 
-            Source source = new StreamSource(new ByteArrayInputStream(rawCapabilities));
+            Source source;
+            try {
+                /*
+                 * As per GEOS-4945, we need to provide the XSL transformer a namespace aware input
+                 * source that doesn't complain if the resulting DTD location is unreachable. To do
+                 * so, a SAX XMLReader with an EntityResolver that resolves to the local copy of the
+                 * DTD will be used.
+                 */
+                SAXParserFactory spf = SAXParserFactory.newInstance();
+                spf.setNamespaceAware(true); // xslt _needs_ namespace aware input source
+                SAXParser sp = spf.newSAXParser();
+                XMLReader rawCapsReader = sp.getXMLReader();
+                rawCapsReader.setEntityResolver(new EntityResolver() {
+                    @Override
+                    public InputSource resolveEntity(String publicId, String systemId)
+                            throws SAXException {
+                        final String dtdLocation = "/schemas/wms/1.1.1/WMS_MS_Capabilities.dtd";
+                        String dtdSystemId = getClass().getResource(dtdLocation).toExternalForm();
+                        return new InputSource(dtdSystemId);
+                    }
+                });
+
+                source = new SAXSource(rawCapsReader, new InputSource(new ByteArrayInputStream(
+                        rawCapabilities)));
+            } catch (Exception e) {
+                throw new ServiceException(e);
+            }
             Result result = new StreamResult(output);
             try {
                 dtdIncludeTransformer.transform(source, result);

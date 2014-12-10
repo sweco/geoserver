@@ -1,8 +1,12 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.web.admin;
 
 import org.apache.wicket.markup.html.form.Button;
 import org.apache.wicket.markup.html.form.Form;
-import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.model.CompoundPropertyModel;
 import org.apache.wicket.model.IModel;
 import org.geoserver.config.ContactInfo;
@@ -16,20 +20,9 @@ public class ContactPage extends ServerAdminPage {
         final IModel contactModel = getContactInfoModel();
 
         Form form = new Form("form", new CompoundPropertyModel(contactModel));
-
         add(form);
-        form.add(new TextField("contactPerson" ));
-        form.add(new TextField("contactOrganization"));
-        form.add(new TextField("contactPosition"));
-        form.add(new TextField("addressType"));
-        form.add(new TextField("address")); 
-        form.add(new TextField("addressCity"));
-        form.add(new TextField("addressState")); 
-        form.add(new TextField("addressPostalCode"));
-        form.add(new TextField("addressCountry"));
-        form.add(new TextField("contactVoice"));
-        form.add(new TextField("contactFacsimile"));
-        form.add(new TextField("contactEmail"));
+
+        form.add(new ContactPanel("contact", contactModel));
         form.add(new Button("submit") {
             @Override
             public void onSubmit() {
@@ -37,13 +30,13 @@ public class ContactPage extends ServerAdminPage {
                 GeoServerInfo global = gs.getGlobal();
                 global.setContact((ContactInfo)contactModel.getObject());
                 gs.save(global);
-                setResponsePage(GeoServerHomePage.class);
+                doReturn();
             }
         });
         form.add(new Button("cancel") {
             @Override
             public void onSubmit() {
-                setResponsePage(GeoServerHomePage.class);
+                doReturn();
             }
         });
     }

@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
@@ -50,6 +51,10 @@ public class WMSLifecycleHandler implements GeoServerLifecycleHandler, Applicati
         shutdownAnimatorExecutorService();
     }
 
+    public void beforeReload() {
+        // nothing to do
+    }
+
     public void onReload() {
         // clear the caches for good measure
         onReset();
@@ -73,7 +78,7 @@ public class WMSLifecycleHandler implements GeoServerLifecycleHandler, Applicati
      */
     private void resetAnimatorExecutorService() {
         shutdownAnimatorExecutorService();
-        
+
         Long framesTimeout = this.wmsConfig.getMaxAnimatorRenderingTime() != null ? 
                 this.wmsConfig.getMaxAnimatorRenderingTime() : Long.MAX_VALUE;
         ExecutorService animatorExecutorService = 

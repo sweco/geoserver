@@ -143,7 +143,7 @@ As with previous examples, **lines 8-11** determine the ``<ColorMap>``, with **l
 Three-color gradient
 --------------------
 
-This example creates a three-color gradient in primary colors.  In addition, the gradient doesn't span the entire range of data values, leading some data not to be rendered at all.
+This example creates a three-color gradient in primary colors.
 
 .. figure:: images/raster_threecolorgradient.png
    :align: center
@@ -175,7 +175,7 @@ Details
 
 This example creates a three-color gradient based on a ``<ColorMap>`` with three entries on **lines 4-8**: **line 5** specifies the lower bound (150) be styled in blue (``#0000FF``), **line 6** specifies an intermediate point (200) be styled in yellow (``#FFFF00``), and **line 7** specifies the upper bound (250) be styled in red (``#FF0000``).
 
-Since our data values run between 70 and 256, some data points are not accounted for in this style.  Those values below the lowest entry in the color map (the range from 70 to 149)  are styled the same color as the lower bound, in this case blue.  On the other hand, values above the upper bound in the color map (the range from 251 to 256) are not rendered at all.
+Since our data values run between 70 and 256, some data points are not accounted for in this style.  Those values below the lowest entry in the color map (the range from 70 to 149)  are styled the same color as the lower bound, in this case blue.  Values above the upper bound in the color map (the range from 251 to 256) are styled the same color as the upper bound, in this case red.
 
 
 Alpha channel
@@ -218,7 +218,7 @@ In this example, there is a ``<ColorMap>`` with two entries: **line 5** specifie
 Discrete colors
 ---------------
 
-This example shows a gradient that is not linearly interpolated but instead has values mapped precisely to one of three speci?c colors.
+This example shows a gradient that is not linearly interpolated but instead has values mapped precisely to one of three specific colors.
 
 .. note:: This example leverages an SLD extension in GeoServer.  Discrete colors are not part of the standard SLD 1.0 specification.
 
@@ -256,7 +256,7 @@ band such that colors are mapped to values less than the value of one entry but 
 Many color gradient
 -------------------
 
-This example shows an eight color gradient.
+This example shows a gradient interpolated across eight different colors.
 
 .. figure:: images/raster_manycolorgradient.png
    :align: center
@@ -291,7 +291,8 @@ Code
 Details
 ~~~~~~~
 
-There is no limit on the amount of entries that can be contained in a ``<ColorMap>`` (**lines 4-13**).  This example has eight entries:
+A ``<ColorMap>`` can include up to 255 ``<ColorMapEntry>`` elements.  
+This example has eight entries (**lines 4-13**):
 
 .. list-table::
    :widths: 15 25 30 30 

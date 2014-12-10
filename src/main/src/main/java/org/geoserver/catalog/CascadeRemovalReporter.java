@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -142,8 +143,13 @@ public class CascadeRemovalReporter implements CatalogVisitor {
         List<ResourceInfo> resources = catalog.getResourcesByStore(dataStore, ResourceInfo.class);
         for (ResourceInfo ri : resources) {
             List<LayerInfo> layers = catalog.getLayers(ri);
-            for (LayerInfo li : layers) {
-                li.accept(this);
+            if (!layers.isEmpty()) {
+                for (LayerInfo li : layers) {
+                    li.accept(this);
+                }
+            }
+            else {
+                ri.accept(this);
             }
         }
 
@@ -182,7 +188,7 @@ public class CascadeRemovalReporter implements CatalogVisitor {
                 // a group can contain the same layer multiple times. We want to
                 // make sure to mark the group as removed if all the layers inside of
                 // it are going to be removed, just changed otherwise
-                if(layers.size() == new HashSet<LayerInfo>(group.getLayers()).size()) {
+                if(layers.size() == new HashSet<PublishedInfo>(group.getLayers()).size()) {
                     add(group, ModificationType.DELETE);
                 } else {
                     add(group, ModificationType.GROUP_CHANGED);
@@ -204,16 +210,31 @@ public class CascadeRemovalReporter implements CatalogVisitor {
         // groups can also refer styles
         List<LayerGroupInfo> groups = catalog.getLayerGroups();
         for (LayerGroupInfo group : groups) {
-            if (group.getStyles().contains(style))
+            if (style.equals(group.getRootLayerStyle())) {
+                add(group, ModificationType.GROUP_CHANGED);                
+            }
+            
+            if (group.getStyles().contains(style)) {
                 add(group, ModificationType.GROUP_CHANGED);
+            }
         }
         
         // add the style
         add(style, ModificationType.DELETE);
     }
 
-    public void visit(LayerGroupInfo layerGroup) {
-        add(layerGroup, ModificationType.DELETE);
+    public void visit(LayerGroupInfo layerGroupToRemove) {
+        List<LayerGroupInfo> groups = catalog.getLayerGroups();
+        for (LayerGroupInfo group : groups) {
+            if (group.getLayers().remove(layerGroupToRemove)) {
+                if (group.getLayers().size() == 0) {
+                    visit(group);
+                } else {
+                    add(group, ModificationType.GROUP_CHANGED);
+                }
+            }
+        }
+        
+        add(layerGroupToRemove, ModificationType.DELETE);
     }
-
 }

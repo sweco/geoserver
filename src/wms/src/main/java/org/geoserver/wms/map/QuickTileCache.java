@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.map;
@@ -21,6 +22,7 @@ import org.geoserver.config.ConfigurationListenerAdapter;
 import org.geoserver.config.GeoServer;
 import org.geoserver.config.GeoServerInfo;
 import org.geoserver.config.ServiceInfo;
+import org.geoserver.config.impl.GeoServerLifecycleHandler;
 import org.geoserver.platform.ServiceException;
 import org.geoserver.wfs.TransactionEvent;
 import org.geoserver.wfs.TransactionListener;
@@ -33,7 +35,7 @@ import org.geotools.util.CanonicalSet;
 
 import com.vividsolutions.jts.geom.Envelope;
 
-public class QuickTileCache implements TransactionListener {
+public class QuickTileCache implements TransactionListener, GeoServerLifecycleHandler {
     /**
      * Set of parameters that we can ignore, since they do not define a map, are either unrelated,
      * or define the tiling instead
@@ -114,7 +116,7 @@ public class QuickTileCache implements TransactionListener {
         // since this will be used for thread synchronization, we have to make
         // sure two thread asking for the same meta tile will get the same key
         // object
-        return (MetaTileKey) metaTileKeys.unique(key);
+        return metaTileKeys.unique(key);
     }
 
     private ReferencedEnvelope getMetaTileEnvelope(ReferencedEnvelope bbox, Point tileCoords, Point metaTileCoords) {
@@ -158,6 +160,24 @@ public class QuickTileCache implements TransactionListener {
         double centery = env.getMinY() + env.getHeight() / 2;
         int x = (int) Math.floor((centerx - origin.getX()) / env.getWidth());
         int y = (int) Math.floor((centery - origin.getY()) / env.getWidth());
+
+        return new Point(x, y);
+    }
+    
+    /**
+     * Given an envelope and the metatile envelope, locate the tile inside the metatile
+     * 
+     * @param env
+     * @param origin
+     * @return
+     */
+    Point getTileOffsetsInMeta(Envelope bbox, Envelope metatileBox) {
+        // compute using local coordinates, the previous math was using global one that
+        // broke at zoom level 23-24 in the global mercator projection (yes, at scale 1:33)
+        double dx = bbox.getMinX() - metatileBox.getMinX();
+        double dy = bbox.getMinY() - metatileBox.getMinY();
+        int x = (int) Math.round(dx / bbox.getWidth());
+        int y = (int) Math.round(dy / bbox.getHeight());
 
         return new Point(x, y);
     }
@@ -337,11 +357,10 @@ public class QuickTileCache implements TransactionListener {
         if(CRS.getAxisOrder(request.getCrs()) == AxisOrder.NORTH_EAST) {
             bbox = new Envelope(bbox.getMinY(), bbox.getMaxY(), bbox.getMinX(), bbox.getMaxX());
         }
-        Point tileCoord = getTileCoordinates(bbox, key.mapKey.origin);
-        Point metaCoord = key.metaTileCoords;
+        
+        Point tileCoord = getTileOffsetsInMeta(bbox, key.getMetaTileEnvelope());
 
-        return tiles[tileCoord.x - metaCoord.x
-                + ((tileCoord.y - metaCoord.y) * key.getMetaFactor())];
+        return tiles[tileCoord.x + (tileCoord.y * key.getMetaFactor())];
     }
 
     /**
@@ -369,6 +388,26 @@ public class QuickTileCache implements TransactionListener {
         // contains a string with part of the map request where the layer
         // name is included, but we would have to parse it and consider
         // also that the namespace may be missing in the getmap request
+        tileCache.clear();
+    }
+
+    @Override
+    public void onReset() {
+        // data might have changed in the meantime
+        tileCache.clear();        
+    }
+
+    @Override
+    public void onDispose() {
+        tileCache.clear();
+    }
+
+    public void beforeReload() {
+        // nothing to do
+    }
+
+    @Override
+    public void onReload() {
         tileCache.clear();
     }
 }

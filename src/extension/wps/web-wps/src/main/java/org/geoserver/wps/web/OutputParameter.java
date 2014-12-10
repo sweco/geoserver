@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -10,9 +11,9 @@ import java.util.List;
 
 import org.geoserver.wps.ppio.ComplexPPIO;
 import org.geoserver.wps.ppio.ProcessParameterIO;
+import org.geoserver.wps.process.GeoServerProcessors;
 import org.geotools.data.Parameter;
 import org.geotools.process.ProcessFactory;
-import org.geotools.process.Processors;
 import org.opengis.feature.type.Name;
 
 /**
@@ -64,7 +65,7 @@ class OutputParameter implements Serializable {
     }
 
     ProcessFactory getProcessFactory() {
-        return Processors.createProcessFactory(processName);
+        return GeoServerProcessors.createProcessFactory(processName);
     }
 
     Parameter<?> getParameter() {

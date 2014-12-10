@@ -1,8 +1,11 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.web.data.store;
+
+import java.util.List;
 
 import org.apache.wicket.Component;
 import org.apache.wicket.PageParameters;
@@ -27,6 +30,13 @@ public class WMSStoreEditPage extends AbstractWMSStorePage {
         initUI(store);
     }
 
+    /**
+     * Creates a new edit page directly from a store object.
+     */
+    public WMSStoreEditPage(WMSStoreInfo store) {
+        initUI(store);
+    }
+
     @Override
     protected void onSave(WMSStoreInfo info, AjaxRequestTarget target)
             throws IllegalArgumentException {
@@ -48,10 +58,17 @@ public class WMSStoreEditPage extends AbstractWMSStorePage {
         }
 
     }
-    
-    private void doSaveStore(WMSStoreInfo info) {
+
+    /**
+     * Performs the save of the store.
+     * <p>
+     * This method may be subclasses to provide custom save functionality.
+     * </p>
+     */
+    protected void doSaveStore(WMSStoreInfo info) {
+        getCatalog().validate(info, false).throwIfInvalid();
         getCatalog().save(info);
-        setResponsePage(StorePage.class);
+        doReturn(StorePage.class);
     }
 
     @SuppressWarnings("serial")
@@ -94,7 +111,7 @@ public class WMSStoreEditPage extends AbstractWMSStorePage {
             @Override
             public void onClose(AjaxRequestTarget target) {
                 if (accepted) {
-                    setResponsePage(StorePage.class);
+                    doReturn(StorePage.class);
                 }
             }
         });

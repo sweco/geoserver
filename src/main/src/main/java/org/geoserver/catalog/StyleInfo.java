@@ -1,10 +1,12 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.geotools.styling.Style;
 import org.geotools.util.Version;
@@ -53,15 +55,47 @@ public interface StyleInfo extends CatalogInfo {
     void setName(String name);
 
     /**
+     * The workspace the style is part of, or <code>null</code> if the style is global.
+     */
+    WorkspaceInfo getWorkspace();
+
+    /**
+     * Sets the workspace the style is part of.
+     */
+    void setWorkspace(WorkspaceInfo workspace);
+
+    /**
      * The sld version of the style.
+     * @deprecated use {@link #getFormatVersion()}
      */
     Version getSLDVersion();
 
     /**
      * Sets the sld version of the style.
+     * @deprecated use {@link #setFormatVersion(Version)}
      */
     void setSLDVersion(Version v);
-    
+
+    /**
+     * The styling language/format for the style, for example: "sld"
+     */
+    String getFormat();
+
+    /**
+     * Sets the styling format for the style, for example: "sld"
+     */
+    void setFormat(String format);
+
+    /**
+     * The version of the style format.
+     */
+    Version getFormatVersion();
+
+    /**
+     * Sets the version of the style format.
+     */
+    void setFormatVersion(Version version);
+
     /**
      * The name of the file the style originates from.
      */

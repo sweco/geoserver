@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2011 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -12,17 +13,18 @@ import javax.xml.namespace.QName;
 import org.geoserver.config.GeoServer;
 import org.geoserver.ows.XmlRequestReader;
 import org.geoserver.platform.ServiceException;
+import org.geoserver.util.EntityResolverProvider;
 import org.geoserver.wfs.WFSException;
 import org.geoserver.wfs.WFSInfo;
 import org.geoserver.wfs.xml.FeatureTypeSchemaBuilder;
+import org.geoserver.wfs.xml.WFSURIHandler;
 import org.geoserver.wfs.xml.WFSXmlUtils;
 import org.geotools.util.Version;
 import org.geotools.wfs.v2_0.WFS;
-import org.geotools.wfs.v2_0.WFSConfiguration;
 import org.geotools.xml.Parser;
 
 /**
- * Xml reader for wfs 1.0 xml requests.
+ * Xml reader for wfs 2.0 xml requests.
  * 
  * @author Justin Deoliveira, OpenGeo
  *
@@ -30,11 +32,13 @@ import org.geotools.xml.Parser;
 public class WfsXmlReader extends XmlRequestReader {
 
     GeoServer gs;
+    EntityResolverProvider entityResolverProvider;
     
     public WfsXmlReader(String element, GeoServer gs) {
         super(new QName(WFS.NAMESPACE, element), new Version("2.0.0"), "wfs");
         this.gs = gs;
-    }
+        this.entityResolverProvider = new EntityResolverProvider(gs);
+    }  
     
     @Override
     public Object read(Object request, Reader reader, Map kvp) throws Exception {
@@ -42,8 +46,7 @@ public class WfsXmlReader extends XmlRequestReader {
         WFSXmlUtils.initWfsConfiguration(config, gs, new FeatureTypeSchemaBuilder.GML32(gs));
         
         Parser parser = new Parser(config);
-        
-        
+        parser.setEntityResolver(entityResolverProvider.getEntityResolver());
         
         WFSInfo wfs = wfs();
         

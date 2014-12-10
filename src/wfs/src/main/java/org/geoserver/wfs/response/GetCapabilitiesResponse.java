@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.response;
@@ -11,11 +12,9 @@ import java.util.List;
 
 import javax.xml.transform.TransformerException;
 
-import net.opengis.wfs.GetCapabilitiesType;
-
 import org.geoserver.ows.Response;
-import org.geoserver.ows.util.OwsUtils;
 import org.geoserver.platform.Operation;
+import org.geoserver.wfs.request.GetCapabilitiesRequest;
 import org.geotools.xml.transform.TransformerBase;
 
 
@@ -35,12 +34,11 @@ public class GetCapabilitiesResponse extends Response {
     }
 
     public String getMimeType(Object value, Operation operation) {
-        GetCapabilitiesType request = (GetCapabilitiesType) OwsUtils.parameter(operation
-                .getParameters(), GetCapabilitiesType.class);
+        GetCapabilitiesRequest request = GetCapabilitiesRequest.adapt(operation.getParameters()[0]);
 
         if ((request != null) && (request.getAcceptFormats() != null)) {
             //look for an accepted format
-            List formats = request.getAcceptFormats().getOutputFormat();
+            List formats = request.getAcceptFormats();
 
             for (Iterator f = formats.iterator(); f.hasNext();) {
                 String format = (String) f.next();

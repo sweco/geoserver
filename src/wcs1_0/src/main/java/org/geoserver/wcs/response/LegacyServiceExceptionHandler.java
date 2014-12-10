@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wcs.response;
@@ -165,7 +166,7 @@ public class LegacyServiceExceptionHandler extends ServiceExceptionHandler {
             sb.append("\n" + tab + tab);
             OwsUtils.dumpExceptionMessages(exception, sb, true);
 
-            if(geoServer.getGlobal().isVerboseExceptions()) {
+            if(geoServer.getSettings().isVerboseExceptions()) {
                 ByteArrayOutputStream stackTrace = new ByteArrayOutputStream();
                 exception.printStackTrace(new PrintStream(stackTrace));
 

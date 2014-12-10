@@ -1,11 +1,14 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wps.gs;
 
+import javax.xml.namespace.QName;
+
 import org.geoserver.wps.ppio.XStreamPPIO;
-import org.geotools.process.feature.gs.AggregateProcess;
+import org.geotools.process.vector.AggregateProcess;
 
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.mapper.MapperWrapper;
@@ -16,8 +19,10 @@ import com.thoughtworks.xstream.mapper.MapperWrapper;
  */
 public class AggregateProcessPPIO extends XStreamPPIO {
 
+    static final QName AggregationResults = new QName("AggregationResults");
+
     protected AggregateProcessPPIO() {
-        super(AggregateProcess.Results.class);
+        super(AggregateProcess.Results.class, AggregationResults);
     }
     
     @Override
@@ -27,7 +32,7 @@ public class AggregateProcessPPIO extends XStreamPPIO {
                 return new UppercaseTagMapper(next);
             };
         };
-        xstream.alias("AggregationResults", AggregateProcess.Results.class);
+        xstream.alias(AggregationResults.getLocalPart(), AggregateProcess.Results.class);
         return xstream;
     }
     

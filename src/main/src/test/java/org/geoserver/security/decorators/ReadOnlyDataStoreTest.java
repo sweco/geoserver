@@ -1,16 +1,24 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.security.decorators;
 
 import static org.easymock.EasyMock.createNiceMock;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.replay;
+import static org.junit.Assert.*;
 
+import org.geoserver.security.SecurityUtils;
 import org.geoserver.security.WrapperPolicy;
 import org.geoserver.security.impl.SecureObjectsTest;
-import org.geoserver.util.SecurityUtils;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataUtilities;
 import org.geotools.data.Transaction;
 import org.geotools.data.simple.SimpleFeatureStore;
+import org.junit.Before;
+import org.junit.Test;
 import org.opengis.feature.type.Name;
 import org.opengis.filter.Filter;
 
@@ -18,9 +26,8 @@ public class ReadOnlyDataStoreTest extends SecureObjectsTest {
 
     private DataStore ds;
 
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
+    @Before
+    public void setUp() throws Exception {
         SimpleFeatureStore fs = createNiceMock(SimpleFeatureStore.class);
         expect(fs.getSchema()).andReturn(DataUtilities.createType("test", "g:Polygon,name:String")).anyTimes();
         replay(fs);
@@ -29,6 +36,7 @@ public class ReadOnlyDataStoreTest extends SecureObjectsTest {
         replay(ds);
     }
 
+    @Test
     public void testDisallowedAPI() throws Exception {
         ReadOnlyDataStore ro = new ReadOnlyDataStore(ds, WrapperPolicy.hide(null));
 
@@ -72,6 +80,7 @@ public class ReadOnlyDataStoreTest extends SecureObjectsTest {
         }
     }
     
+    @Test
     public void testChallenge() throws Exception {
         ReadOnlyDataStore ro = new ReadOnlyDataStore(ds, WrapperPolicy.readOnlyChallenge(null));
 

@@ -1,11 +1,13 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.vfny.geoserver.global;
 
 import java.io.IOException;
 
+import org.geoserver.catalog.FeatureTypeInfo;
 import org.geotools.data.DataSourceException;
 import org.geotools.data.FeatureLock;
 import org.geotools.data.FeatureLocking;
@@ -44,11 +46,12 @@ public class GeoServerFeatureLocking extends GeoServerFeatureStore implements Si
      * @param definitionQuery DOCUMENT ME!
      * @param declaredCRS 
      * @param srsHandling see {@link FeatureTypeInfo#FORCE} & co.
+     * @param linearizationTolerance TODO
      */
     GeoServerFeatureLocking(FeatureLocking<SimpleFeatureType, SimpleFeature> locking,
             SimpleFeatureType schema, Filter definitionQuery,
-            CoordinateReferenceSystem declaredCRS, int srsHandling) {
-        super(locking, schema, definitionQuery, declaredCRS, srsHandling);
+            CoordinateReferenceSystem declaredCRS, int srsHandling, Double linearizationTolerance) {
+        super(locking, schema, definitionQuery, declaredCRS, srsHandling, linearizationTolerance);
     }
 
     FeatureLocking<SimpleFeatureType, SimpleFeature> locking() {

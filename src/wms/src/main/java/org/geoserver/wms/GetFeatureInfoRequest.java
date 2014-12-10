@@ -1,9 +1,11 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
 
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -53,6 +55,11 @@ public class GetFeatureInfoRequest extends WMSRequest {
      * Holds the value of the requiered <code>Y</code> parameter
      */
     private int YPixel;
+    
+    /**
+     * Property selection, if any (one list per layer)
+     */
+    private List<List<String>> propertyNames;
 
     /**
      * Holder for the optional <code>EXCEPTIONS</code> parameter, defaults to
@@ -167,5 +174,21 @@ public class GetFeatureInfoRequest extends WMSRequest {
      */
     public void setYPixel(int pixel) {
         YPixel = pixel;
+    }
+
+    /**
+     * The property selection, if any
+     * @return
+     */
+    public List<List<String>> getPropertyNames() {
+        return propertyNames;
+    }
+
+    /**
+     * Sets the property selection
+     * @param propertyNames
+     */
+    public void setPropertyNames(List<List<String>> propertyNames) {
+        this.propertyNames = propertyNames;
     }
 }

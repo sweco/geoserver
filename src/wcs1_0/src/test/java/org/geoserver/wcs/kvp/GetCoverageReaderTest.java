@@ -1,40 +1,35 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wcs.kvp;
 
 import static org.geoserver.data.test.MockData.TASMANIA_BM;
+import static org.junit.Assert.*;
 import static org.vfny.geoserver.wcs.WcsException.WcsExceptionCode.InvalidParameterValue;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import junit.framework.Test;
 import net.opengis.wcs10.GetCoverageType;
 
 import org.geoserver.catalog.Catalog;
 import org.geoserver.wcs.test.WCSTestSupport;
+import org.junit.Before;
+import org.junit.Test;
 import org.vfny.geoserver.wcs.WcsException;
 
 public class GetCoverageReaderTest extends WCSTestSupport {
 
     static Wcs10GetCoverageRequestReader reader;
 
-    /**
-     * This is a READ ONLY TEST so we can use one time setup
-     */
-    public static Test suite() {
-        return new OneTimeTestSetup(new GetCoverageReaderTest());
+    @Before
+    public void setUp() {
+        reader = new Wcs10GetCoverageRequestReader(getCatalog());
     }
 
-    @Override
-    protected void oneTimeSetUp() throws Exception {
-        super.oneTimeSetUp();
-        Catalog catalog = (Catalog) applicationContext.getBean("catalog");
-        reader = new Wcs10GetCoverageRequestReader(catalog);
-    }
-
-    // protected String getDefaultLogConfiguration() {
-    // return "/DEFAULT_LOGGING.properties";
-    // }
-
+    @Test
     public void testMissingParams() throws Exception {
         Map<String, Object> raw = baseMap();
 
@@ -84,6 +79,7 @@ public class GetCoverageReaderTest extends WCSTestSupport {
         return raw;
     }
 
+    @Test
     public void testUnknownCoverageParams() throws Exception {
         Map<String, Object> raw = baseMap();
         final String layerId = "fairyTales:rumpelstilskin";
@@ -100,6 +96,7 @@ public class GetCoverageReaderTest extends WCSTestSupport {
         }
     }
 
+    @Test
     public void testBasic() throws Exception {
         Map<String, Object> raw = baseMap();
         final String layerId = getLayerId(TASMANIA_BM);
@@ -117,7 +114,76 @@ public class GetCoverageReaderTest extends WCSTestSupport {
         assertEquals("image/tiff", getCoverage.getOutput().getFormat().getValue());
         assertEquals("EPSG:4326", getCoverage.getOutput().getCrs().getValue());
     }
+    
+    @Test
+    public void testInterpolation() throws Exception {
+        Map<String, Object> raw = baseMap();
+        String layerId = getLayerId(TASMANIA_BM);
+        raw.put("SourceCoverage", layerId);
+        raw.put("version", "1.0.0");
+        raw.put("format", "image/tiff");
+        raw.put("BBOX", "-45,146,-42,147");
+        raw.put("CRS", "EPSG:4326");
+        raw.put("width", "150");
+        raw.put("height", "150");
+        raw.put("interpolation", "nearest neighbor");
 
+        GetCoverageType getCoverage = (GetCoverageType) reader.read(reader.createRequest(),parseKvp(raw), raw);
+        assertEquals(layerId, getCoverage.getSourceCoverage());
+        assertEquals("image/tiff", getCoverage.getOutput().getFormat().getValue());
+        assertEquals("nearest neighbor", getCoverage.getInterpolationMethod().toString());
+
+        //bilinear
+        raw = baseMap();
+        raw.put("SourceCoverage", layerId);
+        raw.put("version", "1.0.0");
+        raw.put("format", "image/tiff");
+        raw.put("BBOX", "-45,146,-42,147");
+        raw.put("CRS", "EPSG:4326");
+        raw.put("width", "150");
+        raw.put("height", "150");
+        raw.put("interpolation", "bilinear");
+
+        getCoverage = (GetCoverageType) reader.read(reader.createRequest(),parseKvp(raw), raw);
+        assertEquals(layerId, getCoverage.getSourceCoverage());
+        assertEquals("image/tiff", getCoverage.getOutput().getFormat().getValue());
+        assertEquals("bilinear", getCoverage.getInterpolationMethod().toString());
+        
+        //nearest
+        raw = baseMap();
+        raw.put("SourceCoverage", layerId);
+        raw.put("version", "1.0.0");
+        raw.put("format", "image/tiff");
+        raw.put("BBOX", "-45,146,-42,147");
+        raw.put("CRS", "EPSG:4326");
+        raw.put("width", "150");
+        raw.put("height", "150");
+        raw.put("interpolation", "nearest");
+
+        getCoverage = (GetCoverageType) reader.read(reader.createRequest(),parseKvp(raw), raw);
+        assertEquals(layerId, getCoverage.getSourceCoverage());
+        assertEquals("image/tiff", getCoverage.getOutput().getFormat().getValue());
+        assertEquals("nearest neighbor", getCoverage.getInterpolationMethod().toString());
+
+        
+        //bicubic
+        raw = baseMap();
+        raw.put("SourceCoverage", layerId);
+        raw.put("version", "1.0.0");
+        raw.put("format", "image/tiff");
+        raw.put("BBOX", "-45,146,-42,147");
+        raw.put("CRS", "EPSG:4326");
+        raw.put("width", "150");
+        raw.put("height", "150");
+        raw.put("interpolation", "bicubic");
+
+        getCoverage = (GetCoverageType) reader.read(reader.createRequest(),parseKvp(raw), raw);
+        assertEquals(layerId, getCoverage.getSourceCoverage());
+        assertEquals("image/tiff", getCoverage.getOutput().getFormat().getValue());
+        assertEquals("bicubic", getCoverage.getInterpolationMethod().toString());
+    }
+
+    @Test
     public void testUnsupportedCRS() throws Exception {
         Map<String, Object> raw = baseMap();
         final String layerId = getLayerId(TASMANIA_BM);

@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.security.decorators;
 
 import java.util.List;
@@ -12,6 +17,7 @@ import org.geoserver.catalog.LegendInfo;
 import org.geoserver.catalog.MetadataMap;
 import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.catalog.StyleInfo;
+import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.catalog.impl.AbstractDecorator;
 
 /**
@@ -44,6 +50,10 @@ public class DecoratingLayerInfo extends AbstractDecorator<LayerInfo> implements
 
     public String getName() {
         return delegate.getName();
+    }
+
+    public String prefixedName() {
+        return delegate.prefixedName();
     }
 
     public String getPath() {
@@ -118,11 +128,18 @@ public class DecoratingLayerInfo extends AbstractDecorator<LayerInfo> implements
 
     public void setQueryable(boolean _queryableEnabled) {
         delegate.setQueryable(_queryableEnabled);
-
     }
 
     public boolean isQueryable() {
         return delegate.isQueryable();
+    }
+
+    public void setOpaque(boolean _opaqueEnabled) {
+        delegate.setOpaque(_opaqueEnabled);
+    }
+
+    public boolean isOpaque() {
+        return delegate.isOpaque();
     }
 
     @Override
@@ -143,5 +160,25 @@ public class DecoratingLayerInfo extends AbstractDecorator<LayerInfo> implements
     @Override
     public List<LayerIdentifierInfo> getIdentifiers() {
         return delegate.getIdentifiers();
+    }
+
+    @Override
+    public String getTitle() {
+        return delegate.getTitle();
+    }
+
+    @Override
+    public void setTitle(String title) {
+        delegate.setTitle(title);
+    }
+
+    @Override
+    public String getAbstract() {
+        return delegate.getAbstract();
+    }
+
+    @Override
+    public void setAbstract(String abstractTxt) {
+        delegate.setAbstract(abstractTxt);
     }
 }

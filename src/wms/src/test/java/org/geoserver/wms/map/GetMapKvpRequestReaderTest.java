@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.map;
@@ -10,7 +11,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,8 +23,11 @@ import org.geoserver.catalog.CatalogBuilder;
 import org.geoserver.catalog.CatalogFactory;
 import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
+import org.geoserver.config.GeoServerInfo;
+import org.geoserver.config.GeoServerLoader;
 import org.geoserver.data.test.MockData;
 import org.geoserver.ows.Dispatcher;
+import org.geoserver.ows.kvp.URLKvpParser;
 import org.geoserver.platform.ServiceException;
 import org.geoserver.test.RemoteOWSTestSupport;
 import org.geoserver.test.ows.KvpRequestReaderTestSupport;
@@ -33,6 +37,7 @@ import org.geoserver.wms.WMS;
 import org.geoserver.wms.kvp.PaletteManager;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.styling.Style;
+import org.geotools.util.DateRange;
 import org.opengis.filter.FilterFactory;
 import org.opengis.filter.Id;
 import org.opengis.filter.PropertyIsEqualTo;
@@ -63,6 +68,13 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         cb.calculateLayerGroupBounds(gi);
         getCatalog().add(gi);
     }
+    
+    @Override
+    protected void oneTimeTearDown() throws Exception {
+        super.oneTimeTearDown();
+        // reset the legacy flag so that other tests are not getting affected by it
+        GeoServerLoader.setLegacy(false);
+    }
 
     protected void setUpInternal() throws Exception {
         super.setUpInternal();
@@ -72,6 +84,44 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         reader = new GetMapKvpRequestReader(wms);
     }
 
+    public void testSldEntityResolver() throws Exception {
+        WMS wms = new WMS(getGeoServer());
+        GeoServerInfo geoserverInfo = wms.getGeoServer().getGlobal();
+        try {
+            // enable entities in external SLD files
+            geoserverInfo.setXmlExternalEntitiesEnabled(true);
+            getGeoServer().save(geoserverInfo);
+
+            // test setting has been saved
+            assertNotNull(wms.getGeoServer().getGlobal().isXmlExternalEntitiesEnabled());
+            assertTrue((Boolean) wms.getGeoServer().getGlobal().isXmlExternalEntitiesEnabled());
+            
+            // test no custom entity resolver will be used
+            GetMapKvpRequestReader reader = new GetMapKvpRequestReader(wms);
+            assertNull(reader.entityResolverProvider.getEntityResolver());
+
+            // disable entities
+            geoserverInfo.setXmlExternalEntitiesEnabled(false);
+            getGeoServer().save(geoserverInfo);
+
+            // since XML entities are disabled for external SLD files
+            // I need an entity resolver which enforce this
+            reader = new GetMapKvpRequestReader(wms);
+            assertNotNull(reader.entityResolverProvider.getEntityResolver());
+            
+            // try default value: entities should be disabled
+            geoserverInfo.setXmlExternalEntitiesEnabled(null);
+            getGeoServer().save(geoserverInfo);
+
+            reader = new GetMapKvpRequestReader(wms);
+            assertNotNull(reader.entityResolverProvider.getEntityResolver());            
+        } finally {
+            // reset to default
+            geoserverInfo.setXmlExternalEntitiesEnabled(null);
+            getGeoServer().save(geoserverInfo);
+        }
+    }
+    
     public void testCreateRequest() throws Exception {
         GetMapRequest request = (GetMapRequest) reader.createRequest();
         assertNotNull(request);
@@ -135,15 +185,15 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         assertEquals(new Point2D.Double(1.2, 3.4), request.getTilesOrigin());
         assertEquals(1, request.getBuffer());
 
-        assertEquals(PaletteManager.safePalette, request.getPalette().getIcm());
+        assertEquals(PaletteManager.safePalette, request.getPalette());
         assertEquals(Arrays.asList(4.0), request.getElevation());
 
-        Calendar cal = Calendar.getInstance();
-        cal.setTimeZone(TimeZone.getTimeZone("UTC"));
+        Calendar cal = new GregorianCalendar(TimeZone.getTimeZone("UTC"));
+        cal.clear();
         cal.set(2006, 1, 27, 22, 8, 12);
         List<Object> times = request.getTime();
         assertEquals(1, request.getTime().size());
-        assertEquals(cal.getTime().toString(), times.get(0).toString());
+        assertEquals(cal.getTime(), ((DateRange)times.get(0)).getMinValue());
     }
 
     public void testDefaultStyle() throws Exception {
@@ -217,7 +267,8 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         HashMap kvp = new HashMap();
         URL url = GetMapKvpRequestReader.class.getResource("BasicPolygonsLibraryNoDefault.sld");
         // the kvp should be already in decoded form
-        kvp.put("sld", URLDecoder.decode(url.toExternalForm(), "UTF-8"));
+        String decoded = URLDecoder.decode(url.toExternalForm(), "UTF-8");
+        kvp.put("sld", decoded);
         kvp.put("layers",
                 MockData.BASIC_POLYGONS.getPrefix() + ":" + MockData.BASIC_POLYGONS.getLocalPart());
 
@@ -226,7 +277,7 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         request = (GetMapRequest) reader.read(request, parseKvp(kvp), caseInsensitiveKvp(kvp));
 
         assertNotNull(request.getSld());
-        assertEquals(url, request.getSld());
+        assertEquals(URLKvpParser.fixURL(decoded), request.getSld().toExternalForm());
         final Style style = (Style) request.getStyles().get(0);
         assertNotNull(style);
         assertEquals("BasicPolygons", style.getName());
@@ -236,7 +287,8 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         // no style name, but the sld has a default for that layer
         HashMap kvp = new HashMap();
         URL url = GetMapKvpRequestReader.class.getResource("BasicPolygonsLibraryDefault.sld");
-        kvp.put("sld", URLDecoder.decode(url.toExternalForm(), "UTF-8"));
+        String decoded = URLDecoder.decode(url.toExternalForm(), "UTF-8");
+        kvp.put("sld", decoded);
         kvp.put("layers",
                 MockData.BASIC_POLYGONS.getPrefix() + ":" + MockData.BASIC_POLYGONS.getLocalPart());
 
@@ -244,7 +296,7 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         request = (GetMapRequest) reader.read(request, parseKvp(kvp), kvp);
 
         assertNotNull(request.getSld());
-        assertEquals(url, request.getSld());
+        assertEquals(URLKvpParser.fixURL(decoded), request.getSld().toExternalForm());
         final Style style = (Style) request.getStyles().get(0);
         assertNotNull(style);
         assertEquals("TheLibraryModeStyle", style.getName());
@@ -254,7 +306,8 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         // style name matching one in the sld
         HashMap kvp = new HashMap();
         URL url = GetMapKvpRequestReader.class.getResource("BasicPolygonsLibraryNoDefault.sld");
-        kvp.put("sld", URLDecoder.decode(url.toExternalForm(), "UTF-8"));
+        String decoded = URLDecoder.decode(url.toExternalForm(), "UTF-8");
+        kvp.put("sld", decoded);
         kvp.put("layers",
                 MockData.BASIC_POLYGONS.getPrefix() + ":" + MockData.BASIC_POLYGONS.getLocalPart());
         kvp.put("styles", "TheLibraryModeStyle");
@@ -263,7 +316,7 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         request = (GetMapRequest) reader.read(request, parseKvp(kvp), kvp);
 
         assertNotNull(request.getSld());
-        assertEquals(url, request.getSld());
+        assertEquals(URLKvpParser.fixURL(decoded), request.getSld().toExternalForm());
         final Style style = (Style) request.getStyles().get(0);
         assertNotNull(style);
         assertEquals("TheLibraryModeStyle", style.getName());
@@ -292,13 +345,14 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         // no styles, no layer, the full definition is in the sld
         HashMap kvp = new HashMap();
         URL url = GetMapKvpRequestReader.class.getResource("BasicPolygonsFeatureTypeConstaint.sld");
-        kvp.put("sld", URLDecoder.decode(url.toExternalForm(), "UTF-8"));
+        String decoded = URLDecoder.decode(url.toExternalForm(), "UTF-8");
+        kvp.put("sld", decoded);
 
         GetMapRequest request = (GetMapRequest) reader.createRequest();
         request = (GetMapRequest) reader.read(request, parseKvp(kvp), kvp);
 
         assertNotNull(request.getSld());
-        assertEquals(url, request.getSld());
+        assertEquals(URLKvpParser.fixURL(decoded), request.getSld().toExternalForm());
         // check the style
         final Style style = (Style) request.getStyles().get(0);
         assertNotNull(style);
@@ -318,7 +372,8 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         // no styles, no layer, the full definition is in the sld
         HashMap kvp = new HashMap();
         URL url = GetMapKvpRequestReader.class.getResource("BasicPolygonsFeatureTypeConstaint.sld");
-        kvp.put("sld", URLDecoder.decode(url.toExternalForm(), "UTF-8"));
+        String decoded = URLDecoder.decode(url.toExternalForm(), "UTF-8");
+        kvp.put("sld", decoded);
         kvp.put("layers",
                 MockData.BASIC_POLYGONS.getPrefix() + ":" + MockData.BASIC_POLYGONS.getLocalPart());
         kvp.put("styles", "TheLibraryModeStyle");
@@ -327,7 +382,7 @@ public class GetMapKvpRequestReaderTest extends KvpRequestReaderTestSupport {
         request = (GetMapRequest) reader.read(request, parseKvp(kvp), kvp);
 
         assertNotNull(request.getSld());
-        assertEquals(url, request.getSld());
+        assertEquals(URLKvpParser.fixURL(decoded), request.getSld().toExternalForm());
         // check the style
         final Style style = (Style) request.getStyles().get(0);
         assertNotNull(style);

@@ -1,5 +1,6 @@
-/* Copyright (c) 2010 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2014 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
@@ -13,7 +14,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -24,11 +24,12 @@ import javax.media.jai.RenderedImageList;
 
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.WMSLayerInfo;
+import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.platform.ServiceException;
 import org.geoserver.wms.map.MetatileMapOutputFormat;
 import org.geoserver.wms.map.RenderedImageMap;
 import org.geoserver.wms.map.RenderedImageMapOutputFormat;
-import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
+import org.geotools.coverage.grid.io.GridCoverage2DReader;
 import org.geotools.data.FeatureSource;
 import org.geotools.data.Query;
 import org.geotools.data.QueryCapabilities;
@@ -39,14 +40,12 @@ import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.factory.GeoTools;
 import org.geotools.factory.Hints;
 import org.geotools.filter.Filters;
-import org.geotools.filter.function.EnvFunction;
+import org.geotools.filter.visitor.SimplifyingFilterVisitor;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.map.FeatureLayer;
 import org.geotools.map.WMSLayer;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.geotools.renderer.lite.MetaBufferEstimator;
-import org.geotools.renderer.lite.RendererUtilities;
-import org.geotools.renderer.lite.StreamingRenderer;
 import org.geotools.styling.FeatureTypeConstraint;
 import org.geotools.styling.FeatureTypeStyle;
 import org.geotools.styling.Rule;
@@ -73,14 +72,22 @@ public class GetMap {
     private FilterFactory ff;
 
     private final WMS wms;
+    
+    private List<GetMapCallback> callbacks;
 
     public GetMap(final WMS wms) {
         this.wms = wms;
         this.ff = CommonFactoryFinder.getFilterFactory(GeoTools.getDefaultHints());
+        this.callbacks = GeoServerExtensions.extensions(GetMapCallback.class);
     }
 
     public void setFilterFactory(final FilterFactory filterFactory) {
         this.ff = filterFactory;
+    }
+    
+    public void setGetMapCallbacks(List<GetMapCallback> callbacks) {
+        this.callbacks.clear();
+        this.callbacks.addAll(callbacks);
     }
 
     /**
@@ -102,24 +109,64 @@ public class GetMap {
      * @throws ServiceException
      *             if an error occurs creating the map from the provided request
      */
-    public WebMap run(final GetMapRequest request) throws ServiceException {
+    public WebMap run(GetMapRequest request) throws ServiceException {
+        request = fireInitRequest(request);
         // JD/GR:hold a reference in order to release resources later. mapcontext can leak memory --
-        // we make sure we done (see
-        // finally block)
+        // we make sure we done (see finally block)
         WMSMapContent mapContent = new WMSMapContent(request);
+        mapContent.setGetMapCallbacks(callbacks);
         try {
-            return run(request, mapContent);
-        } catch (ServiceException e) {
-            mapContent.dispose();
-            throw e;
-        } catch (RuntimeException e) {
-            mapContent.dispose();
-            throw (RuntimeException) e;
-        } catch (Exception e) {
-            mapContent.dispose();
-            throw new ServiceException("Internal error ", e);
-        }
+            WebMap map = run(request, mapContent);
+            map = fireFinished(map);
+            return map;
+        } catch (Throwable t) {
+            fireFailed(t);
+            if(t instanceof RuntimeException) {
+                throw (RuntimeException) t;
+            } else if(t instanceof Error) {
+                throw (Error) t;
+            } else {
+                throw new ServiceException("Internal error ", t);
+            }
+        } 
     }
+
+    private GetMapRequest fireInitRequest(GetMapRequest request) {
+        for (GetMapCallback callback : callbacks) {
+            request = callback.initRequest(request);
+        }        
+        
+        return request;
+    }
+    
+    private void fireMapContentInit(WMSMapContent mapContent) {
+        for (GetMapCallback callback : callbacks) {
+            callback.initMapContent(mapContent);
+        }        
+    }
+    
+    private WMSMapContent fireBeforeRender(WMSMapContent mapContent) {
+        for (GetMapCallback callback : callbacks) {
+            mapContent = callback.beforeRender(mapContent);
+        }        
+        
+        return mapContent;
+    }
+    
+    private WebMap fireFinished(WebMap result) {
+        for (GetMapCallback callback : callbacks) {
+            result = callback.finished(result);
+        }        
+        
+        return result;
+    }
+    
+    private void fireFailed(Throwable t) {
+        for (GetMapCallback callback : callbacks) {
+            callback.failed(t);
+        }        
+    }
+
 
     /**
      * TODO: This method have become a 300+ lines monster, refactor it to private methods from which
@@ -134,12 +181,6 @@ public class GetMap {
 
         GetMapOutputFormat delegate = getDelegate(outputFormat);
 
-        // if there's a crs in the request, use that. If not, assume its 4326
-        final CoordinateReferenceSystem mapcrs = request.getCrs();
-
-        final List<MapLayerInfo> layers = request.getLayers();
-        final Style[] styles = request.getStyles().toArray(new Style[] {});
-        final Filter[] filters = buildLayersFilters(request.getFilter(), layers);
         final boolean isTiled = MetatileMapOutputFormat.isRequestTiled(request, delegate);
 
         //
@@ -178,7 +219,7 @@ public class GetMap {
         if(numTimes > 1 && isMultivaluedSupported) {
             WebMap map = null;
             List<RenderedImage> images = new ArrayList<RenderedImage>();
-            for (Object currentTime : times){
+            for (Object currentTime : times) {
                 map = executeInternal(mapContent, request, delegate, Arrays.asList(currentTime), elevations);
                 
                 // remove layers to start over again
@@ -244,7 +285,7 @@ public class GetMap {
         mapContent.setBgColor(request.getBgColor());
         mapContent.setTransparent(request.isTransparent());
         mapContent.setBuffer(request.getBuffer());
-        mapContent.setPaletteInverter(request.getPalette());
+        mapContent.setPalette(request.getPalette());
 
         // //
         //
@@ -265,6 +306,8 @@ public class GetMap {
         if (LOGGER.isLoggable(Level.FINE)) {
             LOGGER.fine("setting up map");
         }
+        
+        fireMapContentInit(mapContent);
 
         // track the external caching strategy for any map layers
         boolean cachingPossible = request.isGet();
@@ -281,7 +324,7 @@ public class GetMap {
             }
 
             final Style layerStyle = styles[i];
-            final Filter layerFilter = filters[i];
+            final Filter layerFilter = SimplifyingFilterVisitor.simplify(filters[i]);
 
             final org.geotools.map.Layer layer;
 
@@ -336,7 +379,8 @@ public class GetMap {
                     throw new ServiceException("Internal error", exp);
                 }
                 FeatureLayer featureLayer = new FeatureLayer(source, layerStyle);
-                featureLayer.setTitle(mapLayerInfo.getFeature().getPrefixedName());
+                featureLayer.setTitle(mapLayerInfo.getFeature().prefixedName());
+                featureLayer.getUserData().put("abstract", mapLayerInfo.getDescription());
                 
                 // mix the dimension related filter with the layer filter
                 Filter dimensionFilter = wms.getTimeElevationToFilter(times, elevations, mapLayerInfo.getFeature());
@@ -380,7 +424,7 @@ public class GetMap {
                 // Adding a coverage layer
                 //
                 // /////////////////////////////////////////////////////////
-                final AbstractGridCoverage2DReader reader = (AbstractGridCoverage2DReader) mapLayerInfo
+                final GridCoverage2DReader reader = (GridCoverage2DReader) mapLayerInfo
                         .getCoverageReader();
                 if (reader != null) {
 
@@ -395,7 +439,7 @@ public class GetMap {
                             throw new RuntimeException(e);
                         }
 
-                        layer.setTitle(mapLayerInfo.getCoverage().getPrefixedName());
+                        layer.setTitle(mapLayerInfo.getCoverage().prefixedName());
 
                         mapContent.addLayer(layer);
                     } catch (IllegalArgumentException e) {
@@ -435,7 +479,7 @@ public class GetMap {
                 }
                 if (!merged) {
                     WMSLayer Layer = new WMSLayer(wms, gt2Layer);
-                    Layer.setTitle(wmsLayer.getPrefixedName());
+                    Layer.setTitle(wmsLayer.prefixedName());
                     mapContent.addLayer(Layer);
                 }
             } else {
@@ -443,15 +487,7 @@ public class GetMap {
             }
         }
 
-        // setup the SLD variable substitution environment
-        Map envMap = new HashMap(request.getEnv());
-        envMap.put("wms_bbox", mapContent.getRenderingArea());
-        envMap.put("wms_crs", mapContent.getRenderingArea().getCoordinateReferenceSystem());
-        envMap.put("wms_srs", mapContent.getRequest().getSRS());
-        envMap.put("wms_width", mapContent.getMapWidth());
-        envMap.put("wms_height", mapContent.getMapHeight());
-        // they will be cleaned up by EnvVariableCleaner
-        EnvFunction.setLocalValues(envMap);
+        RenderingVariables.setupEnvironmentVariables(mapContent);
         
         // set the buffer value if the admin has set a specific value for some layers
         // in this map
@@ -464,6 +500,7 @@ public class GetMap {
         // Producing the map in the requested format.
         //
         // /////////////////////////////////////////////////////////
+        mapContent = fireBeforeRender(mapContent);
         WebMap map = delegate.produceMap(mapContent);
         
         if (cachingPossible) {
@@ -479,9 +516,7 @@ public class GetMap {
         return map;
     }
 
-    
-
-	/**
+    /**
      * Computes the rendering buffer in case the user did not specify one in the request, and the
      * admin setup some rendering buffer hints in the layer configurations
      * 
@@ -510,7 +545,7 @@ public class GetMap {
         }
 
         if (computeBuffer) {
-            final double scaleDenominator = getRequestScale(map);
+            final double scaleDenominator = map.getScaleDenominator(true);
             int buffer = 0;
 
             // either use the preset buffer, or if missing, compute one on the fly based
@@ -550,22 +585,6 @@ public class GetMap {
 
         // we get any estimate, it's better than nothing...
         return estimator.getBuffer();
-    }
-
-    /**
-     * Returns the rendering scale taking into account rotation and dpi
-     * 
-     * @param map
-     * @return
-     */
-    static double getRequestScale(WMSMapContent map) {
-        java.util.Map hints = new HashMap();
-        if (map.getRequest().getFormatOptions().get("dpi") != null) {
-            hints.put(StreamingRenderer.DPI_KEY, ((Integer) map.getRequest().getFormatOptions()
-                    .get("dpi")));
-        }
-        return RendererUtilities.calculateOGCScaleAffine(map.getCoordinateReferenceSystem(),
-                map.getRenderingTransform(), hints);
     }
 
     /**
@@ -629,6 +648,7 @@ public class GetMap {
      */
     private Filter[] buildLayersFilters(List<Filter> requestFilters, List<MapLayerInfo> layers) {
         final int nLayers = layers.size();
+
         if (requestFilters == null || requestFilters.size() == 0) {
             requestFilters = Collections.nCopies(layers.size(), (Filter) Filter.INCLUDE);
         } else if (requestFilters.size() != nLayers) {
@@ -684,7 +704,8 @@ public class GetMap {
      * 
      * @throws ServiceException
      *             if no specialization is configured for the output format specified in
-     *             <code>request</code> or if it can't be instantiated
+     *             <code>request</code> or if it can't be instantiated or the format is not
+     *             allowed
      */
     private GetMapOutputFormat getDelegate(final String outputFormat) throws ServiceException {
 
@@ -694,6 +715,9 @@ public class GetMap {
                     + outputFormat + " format", "InvalidFormat");
             e.setCode("InvalidFormat");
             throw e;
+        }
+        if (wms.isAllowedGetMapFormat(producer)==false) {
+            throw wms.unallowedGetMapFormatException(outputFormat);
         }
         return producer;
     }

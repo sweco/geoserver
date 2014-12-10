@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -27,5 +28,13 @@ public abstract class LayerGroupConfigurationPanel extends Panel {
 
     public LayerGroupInfo getLayerGroupInfo() {
         return (LayerGroupInfo) getDefaultModelObject();
+    }
+
+    /**
+     * Allows subclasses to override in case they need to save any other state than the
+     * {@link LayerGroupInfo} itself
+     */
+    public void save() {
+        // do nothing by default
     }
 }

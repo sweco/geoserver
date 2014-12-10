@@ -1,4 +1,11 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wfs.response;
+
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -6,7 +13,6 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import net.opengis.wfs.FeatureCollectionType;
 import net.opengis.wfs.GetFeatureType;
 import net.opengis.wfs.WfsFactory;
 
@@ -20,6 +26,7 @@ import org.geotools.data.memory.MemoryDataStore;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.junit.Test;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 
@@ -33,8 +40,9 @@ import com.vividsolutions.jts.geom.Point;
 
 public class CSVOutputFormatTest extends WFSTestSupport {
 
+	@Test
     public void testFullRequest() throws Exception {
-        MockHttpServletResponse resp = getAsServletResponse("wfs?version=1.1.0&request=GetFeature&typeName=sf:PrimitiveGeoFeature&outputFormat=csv");
+        MockHttpServletResponse resp = getAsServletResponse("wfs?version=1.1.0&request=GetFeature&typeName=sf:PrimitiveGeoFeature&outputFormat=csv","");
         
         FeatureSource fs = getFeatureSource(MockData.PRIMITIVEGEOFEATURE);
         
@@ -42,6 +50,9 @@ public class CSVOutputFormatTest extends WFSTestSupport {
         
         // check the mime type
         assertEquals("text/csv", resp.getContentType());
+        
+        // check the charset encoding
+        assertEquals("UTF-8", resp.getCharacterEncoding());
         
         // check the content disposition
         assertEquals("attachment; filename=PrimitiveGeoFeature.csv", resp.getHeader("Content-Disposition"));
@@ -58,6 +69,7 @@ public class CSVOutputFormatTest extends WFSTestSupport {
         }
     }
     
+	@Test
     public void testEscapes() throws Exception {
         // build some fake data in memory, the property data store cannot handle newlines in its data
         SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
@@ -69,10 +81,14 @@ public class CSVOutputFormatTest extends WFSTestSupport {
         GeometryFactory gf = new GeometryFactory();
         SimpleFeature f1 = SimpleFeatureBuilder.build(type, new Object[]{gf.createPoint(new Coordinate(5, 8)), "A label with \"quotes\""}, null);
         SimpleFeature f2 = SimpleFeatureBuilder.build(type, new Object[]{gf.createPoint(new Coordinate(5, 4)), "A long label\nwith newlines"}, null);
+        SimpleFeature f3 = SimpleFeatureBuilder.build(type,
+                new Object[] { gf.createPoint(new Coordinate(5, 4)),
+                        "A long label\r\nwith windows\r\nnewlines" }, null);
         
         MemoryDataStore data = new MemoryDataStore();
         data.addFeature(f1);
         data.addFeature(f2);
+        data.addFeature(f3);
         SimpleFeatureSource fs = data.getFeatureSource("funnyLabels");
         
         // build the request objects and feed the output format
@@ -101,6 +117,8 @@ public class CSVOutputFormatTest extends WFSTestSupport {
         // check we have the expected values in the string attributes
         assertEquals(f1.getAttribute("label"), lines.get(1)[2]);
         assertEquals(f2.getAttribute("label"), lines.get(2)[2]);
+        // the test CSVReader helpfully turns \r\n into \n for us.
+        assertEquals(((String) f3.getAttribute("label")).replace("\r\n", "\n"), lines.get(3)[2]);
     }
     
     /**

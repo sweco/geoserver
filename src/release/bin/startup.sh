@@ -61,9 +61,14 @@ if [ -z $GEOSERVER_DATA_DIR ]; then
     fi
 fi
 
+# if not told otherwise pump up the permgen
+if [ -z "$JAVA_OPTS" ]; then
+  export JAVA_OPTS="-XX:MaxPermSize=128m"
+fi 
+
 cd "$GEOSERVER_HOME"
 
 echo "GEOSERVER DATA DIR is $GEOSERVER_DATA_DIR"
 #added headless to true by default, if this messes anyone up let the list
 #know and we can change it back, but it seems like it won't hurt -ch
-exec "$_RUNJAVA" -DGEOSERVER_DATA_DIR="$GEOSERVER_DATA_DIR" -Djava.awt.headless=true -DSTOP.PORT=8079 -DSTOP.KEY=geoserver -jar start.jar 
+exec "$_RUNJAVA" $JAVA_OPTS -DGEOSERVER_DATA_DIR="$GEOSERVER_DATA_DIR" -Djava.awt.headless=true -DSTOP.PORT=8079 -DSTOP.KEY=geoserver -jar start.jar 

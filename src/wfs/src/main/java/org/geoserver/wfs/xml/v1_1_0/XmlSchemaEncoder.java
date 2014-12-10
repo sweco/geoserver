@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.xml.v1_1_0;
@@ -98,7 +99,6 @@ public class XmlSchemaEncoder extends WFSDescribeFeatureTypeOutputFormat {
     
     protected void doWrite(FeatureTypeInfo[] featureTypeInfos, OutputStream output,
             Operation describeFeatureType) throws IOException {
-        GeoServerInfo global = gs.getGlobal();
 
         //create the schema
         Object request = describeFeatureType.getParameters()[0];
@@ -108,7 +108,7 @@ public class XmlSchemaEncoder extends WFSDescribeFeatureTypeOutputFormat {
 
         //serialize
         schema.updateElement();
-        final String encoding = global.getCharset();
+        final String encoding = gs.getSettings().getCharset();
         XSDResourceImpl.serialize(output, schema.getElement(), encoding);
     }
     

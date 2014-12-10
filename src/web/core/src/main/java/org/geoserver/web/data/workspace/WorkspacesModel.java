@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -27,8 +28,11 @@ public class WorkspacesModel extends LoadableDetachableModel {
         return workspaces;
     }
     
-    class WorkspaceComparator implements Comparator<WorkspaceInfo> {
+    protected static class WorkspaceComparator implements Comparator<WorkspaceInfo> {
 
+        public WorkspaceComparator(){
+            //
+        }
         public int compare(WorkspaceInfo w1, WorkspaceInfo w2) {
             return w1.getName().compareToIgnoreCase(w2.getName());
         }

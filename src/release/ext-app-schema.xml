@@ -16,12 +16,14 @@
             <directory>release/target/dependency</directory>
             <outputDirectory></outputDirectory>
             <includes>
-                <!-- gt-app-schema and gt-app-schema-resolver jars-->
+                <!-- matches both gt-app-schema and gt-app-schema-resolver jars -->
                 <include>gt-app-schema-*.jar</include>
-                <include>xml-commons-resolver-*.jar</include>
-                <!-- required for complex feature WFS output (see GML3OutputFormat) -->
-                <include>xalan-*.jar</include>
+                <include>gt-complex-*.jar</include>
+                <include>commons-digester-*.jar</include>
             </includes>
+            <excludes>
+                <exclude>*-tests.jar</exclude>
+            </excludes>
         </fileSet>
         <fileSet>
             <directory>release/extensions</directory>

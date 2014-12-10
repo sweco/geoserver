@@ -1,13 +1,13 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wcs.response;
 
-import static org.geoserver.ows.util.ResponseUtils.appendQueryString;
-import static org.geoserver.ows.util.ResponseUtils.buildSchemaURL;
-import static org.geoserver.ows.util.ResponseUtils.buildURL;
+import static org.geoserver.ows.util.ResponseUtils.*;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -16,6 +16,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import net.opengis.wcs11.GetCapabilitiesType;
@@ -25,7 +26,8 @@ import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.catalog.MetadataLinkInfo;
 import org.geoserver.config.ContactInfo;
 import org.geoserver.config.GeoServer;
-import org.geoserver.config.GeoServerInfo;
+import org.geoserver.config.ResourceErrorHandling;
+import org.geoserver.config.SettingsInfo;
 import org.geoserver.ows.URLMangler.URLType;
 import org.geoserver.wcs.WCSInfo;
 import org.geotools.geometry.jts.ReferencedEnvelope;
@@ -48,7 +50,7 @@ import org.xml.sax.helpers.AttributesImpl;
  * @author Andrea Aime, TOPP
  */
 public class WCSCapsTransformer extends TransformerBase {
-    private static final Logger LOGGER = Logging.getLogger(WCSCapsTransformer.class.getPackage()
+    protected static final Logger LOGGER = Logging.getLogger(WCSCapsTransformer.class.getPackage()
             .getName());
 
     protected static final String WCS_URI = "http://www.opengis.net/wcs/1.1.1";
@@ -59,9 +61,11 @@ public class WCSCapsTransformer extends TransformerBase {
 
     protected static final String XSI_URI = "http://www.w3.org/2001/XMLSchema-instance";
 
-    private WCSInfo wcs;
+    protected WCSInfo wcs;
 
-    private Catalog catalog;
+    protected Catalog catalog;
+    
+    protected final boolean skipMisconfigured;
 
     /**
      * Creates a new WFSCapsTransformer object.
@@ -70,6 +74,8 @@ public class WCSCapsTransformer extends TransformerBase {
         super();
         this.wcs = gs.getService(WCSInfo.class);
         this.catalog = gs.getCatalog();
+        this.skipMisconfigured = ResourceErrorHandling.SKIP_MISCONFIGURED_LAYERS.equals(
+                gs.getGlobal().getResourceErrorHandling());
         setNamespaceDeclarationEnabled(false);
     }
 
@@ -77,14 +83,14 @@ public class WCSCapsTransformer extends TransformerBase {
         return new WCS111CapsTranslator(handler);
     }
 
-    private class WCS111CapsTranslator extends TranslatorSupport {
+    protected class WCS111CapsTranslator extends TranslatorSupport {
         /**
          * DOCUMENT ME!
          * 
          * @uml.property name="request"
          * @uml.associationEnd multiplicity="(0 1)"
          */
-        private GetCapabilitiesType request;
+        protected GetCapabilitiesType request;
 
         /**
          * Creates a new WFSCapsTranslator object.
@@ -148,7 +154,7 @@ public class WCSCapsTransformer extends TransformerBase {
             final String locationAtt = new StringBuffer(XSI_PREFIX).append(":schemaLocation")
                     .toString();
 
-            final String locationDef = buildSchemaURL(request.getBaseUrl(), "wcs/1.1.1/wcsGetCapabilities.xsd");
+            final String locationDef = WCS_URI + " " + buildSchemaURL(request.getBaseUrl(), "wcs/1.1.1/wcsGetCapabilities.xsd");
             
             attributes.addAttribute("", locationAtt, locationAtt, "", locationDef);
             attributes.addAttribute("", "updateSequence", "updateSequence", "", String
@@ -199,7 +205,7 @@ public class WCSCapsTransformer extends TransformerBase {
          * @throws SAXException
          *             For any errors.
          */
-        private void handleServiceIdentification() {
+        protected void handleServiceIdentification() {
             start("ows:ServiceIdentification");
             element("ows:Title", wcs.getTitle());
             element("ows:Abstract", wcs.getAbstract());
@@ -231,12 +237,13 @@ public class WCSCapsTransformer extends TransformerBase {
          * @throws SAXException
          *             For any errors.
          */
-        private void handleServiceProvider() {
+        protected void handleServiceProvider() {
             start("ows:ServiceProvider");
-            GeoServerInfo gs = wcs.getGeoServer().getGlobal();
-			element("ows:ProviderName", gs.getContact().getContactOrganization());
+            SettingsInfo settings = wcs.getGeoServer().getSettings();
+            element("ows:ProviderName", settings.getContact().getContactOrganization());
             AttributesImpl attributes = new AttributesImpl();
-            attributes.addAttribute("", "xlink:href", "xlink:href", "", gs.getOnlineResource() != null ? gs.getOnlineResource() : "");
+            attributes.addAttribute("", "xlink:href", "xlink:href", "", 
+                settings.getOnlineResource() != null ? settings.getOnlineResource() : "");
             element("ows:ProviderSite", null, attributes);
 
             handleContact();
@@ -254,7 +261,7 @@ public class WCSCapsTransformer extends TransformerBase {
          * @throws SAXException
          *             For any problems.
          */
-        private void handleOperationsMetadata() {
+        protected void handleOperationsMetadata() {
             start("ows:OperationsMetadata");
             handleOperation("GetCapabilities", null);
             handleOperation("DescribeCoverage", null);
@@ -277,7 +284,7 @@ public class WCSCapsTransformer extends TransformerBase {
             end("ows:OperationsMetadata");
         }
 
-        private void handleOperation(String capabilityName, Map<String, List<String>> parameters) {
+        protected void handleOperation(String capabilityName, Map<String, List<String>> parameters) {
             AttributesImpl attributes = new AttributesImpl();
             attributes.addAttribute(null, "name", "name", null, capabilityName);
             start("ows:Operation", attributes);
@@ -326,7 +333,7 @@ public class WCSCapsTransformer extends TransformerBase {
          * @throws SAXException
          *             DOCUMENT ME!
          */
-        private void handleKeywords(List kwords) {
+        protected void handleKeywords(List kwords) {
             if(kwords != null && kwords.size() > 0) {
                 start("ows:Keywords");
     
@@ -346,11 +353,11 @@ public class WCSCapsTransformer extends TransformerBase {
          * @param wcs
          *            the service.
          */
-        private void handleContact() {
+        protected void handleContact() {
             final GeoServer gs = wcs.getGeoServer();
             start("ows:ServiceContact");
 
-            ContactInfo contact = gs.getGlobal().getContact();
+            ContactInfo contact = gs.getSettings().getContact();
             elementIfNotEmpty("ows:IndividualName", contact.getContactPerson());
             elementIfNotEmpty("ows:PositionName", contact.getContactPosition());
 
@@ -368,7 +375,7 @@ public class WCSCapsTransformer extends TransformerBase {
             elementIfNotEmpty("ows:ElectronicMailAddress", contact.getContactEmail());
             end("ows:Address");
 
-            String or = gs.getGlobal().getOnlineResource();
+            String or = gs.getSettings().getOnlineResource();
             if ((or != null) && !"".equals(or.trim())) {
                 AttributesImpl attributes = new AttributesImpl();
                 attributes.addAttribute("", "xlink:href", "xlink:href", "", or);
@@ -380,7 +387,7 @@ public class WCSCapsTransformer extends TransformerBase {
             end("ows:ServiceContact");
         }
 
-        private void handleEnvelope(ReferencedEnvelope envelope) {
+        protected void handleEnvelope(ReferencedEnvelope envelope) {
             start("ows:WGS84BoundingBox");
             element("ows:LowerCorner", new StringBuffer(Double.toString(envelope.getLowerCorner()
                     .getOrdinate(0))).append(" ").append(envelope.getLowerCorner().getOrdinate(1))
@@ -391,18 +398,18 @@ public class WCSCapsTransformer extends TransformerBase {
             end("ows:WGS84BoundingBox");
         }
 
-        private void handleContents() {
+        protected void handleContents() {
             start("wcs:Contents");
 
-            List<CoverageInfo> coverages = wcs.getGeoServer().getCatalog().getCoverages();
+            List<CoverageInfo> coverages =
+                    new ArrayList<CoverageInfo>(wcs.getGeoServer().getCatalog().getCoverages());
             
             // filter out disabled coverages
-            for (Iterator it = coverages.iterator(); it.hasNext();) {
-                // GR: I don't think we should be removing directly from the list returned by
-                // Catalog?
+            for (Iterator<CoverageInfo> it = coverages.iterator(); it.hasNext();) {
                 CoverageInfo cv = (CoverageInfo) it.next();
-                if(!cv.enabled())
+                if (!cv.enabled()) {
                     it.remove();
+                }
             }
             
             // filter out coverages that are not in the requested namespace
@@ -418,14 +425,26 @@ public class WCSCapsTransformer extends TransformerBase {
             Collections.sort(coverages, new CoverageInfoLabelComparator());
             for (Iterator i = coverages.iterator(); i.hasNext();) {
                 CoverageInfo cv = (CoverageInfo) i.next();
-                if (cv.enabled())
+                try {
+                    mark();
                     handleCoverageSummary(cv);
+                    commit();
+                } catch (Exception e) {
+                    if (skipMisconfigured) {
+                        reset();
+                        LOGGER.log(Level.SEVERE, "Skipping coverage " + cv.getPrefixedName()
+                                + " as its capabilities generation failed", e);
+                    } else {
+                        throw new RuntimeException("Capabilities document generation failed on coverage "
+                                + cv.getPrefixedName(), e);
+                    }
+                }
             }
 
             end("wcs:Contents");
         }
 
-        private void handleCoverageSummary(CoverageInfo cv) {
+        protected void handleCoverageSummary(CoverageInfo cv) {
             start("wcs:CoverageSummary");
             elementIfNotEmpty("ows:Title", cv.getTitle());
             elementIfNotEmpty("ows:Abstract", cv.getDescription());
@@ -437,24 +456,38 @@ public class WCSCapsTransformer extends TransformerBase {
             end("wcs:CoverageSummary");
         }
 
-        private void handleMetadataLinks(List<MetadataLinkInfo> links, String linkType) {
-        	for (MetadataLinkInfo  mdl : links) {
-        		if (mdl != null) {
-                    AttributesImpl attributes = new AttributesImpl();
-
-                    if ((mdl.getAbout() != null) && (mdl.getAbout() != "")) {
-                        attributes.addAttribute("", "about", "about", "", mdl.getAbout());
-                    }
-
-                    if ((mdl.getMetadataType() != null) && (mdl.getMetadataType() != "")) {
-                        attributes.addAttribute("", "xlink:type", "xlink:type", "", linkType);
-                    }
-
-                    if (attributes.getLength() > 0) {
-                        element("ows:Metadata", null, attributes);
-                    }
+        /**
+         * Converts each metadata URL to XML.
+         * 
+         * @param links
+         *              a collection of links
+         * @param linkType
+         *              the type of links
+         */
+        protected void handleMetadataLinks(List<MetadataLinkInfo> links, String linkType) {
+            for (MetadataLinkInfo  mdl : links) {
+                if (mdl != null) {
+                    handleMetadataLink(mdl, linkType);
                 }
-			}
+            }
+        }
+
+        protected void handleMetadataLink(MetadataLinkInfo mdl, String linkType) {
+            AttributesImpl attributes = new AttributesImpl();
+
+            if ((mdl.getAbout() != null) && (mdl.getAbout() != "")) {
+                attributes.addAttribute("", "about", "about", "", mdl.getAbout());
+            }
+
+            if ((linkType != null) && (linkType != "")) {
+                attributes.addAttribute("", "xlink:type", "xlink:type", "", linkType);
+            }
+
+            if ((mdl.getContent() != null) && (mdl.getContent() != "")) {
+                attributes.addAttribute("", "xlink:href", "xlink:href", 
+                        "", mdl.getContent());
+                element("ows:Metadata", null, attributes);
+            }
         }
 
         /**
@@ -464,7 +497,7 @@ public class WCSCapsTransformer extends TransformerBase {
          * @param elementName
          * @param content
          */
-        private void elementIfNotEmpty(String elementName, String content) {
+        protected void elementIfNotEmpty(String elementName, String content) {
             if (content != null && !"".equals(content.trim()))
                 element(elementName, content);
         }

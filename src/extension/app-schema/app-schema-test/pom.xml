@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+ Copyright (C) 2014 - Open Source Geospatial Foundation. All rights reserved.
+ This code is licensed under the GPL 2.0 license, available at the root
+ application directory.
+ -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
@@ -6,22 +11,22 @@
 
 	<parent>
 		<groupId>org.geoserver.extension</groupId>
-		<artifactId>app-schema</artifactId>
-		<version>2.2-SNAPSHOT</version>
+		<artifactId>gs-app-schema</artifactId>
+		<version>2.7-SNAPSHOT</version>
 	</parent>
 
 	<groupId>org.geoserver.extension</groupId>
-	<artifactId>app-schema-test</artifactId>
+	<artifactId>gs-app-schema-test</artifactId>
 	<name>Application Schema Integration Test</name>
 
 	<dependencies>
 		<dependency>
 			<groupId>org.geoserver</groupId>
-			<artifactId>main</artifactId>
+			<artifactId>gs-main</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.geoserver</groupId>
-			<artifactId>main</artifactId>
+			<artifactId>gs-main</artifactId>
 			<classifier>tests</classifier>
 		</dependency>
 		<dependency>
@@ -30,30 +35,30 @@
 				compile but will not run.
 			-->
 			<groupId>org.geoserver</groupId>
-			<artifactId>wfs</artifactId>
+			<artifactId>gs-wfs</artifactId>
 		</dependency>
         <dependency>
             <!--
                 //NC - wms package required for wms support
             -->
             <groupId>org.geoserver</groupId>
-            <artifactId>wms</artifactId>
+            <artifactId>gs-wms</artifactId>
         </dependency>
         <dependency>
-            <!-- required for complex feature WFS output (see GML3OutputFormat) -->
-            <groupId>xalan</groupId>
-            <artifactId>xalan</artifactId>
+            <groupId>net.sf.opencsv</groupId>
+            <artifactId>opencsv</artifactId>
+            <version>1.8</version>
             <scope>test</scope>
-        </dependency>
+        </dependency>        
         <dependency>
             <groupId>org.geoserver</groupId>
-            <artifactId>restconfig</artifactId>
+            <artifactId>gs-restconfig</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.geoserver</groupId>
-            <artifactId>restconfig</artifactId>
+            <artifactId>gs-restconfig</artifactId>
             <version>${project.version}</version>
             <classifier>tests</classifier>
             <scope>test</scope>
@@ -131,7 +136,7 @@
 		<dependency>
 			<groupId>org.geotools.data</groupId>
 			<artifactId>refdataset-1.0</artifactId>
-			<version>1.0.5</version>				
+			<version>1.0.7</version>				
 			<scope>test</scope>
 		</dependency>
         <dependency>
@@ -142,43 +147,112 @@
         </dependency>
         <dependency>
             <groupId>org.geotools.schemas</groupId>
+            <artifactId>geosciml-3.2</artifactId>
+            <version>3.2.0-1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.geotools.schemas</groupId>
             <artifactId>wfs-2.0</artifactId>
             <version>2.0.0-2</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.geotools.schemas</groupId>
+            <artifactId>samplingSpecimen-2.0</artifactId>
+            <version>2.0.0-1</version>
+            <scope>test</scope>
+        </dependency>
 	</dependencies>
 
-	<build>
-
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-plugin</artifactId>
-				<configuration>
-					<excludes>
-						<exclude>**/DataReferenceWfsOracleTest.java</exclude>
-						<exclude>**/DataReferenceWfsPostgisTest.java</exclude>
-                                                <exclude>**/DataReferenceWfsOracleWithJoiningTest.java</exclude>
-                                                <exclude>**/DataReferenceWfsPostgisWithJoiningTest.java</exclude>
-						<exclude>**/WfsOnlineOracleTest.java</exclude>
-						<exclude>**/WfsOnlinePostgisTest.java</exclude>
-					</excludes>
-				</configuration>
-			</plugin>
-		</plugins>
-		<testResources>
-			<testResource>
-				<directory>src/test/resources</directory>
-				<includes>
-					<include>**/*.properties</include>
-					<include>**/*.xml</include>
-					<include>**/*.xsd</include>
-					<include>**/*.sql</include>
-                    <include>**/*.sld</include>
-				</includes>
-			</testResource>
-		</testResources>
-
-	</build>
-
+    <profiles>
+        <profile>
+        <!-- Include data ref set tests -->
+            <id>app-schema-online-test</id>
+            <build>
+                <plugins>
+			        <plugin>
+			            <groupId>org.apache.maven.plugins</groupId>
+			            <artifactId>maven-surefire-plugin</artifactId>
+			            <configuration>
+				            <excludes>
+                                <!-- To be run separately online in app-schema-oracle-test and app-schema-postgis-test -->				
+                                <exclude>**/SortByTest.java</exclude>
+                                <exclude>**/IdFunctionWfsWithJoiningTest.java</exclude>
+                                <exclude>**/XPathPredicateTest.java</exclude>
+                                <exclude>**/PagingTest.java</exclude>
+                                <exclude>${test.exclude.pattern}</exclude>
+					        </excludes>
+				        </configuration>
+			        </plugin>
+		        </plugins>
+		        <testResources>
+			        <testResource>
+				        <directory>src/test/resources</directory>
+				        <includes>
+					        <include>**/*.properties</include>
+					        <include>**/*.xml</include>
+					        <include>**/*.xsd</include>
+							<include>**/*.sql</include>
+							<include>**/*.sld</include>
+			   				<include>**/*.png</include>
+					    </includes>
+			        </testResource>
+		        </testResources>
+	        </build>
+	        <dependencies>
+                <dependency>
+                    <groupId>com.oracle</groupId>
+                    <artifactId>ojdbc14</artifactId> 
+                    <version>10.2.0.3.0</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+        <!-- Default profile, exclude online tests -->
+            <id>offline</id>
+            <activation><activeByDefault>true</activeByDefault></activation>
+	        <build>
+		        <plugins>
+			        <plugin>
+			            <groupId>org.apache.maven.plugins</groupId>
+			            <artifactId>maven-surefire-plugin</artifactId>
+			            <configuration>
+				            <excludes>
+						        <exclude>**/DataReferenceWfsOracleTest.java</exclude>
+						        <exclude>**/DataReferenceWfsPostgisTest.java</exclude>
+                                <exclude>**/DataReferenceWfsOracleWithJoiningTest.java</exclude>
+                                <exclude>**/DataReferenceWfsPostgisWithJoiningTest.java</exclude>
+						        <exclude>**/WfsOnlineOracleTest.java</exclude>
+						        <exclude>**/WfsOnlinePostgisTest.java</exclude>
+						        <exclude>**/DataReferenceWmsOracleTest.java</exclude>
+						        <exclude>**/DataReferenceWmsPostgisTest.java</exclude>
+                                <exclude>**/DataReferenceWmsOracleWithJoiningTest.java</exclude>
+                                <exclude>**/DataReferenceWmsPostgisWithJoiningTest.java</exclude>				
+                                <exclude>**/SortByTest.java</exclude>
+                                <exclude>**/PagingTest.java</exclude>
+                                <exclude>**/IdFunctionWfsWithJoiningTest.java</exclude>
+                                <exclude>**/XPathPredicateTest.java</exclude>
+                                <exclude>${test.exclude.pattern}</exclude>
+					        </excludes>
+					        <argLine>-Xmx${test.maxHeapSize} -XX:MaxPermSize=${test.maxPermSize} -enableassertions ${jvm.opts} -Djava.awt.headless=${java.awt.headless} -DquietTests=${quietTests} -Dorg.geotools.image.test.enabled=true</argLine>
+				        </configuration>
+			        </plugin>
+		        </plugins>
+		        <testResources>
+			        <testResource>
+				        <directory>src/test/resources</directory>
+				        <includes>
+					        <include>**/*.properties</include>
+					        <include>**/*.xml</include>
+					        <include>**/*.xsd</include>
+				    	    <include>**/*.sql</include>
+					    	<include>**/*.sld</include>
+					    	<include>**/*.png</include>
+				        </includes>
+			        </testResource>
+		        </testResources>
+	        </build>
+	    </profile>
+	</profiles>
 </project>

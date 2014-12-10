@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2011 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -17,7 +18,7 @@ import org.apache.wicket.model.IModel;
  * A DataStore parameter panel that presents a dropdown choice
  * 
  */
-public class DropDownChoiceParamPanel extends Panel {
+public class DropDownChoiceParamPanel extends Panel implements ParamPanel {
 
     private static final long serialVersionUID = 1L;
 

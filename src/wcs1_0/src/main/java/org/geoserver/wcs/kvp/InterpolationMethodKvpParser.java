@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -19,16 +20,20 @@ import org.vfny.geoserver.wcs.WcsException;
 public class InterpolationMethodKvpParser extends KvpParser {
 
     public InterpolationMethodKvpParser() {
-        super("interpolationMethod", InterpolationMethodType.class);
+        super("interpolation", InterpolationMethodType.class);
     }
 
     @Override
-    public Object parse(String value) throws Exception {
-        if (InterpolationMethodType.get(value) == null)
-            throw new WcsException("Could not find interpolationMethod '" + value + "'",
+    public Object parse(String interpolation) throws Exception {
+
+        if (interpolation.startsWith("nearest")) {
+            interpolation = "nearest neighbor";
+        }        
+        if (InterpolationMethodType.get(interpolation) == null)
+            throw new WcsException("Could not find interpolationMethod '" + interpolation + "'",
                     InvalidParameterValue, "interpolationMethod");
 
-        return InterpolationMethodType.get(value);
+        return InterpolationMethodType.get(interpolation);
     }
 
 }

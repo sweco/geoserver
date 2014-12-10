@@ -5,9 +5,9 @@ Installing the WPS extension
 
 The WPS module is not a part of GeoServer core, but instead must be installed as an extension.  To install WPS:
 
-#. Navigate to the `GeoServer download page <http://geoserver.org/display/GEOS/Download>`_
+#. Navigate to the `GeoServer download page <http://geoserver.org/download/>`_
 
-#. Find the page that matches the version of the running GeoServer.
+#. Find the page that matches the exact version of GeoServer you are running.
 
    .. warning::  Be sure to match the version of the extension with that of GeoServer, otherwise errors will occur.
 
@@ -23,3 +23,13 @@ After restarting, load the :ref:`web_admin`.  If the extension loaded properly, 
    :align: center
 
    *A link for the WPS capabilities document will display if installed properly*
+   
+Configuring WPS
+---------------
+
+WPS processes are subject to the same feature limit as the WFS service.
+The limit applies to process **input**, so even processes which summarize data
+and return few results will be affected if applied to very large datasets.
+The limit is set on the :ref:`webadmin_wfs` Admin page.
+
+.. warning::  If the limit is encountered during process execution, no error is given. Any results computed by the process may be incomplete

@@ -1,21 +1,28 @@
-/*
- * Copyright (c) 2011 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 
 package org.geoserver.test;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
 
-import org.apache.xml.serialize.OutputFormat;
-import org.apache.xml.serialize.XMLSerializer;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
 import org.custommonkey.xmlunit.SimpleNamespaceContext;
 import org.custommonkey.xmlunit.XMLUnit;
 import org.custommonkey.xmlunit.XpathEngine;
@@ -24,12 +31,17 @@ import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.NamespaceInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.catalog.rest.CatalogRESTTestSupport;
+import org.geoserver.data.test.SystemTestData;
 import org.geoserver.data.util.IOUtils;
+import org.geoserver.test.onlineTest.setup.AppSchemaTestOracleSetup;
+import org.geoserver.test.onlineTest.setup.AppSchemaTestPostgisSetup;
+import org.geoserver.test.onlineTest.support.AbstractReferenceDataSetup;
 import org.geoserver.wfs.WFSInfo;
 import org.geotools.data.complex.AppSchemaDataAccessRegistry;
 import org.geotools.data.complex.DataAccessRegistry;
-import org.geotools.xml.AppSchemaCache;
 import org.geotools.xml.AppSchemaXSDRegistry;
+import org.geotools.xml.resolver.SchemaCache;
+import org.junit.Test;
 import org.w3c.dom.Document;
 
 import com.mockrunner.mock.web.MockHttpServletResponse;
@@ -43,32 +55,24 @@ import com.mockrunner.mock.web.MockHttpServletResponse;
 public class RestconfigWfsTest extends CatalogRESTTestSupport {
 
     @Override
-    protected void oneTimeSetUp() throws Exception {
-        super.oneTimeSetUp();
+    protected void onSetUp(org.geoserver.data.test.SystemTestData testData) throws Exception {
+        super.onSetUp(testData);
         WFSInfo wfs = getGeoServer().getService(WFSInfo.class);
         wfs.setCanonicalSchemaLocation(true);
         wfs.setEncodeFeatureMember(true);
         getGeoServer().save(wfs);
         // disable schema caching in tests, as schemas are expected to provided on the classpath
-        AppSchemaCache.disableGeoserverSupport();
+        SchemaCache.disableAutomaticConfiguration();
     }
 
-    @SuppressWarnings("deprecation")
+    
     @Override
-    protected void oneTimeTearDown() throws Exception {
-        super.oneTimeTearDown();
+    @SuppressWarnings("deprecated")
+    protected void onTearDown(SystemTestData testData) throws Exception {
+        super.onTearDown(testData);
         DataAccessRegistry.unregisterAll();
         AppSchemaDataAccessRegistry.clearAppSchemaProperties();
         AppSchemaXSDRegistry.getInstance().dispose();
-    }
-
-    /**
-     * Enable data directory upgrade to enable manual verification of references between objects in
-     * the serialised form.
-     */
-    @Override
-    protected boolean useLegacyDataDirectory() {
-        return false;
     }
 
     private static final String WORKSPACE = "<workspace>" //
@@ -122,6 +126,13 @@ public class RestconfigWfsTest extends CatalogRESTTestSupport {
             + "<numDecimals>0</numDecimals>" //
             + "</featureType>";
 
+    public static final String DS_PARAMETERS = "<parameters>" //
+            + "<Parameter>" //
+            + "<name>directory</name>" //
+            + "<value>file:./</value>" //
+            + "</Parameter>" //
+            + "</parameters>"; //
+    
     public static final String MAPPING = "<as:AppSchemaDataAccess xmlns:as='http://www.geotools.org/app-schema'>" //
             + "<namespaces>" //
             + "<Namespace>" //
@@ -132,12 +143,7 @@ public class RestconfigWfsTest extends CatalogRESTTestSupport {
             + "<sourceDataStores>" //
             + "<DataStore>" //
             + "<id>datastore</id>" //
-            + "<parameters>" //
-            + "<Parameter>" //
-            + "<name>directory</name>" //
-            + "<value>file:./</value>" //
-            + "</Parameter>" //
-            + "</parameters>" //
+            + DS_PARAMETERS
             + "</DataStore>" //
             + "</sourceDataStores>" //
             + "<targetTypes>" //
@@ -148,7 +154,7 @@ public class RestconfigWfsTest extends CatalogRESTTestSupport {
             + "<typeMappings>" //
             + "<FeatureTypeMapping>" //
             + "<sourceDataStore>datastore</sourceDataStore>" //
-            + "<sourceType>MappedFeature</sourceType>" //
+            + "<sourceType>MAPPEDFEATURE</sourceType>" //
             + "<targetElement>gsml:MappedFeature</targetElement>" //
             + "<attributeMappings>" //
             + "<AttributeMapping>" //
@@ -170,6 +176,7 @@ public class RestconfigWfsTest extends CatalogRESTTestSupport {
      * Test that REST can be used to configure an app-schema datastore and that this datastore can
      * be used to service a WFS request.
      */
+    @Test
     public void testRestconfig() throws Exception {
         MockHttpServletResponse response;
         // create workspace
@@ -212,10 +219,34 @@ public class RestconfigWfsTest extends CatalogRESTTestSupport {
         File dir = new File(new File(new File(getTestData().getDataDirectoryRoot(), "workspaces"),
                 "gsml"), "MappedFeature");
         dir.mkdirs();
-        IOUtils.copy(new ByteArrayInputStream(MAPPING.getBytes("UTF-8")), new File(dir,
+        File propertiesFile = new File(dir, "MAPPEDFEATURE.properties");
+        IOUtils.copy(new ByteArrayInputStream(PROPERTIES.getBytes("UTF-8")), propertiesFile);
+        
+        String mapping = MAPPING;
+        String onlineTestId = System.getProperty("testDatabase");
+        if (onlineTestId != null) {
+            // if test if running in online mode, need to use db params
+            onlineTestId = onlineTestId.trim().toLowerCase();
+            Map<String, File> propertyFiles = new HashMap<String, File>();
+            propertyFiles.put(propertiesFile.getName(), dir);
+            AbstractReferenceDataSetup setup;
+            if (onlineTestId.equals("oracle")) {
+                // oracle
+                mapping = mapping.replaceAll(DS_PARAMETERS, Matcher
+                        .quoteReplacement(AppSchemaTestOracleSetup.DB_PARAMS));
+                setup = AppSchemaTestOracleSetup.getInstance(propertyFiles);
+            } else {
+                // postgis
+                mapping = mapping.replaceAll(DS_PARAMETERS, Matcher
+                        .quoteReplacement(AppSchemaTestPostgisSetup.DB_PARAMS));
+                setup = AppSchemaTestPostgisSetup.getInstance(propertyFiles);
+            }
+            // Run the sql script to create the tables from properties files
+            setup.setUp();
+            setup.tearDown();
+        }
+        IOUtils.copy(new ByteArrayInputStream(mapping.getBytes("UTF-8")), new File(dir,
                 "MappedFeature.xml"));
-        IOUtils.copy(new ByteArrayInputStream(PROPERTIES.getBytes("UTF-8")), new File(dir,
-                "MappedFeature.properties"));
     }
 
     /**
@@ -240,15 +271,11 @@ public class RestconfigWfsTest extends CatalogRESTTestSupport {
      *            stream to which output is written
      */
     private void prettyPrint(Document document, OutputStream output) {
-        OutputFormat format = new OutputFormat(document);
-        // setIndenting must be first as it resets indent and line width
-        format.setIndenting(true);
-        format.setIndent(4);
-        format.setLineWidth(200);
-        XMLSerializer serializer = new XMLSerializer(output, format);
         try {
-            serializer.serialize(document);
-        } catch (IOException e) {
+            Transformer tx = TransformerFactory.newInstance().newTransformer();
+            tx.setOutputProperty(OutputKeys.INDENT, "yes");
+            tx.transform(new DOMSource(document), new StreamResult(output));
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }

@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2010 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -174,7 +175,7 @@ class FTPConfigLoader {
                 @Override
                 public void endNode() {
                     indentLevel--;
-                    System.err.println("indentLevel: " + indentLevel);
+                    //System.err.println("indentLevel: " + indentLevel);
                     if (indentLevel == 0) {
                         XMLStreamWriter xmlStreamWriter = super.getXMLStreamWriter();
                         try {

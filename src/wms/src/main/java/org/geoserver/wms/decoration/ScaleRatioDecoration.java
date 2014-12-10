@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.decoration;
@@ -12,17 +13,12 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.Stroke;
 import java.awt.geom.Rectangle2D;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import org.geoserver.wms.WMSMapContent;
-import org.geotools.renderer.lite.RendererUtilities;
+
 
 public class ScaleRatioDecoration implements MapDecoration {
-    /** A logger for this class. */
-    private static final Logger LOGGER = 
-        org.geotools.util.logging.Logging.getLogger("org.geoserver.wms.responses");
 
     public void loadOptions(Map<String, String> options) {
     }
@@ -32,17 +28,14 @@ public class ScaleRatioDecoration implements MapDecoration {
         return new Dimension(metrics.stringWidth(getScaleText(mapContent)), metrics.getHeight());
     }
 
-    public String getScaleText(WMSMapContent mapContent) {
-        return String.format(
-            "1 : %0$1.0f", 
-            RendererUtilities.calculateOGCScale(
-                mapContent.getRenderingArea(),
-                mapContent.getRequest().getWidth(),
-                new HashMap()
-            )
-        );
+    public double getScale(WMSMapContent mapContent) {
+        return mapContent.getScaleDenominator(true);
     }
 
+    public String getScaleText(WMSMapContent mapContent) {
+        return String.format("1 : %0$1.0f", getScale(mapContent));
+    }
+    
     public void paint(Graphics2D g2d, Rectangle paintArea, WMSMapContent mapContent) 
     throws Exception {
         FontMetrics metrics = g2d.getFontMetrics(g2d.getFont());

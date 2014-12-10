@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wcs.kvp;
@@ -33,10 +34,6 @@ public class Wcs10DescribeCoverageKvpRequestReader extends EMFKvpRequestReader {
         request = super.read(request, kvp, rawKvp);
 
         DescribeCoverageType describeCoverage = (DescribeCoverageType) request;
-        if (describeCoverage.getCoverage() == null || describeCoverage.getCoverage().size() == 0) {
-            throw new WcsException("Required paramer, coverage, missing",
-                    WcsExceptionCode.MissingParameterValue, "coverage");
-        }
         // if not specified, throw a resounding exception (by spec)
         if (!describeCoverage.isSetVersion())
             throw new WcsException("Version has not been specified",

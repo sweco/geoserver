@@ -38,12 +38,15 @@
             <targetElement>gsml:CGI_PlanarOrientation</targetElement>
             <attributeMappings>
                 <AttributeMapping>
-                    <targetAttribute>gsml:CGI_PlanarOrientation</targetAttribute>
+                    <targetAttribute>gsml:CGI_PlanarOrientation</targetAttribute>                    
+					<idExpression>
+                        <OCQL>ID</OCQL>
+                    </idExpression>
                 </AttributeMapping>
                 <AttributeMapping>
                     <targetAttribute>FEATURE_LINK</targetAttribute>
                     <sourceExpression>
-                        <OCQL>strTrim(getId())</OCQL>
+                        <OCQL>ID</OCQL>
                     </sourceExpression>
                 </AttributeMapping>
                 <AttributeMapping>

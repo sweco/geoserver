@@ -1,9 +1,11 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.config;
 
+import java.io.Serializable;
 import java.util.concurrent.ThreadPoolExecutor;
 
 
@@ -13,7 +15,7 @@ import java.util.concurrent.ThreadPoolExecutor;
  * @author Daniele Romagnoli, GeoSolutions
  *
  */
-public interface CoverageAccessInfo {
+public interface CoverageAccessInfo extends Cloneable, Serializable{
 
     public enum QueueType {
         UNBOUNDED, DIRECT
@@ -60,5 +62,5 @@ public interface CoverageAccessInfo {
     void setImageIOCacheThreshold(long threshold);
     long getImageIOCacheThreshold();
     
-    
+    public CoverageAccessInfo clone();
 }

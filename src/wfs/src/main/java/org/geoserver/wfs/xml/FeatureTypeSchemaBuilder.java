@@ -1,11 +1,11 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.xml;
 
-import static org.geoserver.ows.util.ResponseUtils.buildURL;
-import static org.geoserver.ows.util.ResponseUtils.params;
+import static org.geoserver.ows.util.ResponseUtils.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -77,14 +77,16 @@ public abstract class FeatureTypeSchemaBuilder {
     /** logging instance */
     static Logger logger = org.geotools.util.logging.Logging.getLogger("org.geoserver.wfs");
 
-    /** wfs configuration */
-    WFSInfo wfs;
-
     /** the catalog */
     Catalog catalog;
 
     /** resource loader */
     GeoServerResourceLoader resourceLoader;
+    
+    /**
+     * Access to service configuration
+     */
+    GeoServer gs;
 
     /**
      * profiles used for type mapping.
@@ -104,7 +106,7 @@ public abstract class FeatureTypeSchemaBuilder {
     protected volatile XSDElementDeclaration featureSubGroupElement;
 
     protected FeatureTypeSchemaBuilder(GeoServer gs) {
-        this.wfs = gs.getService( WFSInfo.class );
+        this.gs = gs;
         this.catalog = gs.getCatalog();
         this.resourceLoader = gs.getCatalog().getResourceLoader();
 
@@ -177,9 +179,14 @@ public abstract class FeatureTypeSchemaBuilder {
         }
         
         if (baseUrl == null)
-            baseUrl = wfs.getSchemaBaseURL(); 
+            baseUrl = gs.getService(WFSInfo.class).getSchemaBaseURL(); 
                 
-        if (ns2featureTypeInfos.entrySet().size() == 1) {
+        if (ns2featureTypeInfos.entrySet().size() == 0) {
+            // for WFS 2.0 encoding to work we need to have at least a dependency on GML and
+            // a target namespace. We are going to use the GML one.
+            importGMLSchema(schema, factory, baseUrl);
+            schema.setTargetNamespace(gmlSchema().getTargetNamespace());
+        } else if (ns2featureTypeInfos.entrySet().size() == 1) {
             // only 1 namespace, write target namespace out
             String targetPrefix = (String) ns2featureTypeInfos.keySet().iterator().next();
             String targetNamespace = catalog.getNamespaceByPrefix(targetPrefix).getURI();
@@ -242,7 +249,12 @@ public abstract class FeatureTypeSchemaBuilder {
             
             //set the first namespace as the target one
             NamespaceInfo ns = featureTypeInfos[0].getNamespace();
-            schema.setTargetNamespace(ns.getURI());
+
+            //hack for wfs 1.0, the cite tests mandate that in the case of a heterogeneous schema
+            // no target namespace be declared, this conflicts with wfs 2.0
+            if (!(this instanceof GML2)) {
+                schema.setTargetNamespace(ns.getURI());  
+            }
             
             // map of namespace to schemaLocation used to prevent duplicate imports
             Map<String, String> imports = new HashMap<String, String>();
@@ -443,7 +455,7 @@ public abstract class FeatureTypeSchemaBuilder {
             String schemaLocation) {
         XSDImport xsdImport = factory.createXSDImport();
         xsdImport.setNamespace(namespace);
-        xsdImport.setSchemaLocation((String) schemaLocation);
+        xsdImport.setSchemaLocation(schemaLocation);
         schema.getContents().add(xsdImport);
     }
 
@@ -489,7 +501,7 @@ public abstract class FeatureTypeSchemaBuilder {
             }
             
             // add secondary namespaces from catalog
-            for (Map.Entry<String, String> entry : (Set<Map.Entry<String, String>>) schema.getQNamePrefixToNamespaceMap()
+            for (Map.Entry<String, String> entry : schema.getQNamePrefixToNamespaceMap()
                     .entrySet()) {
                 if (!wfsSchema.getQNamePrefixToNamespaceMap().containsKey(entry.getKey())) {
                     wfsSchema.getQNamePrefixToNamespaceMap().put(entry.getKey(), entry.getValue());
@@ -656,8 +668,11 @@ public abstract class FeatureTypeSchemaBuilder {
             throws IOException {
         if (!findTypeInSchema(featureTypeMeta, schema, factory)) {
             // build the type manually
-            XSDComplexTypeDefinition xsdComplexType = buildComplexSchemaContent(featureTypeMeta
-                    .getFeatureType(), schema, factory);
+            FeatureType featureType = featureTypeMeta.getFeatureType();
+            if(featureTypeMeta.isCircularArcPresent() && this.getClass().equals(GML3.class)) {
+                featureType = new CurveTypeWrapper(featureType);
+            }
+			XSDComplexTypeDefinition xsdComplexType = buildComplexSchemaContent(featureType, schema, factory);
 
             XSDElementDeclaration element = factory.createXSDElementDeclaration();
             element.setName(featureTypeMeta.getName());
@@ -674,7 +689,8 @@ public abstract class FeatureTypeSchemaBuilder {
         }
     }
 
-    /**
+
+	/**
      * Construct an XSD type definition for a ComplexType. 
      * 
      * <p>
@@ -703,7 +719,7 @@ public abstract class FeatureTypeSchemaBuilder {
                 AttributeDescriptor attribute = (AttributeDescriptor) pd;
 
                 if ( filterAttributeType( attribute ) ) {
-                    GMLInfo gml = getGMLConfig(wfs);
+                    GMLInfo gml = getGMLConfig(gs.getService(WFSInfo.class));
                     if (gml == null || !gml.getOverrideGMLAttributes()) {
                         continue;
                     }
@@ -766,7 +782,7 @@ public abstract class FeatureTypeSchemaBuilder {
 
     XSDTypeDefinition resolveTypeInSchema(XSDSchema schema, Name typeName) {
         XSDTypeDefinition type = null;
-        for (XSDTypeDefinition td : ((List<XSDTypeDefinition>)schema.getTypeDefinitions())) {
+        for (XSDTypeDefinition td : (schema.getTypeDefinitions())) {
             if (typeName.getNamespaceURI().equals(td.getTargetNamespace()) 
                 && typeName.getLocalPart().equals(td.getName())) {
                 type = td;

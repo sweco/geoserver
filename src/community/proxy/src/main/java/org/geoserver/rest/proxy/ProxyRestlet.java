@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.rest.proxy;
 
 import java.io.IOException;
@@ -9,6 +14,9 @@ import java.net.URL;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.geoserver.platform.GeoServerExtensions;
+import org.geoserver.platform.GeoServerResourceLoader;
+import org.geoserver.platform.resource.Resource;
 import org.geoserver.proxy.ProxyConfig;
 import org.geoserver.proxy.ProxyConfig.Mode;
 import org.geoserver.rest.RestletException;
@@ -61,7 +69,10 @@ public class ProxyRestlet extends Restlet {
     private void init()
     {
         try{
-            configWatcher = new PropertyFileWatcher(ProxyConfig.getConfigFile());
+            GeoServerResourceLoader loader = GeoServerExtensions.bean(GeoServerResourceLoader.class);
+            Resource configFile = loader.get( "proxy/proxy.xml" );
+            
+            configWatcher = new PropertyFileWatcher(configFile);
             watcherWorks = true;
             LOGGER.log(Level.INFO, "Proxy init'd pretty much ok.");
         }
@@ -88,30 +99,40 @@ public class ProxyRestlet extends Restlet {
         /* The first argument should be the request for a URL to grab by proxy */
         String url = f.getFirstValue("url");
         try {
+            Boolean isPutOrPost = request.getMethod().equals(Method.PUT)
+                    || request.getMethod().equals(Method.POST);
+
             /*Construct the connection to the server*/
             URL resolved = new URL(url);
-            final HttpURLConnection connection = (HttpURLConnection) resolved.openConnection();;
-            
-            /*Set appropriately whether the connection does output.*/
-            if (request.getMethod().equals(Method.PUT)
-                    || request.getMethod().equals(Method.POST)) {
+            final HttpURLConnection connection = (HttpURLConnection) resolved.openConnection();
+
+            if (isPutOrPost) {
+                /*Set appropriately whether the connection does output.*/
                 connection.setDoOutput(true);
+                connection.setChunkedStreamingMode(4096);
             }
             
             //connection 
             connection.setRequestMethod(request.getMethod().toString());
 
-            /*Check if this request is permitted to be forwarded*/
+            if (isPutOrPost) {
+                String contentType = request.getEntity().getMediaType().toString();
+
+                /*Check if this request is permitted to be forwarded*/
+                if (checkPermission(resolved, contentType) != true) {
+                    throw new RestletException("Nonpermitted hostname or request body with nonpermitted content type",
+                            Status.CLIENT_ERROR_BAD_REQUEST);
+                }
+
+                /*Appropriately forward the message*/
+                connection.addRequestProperty("Content-Type", contentType);
+                copyStream(request.getEntity().getStream(), connection.getOutputStream());
+            }
+
+            /*Check if this response is permitted to be forwarded*/
             if (checkPermission(resolved, connection.getContentType()) != true) {
                 throw new RestletException("Request for nonpermitted content type or hostname",
                         Status.CLIENT_ERROR_BAD_REQUEST);
-            }
-                
-            /*Appropriately forward the message*/
-            if (request.getMethod().equals(Method.PUT)
-                    || request.getMethod().equals(Method.POST)) {
-                //connection.setDoOutput(true);
-                copyStream(request.getEntity().getStream(), connection.getOutputStream());
             }
                 
             response.setEntity(new StreamRepresentation(new MediaType(connection

@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2010 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -48,12 +49,16 @@ public class CoverageAccessInitializer implements GeoServerInitializer, Extensio
             public void handleGlobalChange(GeoServerInfo global,
                     List<String> propertyNames, List<Object> oldValues,
                     List<Object> newValues) {
-                initCoverage(global.getCoverageAccess());
+                if (propertyNames.contains("coverageAccess")) {
+                    // Make sure to proceed with coverageAccess init
+                    // only in case the global change involved that section
+                    initCoverage(global.getCoverageAccess());
+                }
             }
             
             @Override
             public void handlePostGlobalChange(GeoServerInfo global) {
-                initCoverage(global.getCoverageAccess());
+                // No need to handle that change too
             }
         });
     }

@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wfs.request;
 
 import java.util.Arrays;
@@ -37,7 +42,11 @@ public abstract class GetCapabilitiesRequest extends RequestObject {
     public List<String> getAcceptVersions() {
         return eGet(adaptee, "acceptVersions.version", List.class);
     }
-    
+
+    public List<String> getAcceptFormats() {
+        return eGet(adaptee, "acceptFormats.outputFormat", List.class);
+    }
+
     public void setAcceptVersions(String... versions) {
         Object acceptedVersions = createAcceptedVersions();
         eAdd(acceptedVersions, "version", Arrays.asList(versions));

@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -23,9 +24,19 @@ public class PreviewLayerProvider extends GeoServerDataProvider<PreviewLayer> {
     public static final Property<PreviewLayer> TYPE = new BeanProperty<PreviewLayer>(
             "type", "type");
 
-    public static final Property<PreviewLayer> NAME = new BeanProperty<PreviewLayer>(
-            "name", "name");
-    
+    public static final AbstractProperty<PreviewLayer> NAME = new AbstractProperty<PreviewLayer>("name") {
+        @Override
+        public Object getPropertyValue(PreviewLayer item) {
+            if (item.layerInfo != null) {
+                return item.layerInfo.prefixedName();
+            }
+            if (item.groupInfo != null) {
+                return item.groupInfo.prefixedName();
+            }
+            return null;
+        }
+    };
+
     public static final Property<PreviewLayer> TITLE = new BeanProperty<PreviewLayer>(
             "title", "title");
     
@@ -58,14 +69,16 @@ public class PreviewLayerProvider extends GeoServerDataProvider<PreviewLayer> {
 
         final List<LayerGroupInfo> layerGroups = getCatalog().getLayerGroups();
         for (LayerGroupInfo group :layerGroups ) {
-            boolean enabled = true;
-            layers = group.getLayers();
-            for (LayerInfo layer :layers ) {
-                // ask for enabled() instead of isEnabled() to account for disabled resource/store
-                enabled &= layer.enabled();
+            if (!LayerGroupInfo.Mode.CONTAINER.equals(group.getMode())) {            
+                boolean enabled = true;
+                for (LayerInfo layer : group.layers()) {
+                    // ask for enabled() instead of isEnabled() to account for disabled resource/store
+                    enabled &= layer.enabled();
+                }
+                
+                if (enabled && group.layers().size() > 0)
+                    result.add(new PreviewLayer(group));
             }
-            if (enabled)
-                result.add(new PreviewLayer(group));
         }
 
         return result;

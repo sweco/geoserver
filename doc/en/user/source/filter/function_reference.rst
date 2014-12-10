@@ -3,12 +3,16 @@
 Filter Function Reference
 ==========================
 
-This page contains a reference to filter functions that can be used in WFS filtering or in SLD expressions.
-If a function reported by the WFS capabilities is not available in this list it might either mean that the
-function cannot actually be used for the above purposes, or that it's new and has not been documented still.
-Ask for details on the user mailing list.
+This reference describes all filter functions that can be used in WFS/WMS filtering or in SLD expressions.
 
-Unless otherwise specified none of the filter functions in this references is understood natively by the data stores, and as a result all expressions using them will be evaluated in memory.
+The list of functions available on a Geoserver instance can be determined by 
+browsing to http://localhost:8080/geoserver/wfs?request=GetCapabilities 
+and searching for ``ogc:FunctionNames`` in the returned XML.  
+If a function is described in the Capabilities document but is not in this reference, 
+then it might mean that the function cannot be used for filtering, 
+or that it is new and has not been documented.  Ask for details on the user mailing list.
+
+Unless otherwise specified, none of the filter functions in this reference are understood natively by the data stores, and thus expressions using them will be evaluated in-memory.
 
 Function argument type reference
 ---------------------------------
@@ -19,21 +23,23 @@ Function argument type reference
    * - **Type**
      - **Description**
    * - Double
-     - Floating point number, 8 bytes, IEEE 754. ranging from 4.94065645841246544e-324d to 1.79769313486231570e+308d
+     - Floating point number, 8 bytes, IEEE 754. Ranges from 4.94065645841246544e-324d to 1.79769313486231570e+308d
    * - Float
-     - Floating point number, 4 bytes, IEEE 754. ranging from 1.40129846432481707e-45 to 3.40282346638528860e+38. Smaller range and less accurate than Double.
+     - Floating point number, 4 bytes, IEEE 754. Ranges from 1.40129846432481707e-45 to 3.40282346638528860e+38. Smaller range and less accurate than Double.
    * - Integer
      - Integer number, ranging from -2,147,483,648 to 2,147,483,647
    * - Long
      - Integer number, ranging from -9,223,372,036,854,775,808 to +9,223,372,036,854,775,807
    * - Number
-     - Can be any type of number
+     - A numeric value of any type
+   * - Object
+     - A value of any type
    * - String
      - A sequence of characters
    * - Timestamp
      - Date and time information
      
-Comparison and control Functions
+Comparison functions
 --------------------------------
 
 .. list-table::
@@ -44,7 +50,7 @@ Comparison and control Functions
      - **Arguments**
      - **Description**
    * - between
-     - ``num``:Number, ``low``:Number,``high``:Number
+     - ``num``:Number, ``low``:Number, ``high``:Number
      - returns true if ``low`` <= ``num`` <= ``high``
    * - equalTo
      - ``a``:Object, ``b``:Object
@@ -55,12 +61,10 @@ Comparison and control Functions
    * - greaterThan
      - ``x``:Object, ``y``:Object
      - Returns true if ``x`` > ``y``. Parameters can be either numbers or strings (in the second case lexicographic ordering is used)
-   * - if_the_else
-     - ``condition``:Boolean, ``x``:Object, ``y``: Object
-     - Returns ``x`` if the condition is true, ``y`` otherwise
-   * - in10, in9, in8, in7, in6, in5, in4, in3, in2
+   * - in2, in3, in4, in5, in6, in7, in8, in9, in10
      - ``candidate``:Object, ``v1``:Object, ..., ``v9``:Object
-     - Returns true if ``candidate`` is equal to one of the ``v1``, ..., ``v9`` values. Use the appropriate function name depending on how many arguments you need to pass.
+     - Returns true if ``candidate`` is equal to one of the ``v1``, ..., ``v9`` values. 
+       Use the function name matching the number of arguments specified.
    * - isLike
      - ``string``:String, ``pattern``:String
      - Returns true if the string matches the specified pattern. For the full syntax of the pattern specification see the `Java Pattern class javadocs <http://java.sun.com/javase/6/docs/api/java/util/regex/Pattern.html>`_
@@ -70,7 +74,7 @@ Comparison and control Functions
    * - lessThan
      - ``x``:Object, ``y``:Object
      - Returns true if ``x`` < ``y``. Parameters can be either numbers or strings (in the second case lexicographic ordering is used
-   * - lessThanEqual
+   * - lessEqualThan
      - ``x``:Object, ``y``:Object
      - Returns true if ``x`` <= ``y``. Parameters can be either numbers or strings (in the second case lexicographic ordering is used
    * - not
@@ -80,6 +84,43 @@ Comparison and control Functions
      - ``x``:Object, ``y``:Object
      - Returns true if ``x`` and ``y`` are equal, false otherwise
      
+     
+Control functions
+--------------------------------
+
+.. list-table::
+   :widths: 20 25 55
+   
+   
+   * - **Name**
+     - **Arguments**
+     - **Description**
+   * - if_then_else
+     - ``condition``:Boolean, ``x``:Object, ``y``: Object
+     - Returns ``x`` if the condition is true, ``y`` otherwise
+
+Environment function
+--------------------
+
+This function returns the value of environment variables
+defined in various contexts.
+Contexts which define environment variables include
+:ref:`SLD rendering <sld_variable_substitution>`
+and the :ref:`tutorials_animreflector`.
+
+.. list-table::
+   :widths: 20 25 55
+   
+   
+   * - **Name**
+     - **Arguments**
+     - **Description**
+   * - env
+     - ``variable``:String
+     - Returns the value of the environment variable ``variable``.
+
+
+
 Feature functions
 ------------------
 
@@ -96,12 +137,16 @@ Feature functions
    * - PropertyExists
      - ``f``:Feature, ``propertyName``:String
      - Returns ``true`` if ``f`` has a property named ``propertyName``
+   * - property
+     - ``f``:Feature, ``propertyName``:String
+     - Returns the value of the property ``propertyName``.  
+       Allows property names to be computed or specified by 
+       :ref:`sld_variable_substitution`.
      
-     
-Geometric Functions
---------------------
+Spatial Relationship functions
+------------------------------
 
-Most of the geometric function listed below refer to geometry relationship, to get more information about the meaning of each spatial relationship consult the `OGC Simple Feature Specification for SQL <http://www.opengeospatial.org/standards/sfs>`_
+For more information about the precise meaning of the spatial relationships consult the `OGC Simple Feature Specification for SQL <http://www.opengeospatial.org/standards/sfs>`_
 
 .. list-table::
    :widths: 20 25 55
@@ -110,7 +155,55 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - **Name**
      - **Arguments**
      - **Description**
-   * - Area
+   * - contains
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if the geometry ``a`` contains ``b``
+   * - crosses
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if ``a`` crosses ``b``
+   * - disjoint
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if the two geometries are disjoint, false otherwise   
+   * - equalsExact
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if the two geometries are exactly equal, same coordinates in the same order
+   * - equalsExactTolerance
+     - ``a``:Geometry, ``b``:Geometry, ``tol``:Double
+     - Returns true if the two geometries are exactly equal, same coordinates in the same order, allowing for a ``tol`` distance in the corresponding points
+   * - intersects
+     - ``a``:Geometry, ``b``:Geometry
+     - Returns true if ``a`` intersects ``b``
+   * - isWithinDistance
+     - ``a``: Geometry, ``b``:Geometry, ``distance``: Double
+     - Returns true if the distance between ``a`` and ``b`` is less than ``distance`` (measured as an euclidean distance)
+   * - overlaps
+     - ``a``: Geometry, ``b``:Geometry
+     - Returns true ``a`` overlaps with ``b``
+   * - relate
+     - ``a``: Geometry, ``b``:Geometry
+     - Returns the DE-9IM intersection matrix for ``a`` and ``b``
+   * - relatePattern
+     - ``a``: Geometry, ``b``:Geometry, ``pattern``:String
+     - Returns true if the DE-9IM intersection matrix for ``a`` and ``b`` matches the specified pattern
+   * - touches
+     - ``a``: Geometry, ``b``: Geometry
+     - Returns true if ``a`` touches ``b`` according to the SQL simple feature specification rules
+   * - within
+     - ``a``: Geometry, ``b``:Geometry
+     - Returns true is fully contained inside ``b``
+
+     
+Geometric functions
+--------------------
+
+.. list-table::
+   :widths: 20 25 55
+   
+   
+   * - **Name**
+     - **Arguments**
+     - **Description**
+   * - area
      - ``geometry``:Geometry
      - The area of the specified geometry. Works in a Cartesian plane, the result will be in the same unit of measure as the geometry coordinates (which also means the results won't make any sense for geographic data)
    * - boundary
@@ -125,51 +218,36 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - bufferWithSegments
      - ``geometry``:Geometry, ``distance``:Double, ``segments``:Integer
      - Returns the buffered area around the geometry using the specified distance and using the specified number of segments to represent a quadrant of a circle.
-   * - bufferWithSegments
-     - ``geometry``:Geometry, ``distance``:Double, ``segments``:Integer
-     - Returns the buffered area around the geometry using the specified distance and using the specified number of segments to represent a quadrant of a circle.
    * - centroid
      - ``geometry``:Geometry
      - Returns the centroid of the geometry. Can be often used as a label point for polygons, though there is no guarantee it will actually lie inside the geometry 
-   * - contains
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if the geometry ``a`` contains ``b``
    * - convexHull
      - ``geometry``:Geometry
      - Returns the convex hull of the specified geometry
-   * - crosses
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if ``a`` crosses ``b``
    * - difference
      - ``a``:Geometry, ``b``:Geometry
      - Returns all the points that sit in ``a`` but not in ``b``
    * - dimension
      - ``a``:Geometry
      - Returns the dimension of the specified geometry
-   * - disjoint
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if the two geometries are disjoint, false otherwise   
    * - distance
      - ``a``:Geometry, ``b``:Geometry
      - Returns the euclidean distance between the two geometries
+   * - endAngle
+     - ``line``:LineString
+     - Returns the angle of the end segment of the linestring
    * - endPoint
      - ``line``:LineString
-     - Returns the end point of the line
+     - Returns the end point of the linestring
    * - envelope
      - ``geometry``:geometry
      - Returns the polygon representing the envelope of the geometry, that is, the minimum rectangle with sides parallels to the axis containing it
-   * - equalsExact
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if the two geometries are exactly equal, same coordinates in the same order
-   * - equalsExactTolerance
-     - ``a``:Geometry, ``b``:Geometry, ``tol``:Double
-     - Returns true if the two geometries are exactly equal, same coordinates in the same order, allowing for a ``tol`` distance in the corresponding points
    * - exteriorRing
      - ``poly``:Polygon
      - Returns the exterior ring of the specified polygon
    * - geometryType
      - ``geometry``:Geometry
-     - Returns the type of the geometry as a string. May be ``Point``, ``MultiPoint``, ``LineString``, ``LinearRing``, ``MultiLineString``, ``Polygon``, ``MultiPoligon``, ``GeometryCollection``
+     - Returns the type of the geometry as a string. May be ``Point``, ``MultiPoint``, ``LineString``, ``LinearRing``, ``MultiLineString``, ``Polygon``, ``MultiPolygon``, ``GeometryCollection``
    * - geomFromWKT
      - ``wkt``:String
      - Returns the ``Geometry`` represented in the Well Known Text format contained in the ``wkt`` parameter
@@ -197,9 +275,6 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - intersection
      - ``a``:Geometry, ``b``:Geometry
      - Returns the intersection between ``a`` and ``b``. The intersection result can be anything including a geometry collection of heterogeneous, if the result is empty, it will be represented by an empty collection.
-   * - intersects
-     - ``a``:Geometry, ``b``:Geometry
-     - Returns true if ``a`` intersects ``b``
    * - isClosed
      - ``line``: LineString
      - Returns true if ``line`` forms a closed ring, that is, if the first and last coordinates are equal
@@ -208,7 +283,7 @@ Most of the geometric function listed below refer to geometry relationship, to g
      - Returns true if the geometry does not contain any point (typical case, an empty geometry collection)
    * - isometric
      - ``geometry``:Geometry, ``extrusion``:Double
-     - Returns a multi-polygon containing the isometric extrusions of all segments part of the original geometry. The extrusion distance is ``extrusion`` and it's assume to be expressed in the same unit as the geometry coordinates. Can be used to get a cheap pseudo-3d map effect
+     - Returns a MultiPolygon containing the isometric extrusions of all components of the input geometry. The extrusion distance is ``extrusion``, expressed in the same unit as the geometry coordinates. Can be used to get a pseudo-3d effect in a map
    * - isRing
      - ``line``:LineString
      - Returns true if the ``line`` is actually a closed ring (equivalent to ``isRing(line) and isSimple(line)``)
@@ -218,9 +293,6 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - isValid
      - ``geometry``: Geometry
      - Returns true if the geometry is topologically valid (rings are closed, holes are inside the hull, and so on)
-   * - isWithinDistance
-     - ``a``: Geometry, ``b``:Geometry, ``distance``: Double
-     - Returns true if the distance between ``a`` and ``b`` is less than ``distance`` (measured as an euclidean distance)
    * - numGeometries
      - ``collection``: GeometryCollection
      - Returns the number of geometries contained in the geometry collection
@@ -233,27 +305,18 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - offset
      - ``geometry``: Geometry, ``offsetX``:Double, ``offsetY``:Double
      - Offsets all points in a geometry by the specified X and Y offsets. Offsets are working in the same coordinate system as the geometry own coordinates.
-   * - overlaps
-     - ``a``: Geometry, ``b``:Geometry
-     - Returns true ``a`` overlaps with ``b``
    * - pointN
      - ``geometry``: Geometry, ``n``:Integer
      - Returns the n-th point inside the specified geometry
-   * - relate
-     - ``a``: Geometry, ``b``:Geometry
-     - Returns the DE-9IM intersection matrix for ``a`` and ``b``
-   * - relatePattern
-     - ``a``: Geometry, ``b``:Geometry, ``pattern``:String
-     - Returns true if the DE-9IM intersection matrix for ``a`` and ``b`` matches the specified pattern
+   * - startAngle
+     - ``line``: LineString
+     - Returns the angle of the starting segment of the input linestring
    * - startPoint
      - ``line``: LineString
-     - Returns the starting point of the specified geometry
+     - Returns the starting point of the input linestring
    * - symDifference
      - ``a``: Geometry, ``b``:Geometry
      - Returns the symmetrical difference between ``a`` and ``b`` (all points that are inside ``a`` or ``b``, but not both)
-   * - touches
-     - ``a``: Geometry, ``b``: Geometry
-     - Returns true if ``a`` touches ``b`` according to the SQL simple feature specification rules
    * - toWKT
      - ``geometry``: Geometry
      - Returns the WKT representation of ``geometry``
@@ -263,13 +326,10 @@ Most of the geometric function listed below refer to geometry relationship, to g
    * - vertices
      - ``geom``: Geometry
      - Returns a multi-point made with all the vertices of ``geom``
-   * - within
-     - ``a``: Geometry, ``b``:Geometry
-     - Returns true is fully contained inside ``b``
    
    
 	 
-Math Functions
+Math functions
 --------------
 
 .. list-table::
@@ -293,40 +353,40 @@ Math Functions
      - The absolute value of the specified Double ``value``
    * - acos
      - ``angle``:Double
-     - Returns the arc cosine of an ``angle`` expressed in radians, in the range of 0.0 through ``PI``
+     - Returns the arc cosine of an ``angle`` in radians, in the range of 0.0 through ``PI``
    * - asin
      - ``angle``:Double
-     - Returns the arc sine of an ``angle`` expressed in radians, in the range of ``-PI / 2`` through ``PI / 2``
+     - Returns the arc sine of an ``angle`` in radians, in the range of ``-PI / 2`` through ``PI / 2``
    * - atan
      - ``angle``:Double
-     - Returns the arc tangent of an angle, in the range of ``-PI/2`` through ``PI/2``
+     - Returns the arc tangent of an angle in radians, in the range of ``-PI/2`` through ``PI/2``
    * - atan2
      - ``x``:Double, ``y``:Double
-     - Converts rectangular coordinates ``(x, y)`` to polar ``(r, theta)``.
+     - Converts a rectangular coordinate ``(x, y)`` to polar **(r, theta)** and returns **theta**.
    * - ceil
      - ``x``: Double
-     - Returns the smallest (closest to negative infinity) double value that is greater than or equal to the argument and is equal to a mathematical integer.
+     - Returns the smallest (closest to negative infinity) double value that is greater than or equal to ``x`` and is equal to a mathematical integer.
    * - cos
      - ``angle``: Double
      - Returns the cosine of an ``angle`` expressed in radians
    * - double2bool
      - ``x``: Double
-     - Returns true if the number is zero, false otherwise
+     - Returns ``true`` if ``x`` is zero, ``false`` otherwise
    * - exp
      - ``x``: Double
-     - Returns Euler's number raised to the power of ``x``
+     - Returns Euler's number **e** raised to the power of ``x``
    * - floor
      - ``x``: Double
-     - Returns the largest (closest to positive infinity) value that is less than or equal to the argument and is equal to a mathematical integer
+     - Returns the largest (closest to positive infinity) value that is less than or equal to ``x`` and is equal to a mathematical integer
    * - IEEERemainder
      - ``x``: Double, ``y``:Double
-     - Computes the remainder operation on two arguments as prescribed by the IEEE 754 standard
+     - Computes the remainder of ``x`` divided by ``y`` as prescribed by the IEEE 754 standard
    * - int2bbool
      - ``x``: Integer
-     - Returns true if the number is zero, false otherwise
+     - Returns true if ``x`` is zero, false otherwise
    * - int2ddouble
      - ``x``: Integer
-     - Converts the number to Double
+     - Converts ``x`` to a Double
    * - log
      - ``x``: Integer
      - Returns the natural logarithm (base ``e``) of ``x``
@@ -353,10 +413,10 @@ Math Functions
      -  Same as ``round``, but returns a Long
    * - round
      - ``x``:Double
-     -  Returns the closest Integer to the argument. The result is rounded to an integer by adding 1/2, taking the floor of the result, and casting the result to type Integer. In other words, the result is equal to the value of the expression ``(int)floor(a + 0.5)``
+     -  Returns the closest Integer to ``x``. The result is rounded to an integer by adding 1/2, taking the floor of the result, and casting the result to type Integer. In other words, the result is equal to the value of the expression ``(int)floor(a + 0.5)``
    * - roundDouble
      - ``x``:Double
-     - Returns the closest Long to the argument
+     - Returns the closest Long to ``x``
    * - tan
      - ``angle``:Double
      - Returns the trigonometric tangent of ``angle``
@@ -371,13 +431,19 @@ Math Functions
 String functions
 -----------------   
 
+String functions generally will accept any type of value for ``String`` arguments.  
+Non-string values will be converted into a string representation automatically.
+
 .. list-table::
    :widths: 20 25 55
    
    * - **Name**
      - **Arguments**
      - **Description**
-   * - strCapitalize (since 2.0.2)
+   * - Concatenate
+     - ``s1``:String, ``s2``:String, ...
+     - Concatenates any number of strings.  Non-string arguments are allowed.
+   * - strCapitalize
      - ``sentence``:String
      - Fully capitalizes the sentence. For example, "HoW aRe YOU?" will be turned into "How Are You?"
    * - strConcat
@@ -456,3 +522,55 @@ Parsing and formatting functions
    * - parseLong
      - ``number``:String
      - Parses a string into a long integer
+     
+Transformation functions
+--------------------------------
+
+Transformation functions transform values from one data space into another.
+These functions provide a concise way to compute styling parameters from feature attribute values.
+See also :ref:`transformation_func`.
+
+.. list-table::
+   :widths: 20 25 55
+   
+   * - **Name**
+     - **Arguments**
+     - **Description**
+   * - Recode
+     - ``lookupValue``:Object, 
+     
+       ``data``:Object,
+       ``value``:Object, ...
+     - Transforms a ``lookupValue`` from a set of discrete data values into another set of values.
+       Any number of ``data``/``value`` pairs may be specified.
+   * - Categorize
+     - ``lookupValue``:Object, 
+       ``value``:Object,
+       
+       ``threshold``:Object, ...
+       ``value``:Object,
+       
+       ``belongsTo`` : String
+     - Transforms a continuous-valued attribute value into a set of discrete values.
+       ``lookupValue`` and ``value`` must be an orderable type (typically numeric).
+       The initial ``value`` is required.
+       Any number of additional ``threshold``/``value`` pairs may be specified.
+       ``belongsTo`` is optional, with the value ``succeeding`` or ``preceding``.
+       It defines which interval to use when the lookup value equals a threshold value.
+   * - Interpolate
+     - ``lookupValue``:Numeric, 
+       
+       ``data``:Numeric,
+       ``value``:Numeric *or* #RRGGBB, 
+       ...
+       
+       ``mode``:String,
+       ``method``:String
+     - Transforms a continuous-valued attribute value into another continuous range of values.
+       Any number of ``data``/``value`` pairs may be specified.
+       ``mode`` is optional, with the value ``linear``, ``cosine`` or ``cubic``.
+       It defines the interpolation algorithm to use.
+       ``method`` is optional, with the value ``numeric`` or ``color``.
+       It defines whether the target values are numeric or RGB color specifications.
+
+

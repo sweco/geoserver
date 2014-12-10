@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.platform;
@@ -18,6 +19,7 @@ import java.util.List;
  *  </p>
  *
  * @author Justin Deoliveira, The Open Planning Project, jdeolive@openplans.org
+ * @author Andrea Aime - GeoSolutions
  *
  */
 public class ServiceException extends RuntimeException {
@@ -27,6 +29,15 @@ public class ServiceException extends RuntimeException {
     private static final long serialVersionUID = 7254349181794561723L;
     
     public static final String NEW_LINE = System.getProperty("line.separator");
+    
+    public static final String MISSING_PARAMETER_VALUE = "MissingParameterValue";
+    public static final String INVALID_PARAMETER_VALUE = "InvalidParameterValue";
+    public static final String NO_APPLICABLE_CODE = "NoApplicableCode";
+    public static final String UNSUPPORTED_COMBINATION = "UnsupportedCombination";
+    public static final String NOT_ENOUGH_STORAGE = "NotEnoughStorage";
+    public static final String INVALID_UPDATE_SEQUENCE = "InvalidUpdateSequence";
+    public static final String CURRENT_UPDATE_SEQUENCE = "CurrentUpdateSequence";
+    public static final String VERSION_NEGOTIATION_FAILED = "VersionNegotiationFailed";
 
     /**
      * Application specfic code.

@@ -1,5 +1,18 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.gwc.layer;
 
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertNull;
+import static junit.framework.Assert.assertSame;
+import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.fail;
+import static org.geoserver.gwc.GWC.tileLayerName;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
@@ -11,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -22,13 +36,12 @@ import java.util.Set;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletResponse;
 
-import junit.framework.TestCase;
-
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.Keyword;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.LayerInfo.Type;
 import org.geoserver.catalog.NamespaceInfo;
+import org.geoserver.catalog.PublishedInfo;
 import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.impl.DataStoreInfoImpl;
 import org.geoserver.catalog.impl.FeatureTypeInfoImpl;
@@ -36,34 +49,41 @@ import org.geoserver.catalog.impl.LayerGroupInfoImpl;
 import org.geoserver.catalog.impl.LayerInfoImpl;
 import org.geoserver.catalog.impl.NamespaceInfoImpl;
 import org.geoserver.catalog.impl.StyleInfoImpl;
+import org.geoserver.gwc.GWC;
 import org.geoserver.gwc.config.GWCConfig;
 import org.geoserver.wms.WMSMapContent;
-import org.geoserver.wms.WebMap;
 import org.geoserver.wms.map.RenderedImageMap;
 import org.geoserver.wms.map.RenderedImageMapResponse;
 import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.geowebcache.GeoWebCacheException;
+import org.geowebcache.config.XMLGridSubset;
 import org.geowebcache.conveyor.Conveyor.CacheResult;
 import org.geowebcache.conveyor.ConveyorTile;
 import org.geowebcache.filter.parameters.ParameterFilter;
 import org.geowebcache.filter.parameters.StringParameterFilter;
 import org.geowebcache.grid.BoundingBox;
 import org.geowebcache.grid.GridSetBroker;
-import org.geowebcache.grid.GridSubset;
 import org.geowebcache.grid.OutsideCoverageException;
 import org.geowebcache.io.Resource;
+import org.geowebcache.layer.ExpirationRule;
 import org.geowebcache.layer.meta.LayerMetaInformation;
+import org.geowebcache.locks.MemoryLockProvider;
 import org.geowebcache.mime.MimeType;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileObject;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import com.mockrunner.mock.web.MockHttpServletRequest;
 import com.mockrunner.mock.web.MockHttpServletResponse;
 
-public class GeoServerTileLayerTest extends TestCase {
+public class GeoServerTileLayerTest {
 
     private LayerInfoImpl layerInfo;
 
@@ -73,12 +93,27 @@ public class GeoServerTileLayerTest extends TestCase {
 
     private GeoServerTileLayer layerGroupInfoTileLayer;
 
-    private CatalogConfiguration catalogConfig;
+    private Catalog catalog;
 
-    private GWCConfig defaultSettings;
+    private GridSetBroker gridSetBroker;
 
-    @Override
+    private GWCConfig defaults;
+
+    private GWC mockGWC;
+
+    @After
+    public void tearDown() throws Exception {
+        GWC.set(null);
+    }
+
+    @Before
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void setUp() throws Exception {
+        mockGWC = mock(GWC.class);
+        MemoryLockProvider lockProvider = new MemoryLockProvider();
+        when(mockGWC.getLockProvider()).thenReturn(lockProvider);
+        GWC.set(mockGWC);
+
         final String layerInfoId = "mock-layer-info";
 
         NamespaceInfo ns = new NamespaceInfoImpl();
@@ -103,12 +138,12 @@ public class GeoServerTileLayerTest extends TestCase {
         resource.setNativeBoundingBox(new ReferencedEnvelope(-180, -90, 0, 0,
                 DefaultGeographicCRS.WGS84));
         resource.setSRS("EPSG:4326");
-        resource.setKeywords((List)Arrays.asList(new Keyword("kwd1"), new Keyword("kwd2")));
+        resource.setKeywords((List) Arrays.asList(new Keyword("kwd1"), new Keyword("kwd2")));
 
         layerInfo = new LayerInfoImpl();
         layerInfo.setId(layerInfoId);
-        layerInfo.setEnabled(true);
         layerInfo.setResource(resource);
+        layerInfo.setEnabled(true);
         layerInfo.setName("MockLayerInfoName");
         layerInfo.setType(Type.VECTOR);
         StyleInfo defaultStyle = new StyleInfoImpl(null);
@@ -128,28 +163,29 @@ public class GeoServerTileLayerTest extends TestCase {
         final String layerGroupId = "mock-layergroup-id";
         layerGroup.setId(layerGroupId);
         layerGroup.setName("MockLayerGroup");
-        layerGroup.setLayers(Collections.singletonList((LayerInfo) layerInfo));
+        layerGroup.setTitle("Group title");
+        layerGroup.setAbstract("Group abstract");
+        layerGroup.setLayers(Collections.singletonList((PublishedInfo) layerInfo));
 
-        defaultSettings = GWCConfig.getOldDefaults();
+        defaults = GWCConfig.getOldDefaults();
 
-        catalogConfig = mock(CatalogConfiguration.class);
-        when(catalogConfig.getConfig()).thenReturn(defaultSettings);
-        when(catalogConfig.getLayerInfoById(eq(layerInfoId))).thenReturn(layerInfo);
-        when(catalogConfig.getLayerGroupById(eq(layerGroupId))).thenReturn(layerGroup);
+        catalog = mock(Catalog.class);
+        when(catalog.getLayer(eq(layerInfoId))).thenReturn(layerInfo);
+        when(catalog.getLayerGroup(eq(layerGroupId))).thenReturn(layerGroup);
 
-        GridSetBroker gridSetBroker = new GridSetBroker(true, true);
+        gridSetBroker = new GridSetBroker(true, true);
         gridSetBroker.put(gridSetBroker.WORLD_EPSG4326);
         gridSetBroker.put(gridSetBroker.WORLD_EPSG3857);
-        when(catalogConfig.getGridSetBroker()).thenReturn(gridSetBroker);
     }
 
+    @Test
     public void testEnabled() {
         layerInfo.setEnabled(true);
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
         assertTrue(layerInfoTileLayer.isEnabled());
 
         layerInfo.setEnabled(false);
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
         assertFalse(layerInfoTileLayer.isEnabled());
 
         layerInfo.setEnabled(true);
@@ -161,111 +197,105 @@ public class GeoServerTileLayerTest extends TestCase {
         assertFalse(layerInfoTileLayer.isEnabled());
         layerInfoTileLayer.setConfigErrorMessage(null);
 
-        // this is the only call to layerInfoTileLayer that will call catalogConfig.save
         layerInfoTileLayer.setEnabled(false);
         assertFalse(layerInfoTileLayer.isEnabled());
         assertFalse(layerInfoTileLayer.getInfo().isEnabled());
-        verify(catalogConfig, times(1)).save(same(layerInfoTileLayer));
 
-        layerGroupInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerGroup);
+        layerGroupInfoTileLayer = new GeoServerTileLayer(layerGroup, defaults, gridSetBroker);
         assertTrue(layerGroupInfoTileLayer.isEnabled());
     }
 
+    @Test
     public void testGetMetaTilingFactors() {
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
 
         int[] metaTilingFactors = layerInfoTileLayer.getMetaTilingFactors();
-        assertEquals(defaultSettings.getMetaTilingX(), metaTilingFactors[0]);
-        assertEquals(defaultSettings.getMetaTilingY(), metaTilingFactors[1]);
+        assertEquals(defaults.getMetaTilingX(), metaTilingFactors[0]);
+        assertEquals(defaults.getMetaTilingY(), metaTilingFactors[1]);
 
         GeoServerTileLayerInfo info = layerInfoTileLayer.getInfo();
-        info.setMetaTilingX(1 + defaultSettings.getMetaTilingX());
-        info.setMetaTilingY(2 + defaultSettings.getMetaTilingY());
-        info.saveTo(layerInfo.getMetadata());
+        info.setMetaTilingX(1 + defaults.getMetaTilingX());
+        info.setMetaTilingY(2 + defaults.getMetaTilingY());
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        LegacyTileLayerInfoLoader.save(info, layerInfo.getMetadata());
+
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
         metaTilingFactors = layerInfoTileLayer.getMetaTilingFactors();
-        assertEquals(1 + defaultSettings.getMetaTilingX(), metaTilingFactors[0]);
-        assertEquals(2 + defaultSettings.getMetaTilingY(), metaTilingFactors[1]);
+        assertEquals(1 + defaults.getMetaTilingX(), metaTilingFactors[0]);
+        assertEquals(2 + defaults.getMetaTilingY(), metaTilingFactors[1]);
     }
 
+    @Test
     public void testIsQueryable() {
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
 
-        when(catalogConfig.isQueryable(same(layerInfoTileLayer))).thenReturn(true);
+        when(mockGWC.isQueryable(same(layerInfoTileLayer))).thenReturn(true);
         assertTrue(layerInfoTileLayer.isQueryable());
 
-        when(catalogConfig.isQueryable(same(layerInfoTileLayer))).thenReturn(false);
+        when(mockGWC.isQueryable(same(layerInfoTileLayer))).thenReturn(false);
         assertFalse(layerInfoTileLayer.isQueryable());
 
-        verify(catalogConfig, times(2)).isQueryable(same(layerInfoTileLayer));
+        verify(mockGWC, times(2)).isQueryable(same(layerInfoTileLayer));
     }
 
+    @Test
     public void testGetName() {
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
-        assertEquals(layerInfo.getResource().getPrefixedName(), layerInfoTileLayer.getName());
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
+        assertEquals(tileLayerName(layerInfo), layerInfoTileLayer.getName());
 
-        layerGroupInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerGroup);
-        assertEquals(layerGroup.getName(), layerGroupInfoTileLayer.getName());
+        layerGroupInfoTileLayer = new GeoServerTileLayer(layerGroup, defaults, gridSetBroker);
+        assertEquals(GWC.tileLayerName(layerGroup), layerGroupInfoTileLayer.getName());
 
     }
 
+    @Test
     public void testGetParameterFilters() {
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
         List<ParameterFilter> parameterFilters = layerInfoTileLayer.getParameterFilters();
         assertNotNull(parameterFilters);
         assertEquals(1, parameterFilters.size());
-        assertTrue(parameterFilters.get(0) instanceof StringParameterFilter);
-        StringParameterFilter styleFilter = (StringParameterFilter) parameterFilters.get(0);
+        assertTrue(parameterFilters.get(0) instanceof StyleParameterFilter);
+        StyleParameterFilter styleFilter = (StyleParameterFilter) parameterFilters.get(0);
         assertEquals("STYLES", styleFilter.getKey());
         assertEquals("default_style", styleFilter.getDefaultValue());
-        assertEquals(
-                new HashSet<String>(Arrays.asList("default_style", "alternateStyle-1",
-                        "alternateStyle-2")), new HashSet<String>(styleFilter.getLegalValues()));
+        assertEquals(new HashSet<String>(Arrays.asList("alternateStyle-1", "alternateStyle-2")),
+                new HashSet<String>(styleFilter.getLegalValues()));
 
-        layerInfoTileLayer.getInfo().setCachedStyles(Collections.singleton("alternateStyle-2"));
+        // layerInfoTileLayer.getInfo().getCachedStyles().add("alternateStyle-2");
     }
 
+    @Test
     public void testGetDefaultParameterFilters() {
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
         Map<String, String> defaultFilters = layerInfoTileLayer.getDefaultParameterFilters();
         assertEquals(1, defaultFilters.size());
         assertEquals("default_style", defaultFilters.get("STYLES"));
-
-        StyleInfo newDefaultStyle = new StyleInfoImpl(null);
-        newDefaultStyle.setName("newDefault");
-        layerInfo.setDefaultStyle(newDefaultStyle);
-
-        layerInfoTileLayer.resetParameterFilters();
-
-        defaultFilters = layerInfoTileLayer.getDefaultParameterFilters();
-        assertEquals(1, defaultFilters.size());
-        assertEquals("newDefault", defaultFilters.get("STYLES"));
-
     }
 
-    public void testResetParameterFilters() {
+    // public void testResetParameterFilters() {
+    //
+    // layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
+    //
+    // layerInfoTileLayer.getInfo().cachedStyles().clear();
+    // layerInfoTileLayer.getInfo().cachedStyles().add("alternateStyle-2");
+    //
+    // layerInfoTileLayer.resetParameterFilters();
+    // List<ParameterFilter> parameterFilters = layerInfoTileLayer.getParameterFilters();
+    // StringParameterFilter styleFilter = (StringParameterFilter) parameterFilters.get(0);
+    // assertEquals(new HashSet<String>(Arrays.asList("default_style", "alternateStyle-2")),
+    // new HashSet<String>(styleFilter.getLegalValues()));
+    //
+    // }
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
-
-        layerInfoTileLayer.getInfo().setCachedStyles(Collections.singleton("alternateStyle-2"));
-
-        layerInfoTileLayer.resetParameterFilters();
-        List<ParameterFilter> parameterFilters = layerInfoTileLayer.getParameterFilters();
-        StringParameterFilter styleFilter = (StringParameterFilter) parameterFilters.get(0);
-        assertEquals(new HashSet<String>(Arrays.asList("default_style", "alternateStyle-2")),
-                new HashSet<String>(styleFilter.getLegalValues()));
-
-    }
-
+    @Test
     public void testGetModifiableParameters() throws GeoWebCacheException {
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
         ParameterFilter stylesParamFilter = layerInfoTileLayer.getParameterFilters().get(0);
         List<String> legalValues = stylesParamFilter.getLegalValues();
 
@@ -288,9 +318,10 @@ public class GeoServerTileLayerTest extends TestCase {
         }
     }
 
+    @Test
     public void testGetMetaInformation() {
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
-        layerGroupInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerGroup);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
+        layerGroupInfoTileLayer = new GeoServerTileLayer(layerGroup, defaults, gridSetBroker);
 
         LayerMetaInformation metaInformation = layerInfoTileLayer.getMetaInformation();
         assertNotNull(metaInformation);
@@ -310,14 +341,16 @@ public class GeoServerTileLayerTest extends TestCase {
         description = metaInformation.getDescription();
         keywords = metaInformation.getKeywords();
         // these properties are missing from LayerGroupInfo interface
-        assertEquals(layerGroup.getName(), title);
-        assertEquals("", description);
+        assertEquals("Group title", title);
+        assertEquals("Group abstract", description);
+        
         assertEquals(0, keywords.size());
     }
 
+    @Test
     public void testGetStyles() {
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
-        layerGroupInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerGroup);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
+        layerGroupInfoTileLayer = new GeoServerTileLayer(layerGroup, defaults, gridSetBroker);
 
         assertEquals("default_style", layerInfoTileLayer.getStyles());
         assertNull(layerGroupInfoTileLayer.getStyles());
@@ -329,31 +362,61 @@ public class GeoServerTileLayerTest extends TestCase {
         assertEquals("newDefault", layerInfoTileLayer.getStyles());
     }
 
+    @Test
     public void testGetGridSubsets() throws Exception {
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
         Set<String> gridSubsets = layerInfoTileLayer.getGridSubsets();
         assertNotNull(gridSubsets);
         assertEquals(2, gridSubsets.size());
 
-        layerInfoTileLayer.getInfo().setCachedGridSetIds(Collections.singleton("EPSG:900913"));
-        layerInfoTileLayer.getInfo().saveTo(layerInfo.getMetadata());
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        Set<XMLGridSubset> subsets = layerInfoTileLayer.getInfo().getGridSubsets();
+        subsets.clear();
+        XMLGridSubset xmlGridSubset = new XMLGridSubset();
+        xmlGridSubset.setGridSetName("EPSG:900913");
+        subsets.add(xmlGridSubset);
+        LegacyTileLayerInfoLoader.save(layerInfoTileLayer.getInfo(), layerInfo.getMetadata());
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
 
         gridSubsets = layerInfoTileLayer.getGridSubsets();
         assertNotNull(gridSubsets);
         assertEquals(1, gridSubsets.size());
 
         layerGroup.setBounds(layerInfo.getResource().getLatLonBoundingBox());
-        layerGroupInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerGroup);
+        layerGroupInfoTileLayer = new GeoServerTileLayer(layerGroup, defaults, gridSetBroker);
         gridSubsets = layerGroupInfoTileLayer.getGridSubsets();
         assertNotNull(gridSubsets);
         assertEquals(2, gridSubsets.size());
     }
 
+    @Test
+    public void testGridSubsetBoundsClippedToTargetCrsAreaOfValidity() throws Exception {
+
+        CoordinateReferenceSystem nativeCrs = CRS.decode("EPSG:4326", true);
+        ReferencedEnvelope nativeBounds = new ReferencedEnvelope(-180, 180, -90, 90, nativeCrs);
+        layerGroup.setBounds(nativeBounds);
+        defaults.getDefaultCachingGridSetIds().clear();
+        defaults.getDefaultCachingGridSetIds().add("EPSG:900913");
+        layerGroupInfoTileLayer = new GeoServerTileLayer(layerGroup, defaults, gridSetBroker);
+
+        // force building and setting the bounds to the saved representation
+        layerGroupInfoTileLayer.getGridSubsets();
+
+        XMLGridSubset savedSubset = layerGroupInfoTileLayer.getInfo().getGridSubsets().iterator()
+                .next();
+
+        BoundingBox gridSubsetExtent = savedSubset.getExtent();
+        BoundingBox expected = gridSetBroker.WORLD_EPSG3857.getOriginalExtent();
+        // don't use equals(), it uses an equality threshold we want to avoid here
+        double threshold = 1E-16;
+        assertTrue("Expected " + expected + ", got " + gridSubsetExtent,
+                expected.equals(gridSubsetExtent, threshold));
+    }
+
+    @Test
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testGetFeatureInfo() throws Exception {
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
 
         ConveyorTile convTile = new ConveyorTile(null, null, null, null);
         convTile.setTileLayer(layerInfoTileLayer);
@@ -364,7 +427,7 @@ public class GeoServerTileLayerTest extends TestCase {
 
         Resource mockResult = mock(Resource.class);
         ArgumentCaptor<Map> argument = ArgumentCaptor.forClass(Map.class);
-        Mockito.when(catalogConfig.dispatchOwsRequest(argument.capture(), (Cookie[]) anyObject()))
+        Mockito.when(mockGWC.dispatchOwsRequest(argument.capture(), (Cookie[]) anyObject()))
                 .thenReturn(mockResult);
 
         Resource result = layerInfoTileLayer.getFeatureInfo(convTile, bbox, 100, 100, 50, 50);
@@ -388,11 +451,10 @@ public class GeoServerTileLayerTest extends TestCase {
         assertEquals("50", capturedParams.get("X"));
         assertEquals("50", capturedParams.get("Y"));
 
-        verify(catalogConfig, times(1)).dispatchOwsRequest((Map) anyObject(),
-                (Cookie[]) anyObject());
+        verify(mockGWC, times(1)).dispatchOwsRequest((Map) anyObject(), (Cookie[]) anyObject());
 
-        when(catalogConfig.dispatchOwsRequest((Map) anyObject(), (Cookie[]) anyObject()))
-                .thenThrow(new RuntimeException("mock exception"));
+        when(mockGWC.dispatchOwsRequest((Map) anyObject(), (Cookie[]) anyObject())).thenThrow(
+                new RuntimeException("mock exception"));
         try {
             layerInfoTileLayer.getFeatureInfo(convTile, bbox, 100, 100, 50, 50);
             fail("Expected GeoWebCacheException");
@@ -401,11 +463,12 @@ public class GeoServerTileLayerTest extends TestCase {
         }
     }
 
+    @Test
     public void testGetTilePreconditions() throws Exception {
 
         StorageBroker storageBroker = mock(StorageBroker.class);
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
 
         MockHttpServletRequest servletReq = new MockHttpServletRequest();
         HttpServletResponse servletResp = new MockHttpServletResponse();
@@ -428,27 +491,29 @@ public class GeoServerTileLayerTest extends TestCase {
         } catch (IllegalArgumentException e) {
             assertTrue(e.getMessage().contains("gridset not found"));
         }
+        // layer bounds (in WGS84) is -180, -90, 0, 0
+        long[][] outsideTiles = { { 0, 1, 1 }, { 1, 1, 1 }, { 1, 0, 1 } };
 
-        long[] coverage = layerInfoTileLayer.getGridSubset("EPSG:4326").getCoverage(1);
-        long[] tileIndex = { coverage[0] - 1, coverage[1], 1 };// outside coverage bounds
-        MimeType mimeType = MimeType.createFromFormat("image/png");
-        tile = new ConveyorTile(storageBroker, layerInfoTileLayer.getName(), "EPSG:900913",
-                tileIndex, mimeType, null, servletReq, servletResp);
-
-        try {
-            layerInfoTileLayer.getTile(tile);
-            fail("Expected outside coverage exception");
-        } catch (OutsideCoverageException e) {
-            assertTrue(true);
+        for (long[] tileIndex : outsideTiles) {
+            MimeType mimeType = MimeType.createFromFormat("image/png");
+            tile = new ConveyorTile(storageBroker, layerInfoTileLayer.getName(), "EPSG:900913",
+                    tileIndex, mimeType, null, servletReq, servletResp);
+            try {
+                layerInfoTileLayer.getTile(tile);
+                fail("Expected outside coverage exception");
+            } catch (OutsideCoverageException e) {
+                assertTrue(true);
+            }
         }
     }
 
+    @Test
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testGetTile() throws Exception {
 
         Resource mockResult = mock(Resource.class);
         ArgumentCaptor<Map> argument = ArgumentCaptor.forClass(Map.class);
-        Mockito.when(catalogConfig.dispatchOwsRequest(argument.capture(), (Cookie[]) anyObject()))
+        Mockito.when(mockGWC.dispatchOwsRequest(argument.capture(), (Cookie[]) anyObject()))
                 .thenReturn(mockResult);
 
         BufferedImage image = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
@@ -457,13 +522,13 @@ public class GeoServerTileLayerTest extends TestCase {
 
         RenderedImageMapResponse fakeResponseEncoder = mock(RenderedImageMapResponse.class);
         MimeType mimeType = MimeType.createFromFormat("image/png");
-        when(catalogConfig.getResponseEncoder(eq(mimeType), (WebMap) anyObject())).thenReturn(
+        when(mockGWC.getResponseEncoder(eq(mimeType), (RenderedImageMap) anyObject())).thenReturn(
                 fakeResponseEncoder);
 
         StorageBroker storageBroker = mock(StorageBroker.class);
         when(storageBroker.get((TileObject) anyObject())).thenReturn(false);
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
 
         MockHttpServletRequest servletReq = new MockHttpServletRequest();
         HttpServletResponse servletResp = new MockHttpServletResponse();
@@ -480,22 +545,62 @@ public class GeoServerTileLayerTest extends TestCase {
         assertEquals(200, returned.getStatus());
 
         verify(storageBroker, atLeastOnce()).get((TileObject) anyObject());
-        verify(catalogConfig, times(1)).getResponseEncoder(eq(mimeType),
-                isA(RenderedImageMap.class));
+        verify(mockGWC, times(1)).getResponseEncoder(eq(mimeType), isA(RenderedImageMap.class));
     }
 
+    @Test
     public void testGetMimeTypes() throws Exception {
 
-        layerInfoTileLayer = new GeoServerTileLayer(catalogConfig, layerInfo);
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
         List<MimeType> mimeTypes = layerInfoTileLayer.getMimeTypes();
-        GWCConfig defaults = catalogConfig.getConfig();
         assertEquals(defaults.getDefaultOtherCacheFormats().size(), mimeTypes.size());
 
-        layerInfoTileLayer.getInfo().setMimeFormats(Collections.singleton("image/gif"));
+        layerInfoTileLayer.getInfo().getMimeFormats().clear();
+        layerInfoTileLayer.getInfo().getMimeFormats().add("image/gif");
 
         mimeTypes = layerInfoTileLayer.getMimeTypes();
         assertEquals(1, mimeTypes.size());
         assertEquals(MimeType.createFromFormat("image/gif"), mimeTypes.get(0));
     }
+    
+    @Test
+    public void testTileExpirationList() {
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
+        
+        List<ExpirationRule> list = new ArrayList<ExpirationRule>();
+        list.add(new ExpirationRule(0, 10));
+        list.add(new ExpirationRule(10,20));
+        
+        layerInfoTileLayer.getInfo().setExpireCacheList(list);
+        
+     
+        assertEquals(10, layerInfoTileLayer.getExpireCache(0));
+        assertEquals(10, layerInfoTileLayer.getExpireCache(9));
+        assertEquals(20, layerInfoTileLayer.getExpireCache(10));
+        assertEquals(20, layerInfoTileLayer.getExpireCache(15));
+        
+        assertEquals(0, layerInfoTileLayer.getExpireCache(-1));
+    }
+    
+    @Test
+    public void testCacheExpiration() {
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
+        assertEquals(0, layerInfoTileLayer.getInfo().getExpireCache());
+        layerInfoTileLayer.getInfo().setExpireCache(40);
+        assertEquals(40, layerInfoTileLayer.getInfo().getExpireCache());
+    }
 
+    @Test
+    public void testAdvertised() {
+        // Testing the advertised parameter
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
+        assertTrue(layerInfoTileLayer.isAdvertised());
+    }
+
+    @Test
+    public void testTransient() {
+        // Testing the transient parameter
+        layerInfoTileLayer = new GeoServerTileLayer(layerInfo, defaults, gridSetBroker);
+        assertFalse(layerInfoTileLayer.isTransientLayer());
+    }
 }

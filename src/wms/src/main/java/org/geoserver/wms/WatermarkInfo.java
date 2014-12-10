@@ -1,8 +1,11 @@
-/* Copyright (c) 2001 - 2010 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
+
+import java.io.Serializable;
 
 /**
  * Configuration object for WMS water marking.
@@ -10,7 +13,7 @@ package org.geoserver.wms;
  * @author Justin Deoliveira, The Open Planning Project
  * 
  */
-public interface WatermarkInfo {
+public interface WatermarkInfo extends Serializable{
 
     /**
      * The position of a watermark logo.

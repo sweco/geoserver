@@ -1,10 +1,10 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.rest;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,7 +46,7 @@ public abstract class AbstractResource extends Resource {
     /**
      * list of formats used to read and write representations of the resource.
      */
-    protected Map<MediaType,DataFormat> formats;
+    protected volatile Map<MediaType,DataFormat> formats;
     
     /**
      * Constructs a new resource from context, request, and response.
@@ -110,13 +110,15 @@ public abstract class AbstractResource extends Resource {
         }
         
         List<Preference<MediaType>> accepts = null;
+        boolean acceptsAll = false;
         if ( df == null ) {
             //next check the Accepts header
-            accepts = new ArrayList( getRequest().getClientInfo().getAcceptedMediaTypes() );
+            accepts = getRequest().getClientInfo().getAcceptedMediaTypes();
+            acceptsAll = accepts.isEmpty();
             for ( Iterator<Preference<MediaType>> i = accepts.iterator(); i.hasNext(); ) {
                 Preference<MediaType> pref = i.next();
                 if ( pref.getMetadata().equals( MediaType.ALL ) ) {
-                    i.remove();
+                    acceptsAll = true;
                     continue;
                 }
                 
@@ -127,9 +129,9 @@ public abstract class AbstractResource extends Resource {
             }
         }
         
-        if ( df == null && accepts.isEmpty()  ) {
+        if ( df == null && acceptsAll ) {
             //could not find suitable format, if client specifically did not specify 
-            // any accepted formats, just return the first
+            // any accepted formats or accepts all media types, just return the first
             df = getFormats().values().iterator().next();
         }
         

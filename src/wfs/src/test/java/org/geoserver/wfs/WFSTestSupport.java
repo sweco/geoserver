@@ -1,30 +1,34 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
 import org.custommonkey.xmlunit.SimpleNamespaceContext;
 import org.custommonkey.xmlunit.XMLUnit;
+import org.geoserver.data.test.CiteTestData;
+import org.geoserver.data.test.SystemTestData;
 import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.platform.Service;
-import org.geoserver.test.GeoServerTestSupport;
+import org.geoserver.test.GeoServerSystemTestSupport;
 import org.geoserver.wfs.xml.v1_0_0.WFSConfiguration;
 
 
 /**
- * Base support class for wfs tests.
+ * New Base support class for wfs tests.
  * <p>
  * Deriving from this test class provides the test case with preconfigured
  * geoserver and wfs objects.
  * </p>
- * @author Justin Deoliveira, The Open Planning Project, jdeolive@openplans.org
+ * @author Niels Charlier
  *
  */
-public abstract class WFSTestSupport extends GeoServerTestSupport {
+public abstract class WFSTestSupport extends GeoServerSystemTestSupport {
     /**
      * @return The global wfs instance from the application context.
      */
@@ -61,9 +65,8 @@ public abstract class WFSTestSupport extends GeoServerTestSupport {
     }
     
     @Override
-    protected void oneTimeSetUp() throws Exception {
-        super.oneTimeSetUp();
-        
+    protected void onSetUp(SystemTestData testData) throws Exception {
+       
         // init xmlunit
         Map<String, String> namespaces = new HashMap<String, String>();
         namespaces.put("wfs", "http://www.opengis.net/wfs");
@@ -76,12 +79,35 @@ public abstract class WFSTestSupport extends GeoServerTestSupport {
         namespaces.put("xsi", "http://www.w3.org/2001/XMLSchema-instance");
         namespaces.put("gs", "http://geoserver.org");
         
-        getTestData().registerNamespaces(namespaces);
-        setUpNamespaces(namespaces);
+        CiteTestData.registerNamespaces(namespaces);
         
+        setUpNamespaces(namespaces);
         XMLUnit.setXpathNamespaceContext(new SimpleNamespaceContext(namespaces));
+        
+        setUpInternal(testData);
     }
     
+    protected void setUpInternal(SystemTestData testData) throws Exception {    	
+    }
+    
+
     protected void setUpNamespaces(Map<String,String> namespaces) {
     }
+    
+    protected List<String> getSupportedSpatialOperatorsList(boolean wfs1_0_0) {
+        return Arrays.asList(new String[] {
+                "Disjoint",
+                "Equals",
+                "DWithin",
+                "Beyond",
+                "Intersect" + (wfs1_0_0 ? "" : "s"),
+                "Touches",
+                "Crosses",
+                "Within",
+                "Contains",
+                "Overlaps",
+                "BBOX"
+        });
+    }
+    
 }

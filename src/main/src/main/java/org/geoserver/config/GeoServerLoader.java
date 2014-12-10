@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -31,16 +32,17 @@ import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.NamespaceInfo;
+import org.geoserver.catalog.ResourcePool;
 import org.geoserver.catalog.StyleInfo;
 import org.geoserver.catalog.WMSLayerInfo;
 import org.geoserver.catalog.WMSStoreInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.catalog.Wrapper;
+import org.geoserver.catalog.event.CatalogListener;
 import org.geoserver.catalog.impl.CatalogImpl;
 import org.geoserver.catalog.util.LegacyCatalogImporter;
 import org.geoserver.catalog.util.LegacyCatalogReader;
 import org.geoserver.catalog.util.LegacyFeatureTypeInfoReader;
-import org.geoserver.config.impl.GeoServerInfoImpl;
 import org.geoserver.config.util.LegacyConfigurationImporter;
 import org.geoserver.config.util.XStreamPersister;
 import org.geoserver.config.util.XStreamPersisterFactory;
@@ -49,12 +51,7 @@ import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.platform.GeoServerResourceLoader;
 import org.geotools.util.logging.Logging;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
-import org.springframework.web.context.WebApplicationContext;
-import org.vfny.geoserver.global.GeoserverDataDirectory;
 
 /**
  * Initializes GeoServer configuration and catalog on startup.
@@ -84,7 +81,6 @@ public abstract class GeoServerLoader {
     
     public void setApplicationContext(ApplicationContext applicationContext)
             throws BeansException {
-        GeoserverDataDirectory.init((WebApplicationContext)applicationContext);
     }
     
     public void setXStreamPeristerFactory(XStreamPersisterFactory xpf) {
@@ -126,7 +122,9 @@ public abstract class GeoServerLoader {
         if ( bean instanceof GeoServer ) {
             geoserver = (GeoServer) bean;
             try {
-                loadGeoServer( geoserver, xpf.createXMLPersister() );
+                XStreamPersister xp = xpf.createXMLPersister() ;
+                xp.setCatalog(geoserver.getCatalog());
+                loadGeoServer(geoserver, xp);
                 
                 //load initializers
                 loadInitializers(geoserver);
@@ -152,8 +150,7 @@ public abstract class GeoServerLoader {
                 initer.initialize( geoServer );
             }
             catch( Throwable t ) {
-                //TODO: log this
-                t.printStackTrace();
+                LOGGER.log(Level.SEVERE, "Failed to run initializer " + initer, t);
             }
         }
     }
@@ -169,8 +166,8 @@ public abstract class GeoServerLoader {
         if ( catalog.getStyleByName( StyleInfo.DEFAULT_LINE ) == null ) {
             initializeStyle( catalog, StyleInfo.DEFAULT_LINE, "default_line.sld" );
         }
-        if ( catalog.getStyleByName( StyleInfo.DEFAULT_POLYGON ) == null ) {
-            initializeStyle( catalog, StyleInfo.DEFAULT_POLYGON, "default_line.sld" );
+        if ( catalog.getStyleByName( StyleInfo.DEFAULT_POLYGON ) == null ) {    
+            initializeStyle( catalog, StyleInfo.DEFAULT_POLYGON, "default_polygon.sld" );
         }
         if ( catalog.getStyleByName( StyleInfo.DEFAULT_RASTER ) == null ) {
             initializeStyle( catalog, StyleInfo.DEFAULT_RASTER, "default_raster.sld" );
@@ -212,12 +209,19 @@ public abstract class GeoServerLoader {
     }
 
     protected void readCatalog(Catalog catalog, XStreamPersister xp) throws Exception {
+        // we are going to synch up the catalogs and need to preserve listeners,
+        // but these two fellas are attached to the new catalog as well
+        catalog.removeListeners(ResourcePool.CacheClearingListener.class);
+        catalog.removeListeners(GeoServerPersister.class);
+        List<CatalogListener> listeners = new ArrayList<CatalogListener>(catalog.getListeners());
+
         //look for catalog.xml, if it exists assume we are dealing with 
         // an old data directory
         File f = resourceLoader.find( "catalog.xml" );
         if ( f == null ) {
             //assume 2.x style data directory
             CatalogImpl catalog2 = (CatalogImpl) readCatalog( xp );
+            // make to remove the old resource pool catalog listener
             ((CatalogImpl)catalog).sync( catalog2 );
         } else {
             // import old style catalog, register the persister now so that we start 
@@ -225,37 +229,27 @@ public abstract class GeoServerLoader {
             CatalogImpl catalog2 = (CatalogImpl) readLegacyCatalog( f, xp );
             ((CatalogImpl)catalog).sync( catalog2 );
         }
+        
+        // attach back the old listeners
+        for (CatalogListener listener : listeners) {
+            catalog.addListener(listener);
+        }
     }
     
     /**
      * Reads the catalog from disk.
      */
     Catalog readCatalog( XStreamPersister xp ) throws Exception {
-        Catalog catalog = new CatalogImpl();
+        CatalogImpl catalog = new CatalogImpl();
         catalog.setResourceLoader(resourceLoader);
         xp.setCatalog( catalog );
+        xp.setUnwrapNulls(false);
         
         CatalogFactory factory = catalog.getFactory();
        
-        //styles
-        File styles = resourceLoader.find( "styles" );
-        for ( File sf : list(styles,new SuffixFileFilter(".xml") ) ) {
-            try {
-                //handle the .xml.xml case
-                if (new File(styles,sf.getName()+".xml").exists()) {
-                    continue;
-                }
-                
-                StyleInfo s = depersist( xp, sf, StyleInfo.class );
-                catalog.add( s );
-                
-                LOGGER.info( "Loaded style '" + s.getName() + "'" );
-            }
-            catch( Exception e ) {
-                LOGGER.log( Level.WARNING, "Failed to load style from file '" + sf.getName() + "'" , e );
-            }
-        }
-        
+        //global styles
+        loadStyles(resourceLoader.find( "styles" ), catalog, xp);
+
         //workspaces, stores, and resources
         File workspaces = resourceLoader.find( "workspaces" );
         if ( workspaces != null ) {
@@ -330,7 +324,12 @@ public abstract class GeoServerLoader {
                         
                     }
                 }
-                
+
+                //load the styles for the workspace
+                File styles = resourceLoader.find(wsd, "styles");
+                if (styles != null) {
+                    loadStyles(styles, catalog, xp);
+                }
             }
             
             for ( File wsd : list(workspaces, DirectoryFileFilter.INSTANCE ) ) {
@@ -373,13 +372,12 @@ public abstract class GeoServerLoader {
                                 FeatureTypeInfo ft = null;
                                 try {
                                     ft = depersist(xp,f,FeatureTypeInfo.class);
+                                    catalog.add(ft);
                                 }
                                 catch( Exception e ) {
                                     LOGGER.log( Level.WARNING, "Failed to load feature type '" + ftd.getName() +"'", e);
                                     continue;
                                 }
-                                
-                                catalog.add( ft );
                                 
                                 LOGGER.info( "Loaded feature type '" + ds.getName() +"'");
                                 
@@ -496,12 +494,18 @@ public abstract class GeoServerLoader {
                                         LOGGER.warning( "Ignoring coverage directory " + cd.getAbsolutePath() );
                                     }
                                 }
-                            } else {
+                            } else if(!isConfigDirectory(sd)) {
                                 LOGGER.warning( "Ignoring store directory '" + sd.getName() +  "'");
                                 continue;
                             }
                         }
                     }
+                }
+
+                //load hte layer groups for this workspace
+                File layergroups = resourceLoader.find(wsd, "layergroups");
+                if (layergroups != null) {
+                    loadLayerGroups(layergroups, catalog, xp);
                 }
             }
         }
@@ -514,26 +518,26 @@ public abstract class GeoServerLoader {
         //layergroups
         File layergroups = resourceLoader.find( "layergroups" );
         if ( layergroups != null ) {
-            for ( File lgf : list( layergroups, new SuffixFileFilter( ".xml" ) ) ) {
-                try {
-                    LayerGroupInfo lg = depersist( xp, lgf, LayerGroupInfo.class );
-                    if(lg.getLayers() == null || lg.getLayers().size() == 0) {
-                        LOGGER.warning("Skipping empty layer group '" + lg.getName() + "', it is invalid");
-                        continue;
-                    }
-                    catalog.add( lg );
-                    
-                    LOGGER.info( "Loaded layer group '" + lg.getName() + "'" );    
-                }
-                catch( Exception e ) {
-                    LOGGER.log( Level.WARNING, "Failed to load layer group '" + lgf.getName() + "'", e );
-                }
-            }
+           loadLayerGroups(layergroups, catalog, xp);
         }
-                
+        xp.setUnwrapNulls(true);
+        catalog.resolve();
         return catalog;
     }
     
+    /**
+     * Some config directories in GeoServer are used to store workspace specific configurations, 
+     * identify them so that we don't log complaints about their existence
+     *  
+     * @param f
+     * @return
+     */
+    private boolean isConfigDirectory(File dir) {
+        String name = dir.getName();
+        boolean result = "styles".equals(name) || "layergroups".equals(name);
+        return result;
+    }
+
     /**
      * Reads the legacy (1.x) catalog from disk.
      */
@@ -611,36 +615,37 @@ public abstract class GeoServerLoader {
             //assume 2.x style
             f = resourceLoader.find( "global.xml");
             if ( f != null ) {
-                BufferedInputStream in = new BufferedInputStream( new FileInputStream( f ) );
-                try {
-                    GeoServerInfoImpl global = 
-                        (GeoServerInfoImpl) xpf.createXMLPersister().load( in, GeoServerInfo.class );
-                    geoServer.setGlobal( global );
-                }
-                finally {
-                    in.close();
-                }
+                GeoServerInfo global = depersist(xp, f, GeoServerInfo.class);
+                geoServer.setGlobal( global );
             }
             
             //load logging
             f = resourceLoader.find( "logging.xml" );
             if ( f != null ) {
-                BufferedInputStream in = new BufferedInputStream( new FileInputStream( f ) );
-                try {
-                    LoggingInfo logging = xpf.createXMLPersister().load( in, LoggingInfo.class );
-                    geoServer.setLogging( logging );
-                }
-                finally {
-                    in.close();
+                LoggingInfo logging = depersist(xp, f, LoggingInfo.class );
+                geoServer.setLogging( logging );
+            }
+
+            // load workspace specific settings
+            File workspaces = resourceLoader.find("workspaces");
+            if (workspaces != null) {
+                for (File dir : workspaces.listFiles()) {
+                    if (!dir.isDirectory() && !dir.isHidden()) continue;
+    
+                    f = resourceLoader.find(dir, "settings.xml");
+                    if (f != null) {
+                        SettingsInfo settings = depersist(xp, f, SettingsInfo.class );
+                        geoServer.add(settings);
+                    }
                 }
             }
+
             //load services
             final List<XStreamServiceLoader> loaders = 
                 GeoServerExtensions.extensions( XStreamServiceLoader.class );
             loadServices(null, loaders, geoServer);
 
             //load services specific to workspace
-            File workspaces = resourceLoader.find("workspaces");
             if (workspaces != null) {
                 for (File dir : workspaces.listFiles()) {
                     if (!dir.isDirectory() && !dir.isHidden()) continue;
@@ -665,6 +670,43 @@ public abstract class GeoServerLoader {
         }
     }
 
+    void loadStyles(File styles, Catalog catalog, XStreamPersister xp) {
+        for ( File sf : list(styles,new SuffixFileFilter(".xml") ) ) {
+            try {
+                //handle the .xml.xml case
+                if (new File(styles,sf.getName()+".xml").exists()) {
+                    continue;
+                }
+                
+                StyleInfo s = depersist( xp, sf, StyleInfo.class );
+                catalog.add( s );
+                
+                LOGGER.info( "Loaded style '" + s.getName() + "'" );
+            }
+            catch( Exception e ) {
+                LOGGER.log( Level.WARNING, "Failed to load style from file '" + sf.getName() + "'" , e );
+            }
+        }
+    }
+
+    void loadLayerGroups(File layergroups, Catalog catalog, XStreamPersister xp) {
+        for ( File lgf : list( layergroups, new SuffixFileFilter( ".xml" ) ) ) {
+            try {
+                LayerGroupInfo lg = depersist( xp, lgf, LayerGroupInfo.class );
+                if(lg.getLayers() == null || lg.getLayers().size() == 0) {
+                    LOGGER.warning("Skipping empty layer group '" + lg.getName() + "', it is invalid");
+                    continue;
+                }
+                catalog.add( lg );
+                
+                LOGGER.info( "Loaded layer group '" + lg.getName() + "'" );    
+            }
+            catch( Exception e ) {
+                LOGGER.log( Level.WARNING, "Failed to load layer group '" + lgf.getName() + "'", e );
+            }
+        }
+    }
+
     void loadServices(File directory, List<XStreamServiceLoader> loaders, GeoServer geoServer) {
         for ( XStreamServiceLoader<ServiceInfo> l : loaders ) {
             try {
@@ -676,8 +718,17 @@ public abstract class GeoServerLoader {
                 LOGGER.info( "Loaded service '" +  s.getId() + "', " + (s.isEnabled()?"enabled":"disabled") );
             }
             catch( Throwable t ) {
-                //TODO: log this
-                t.printStackTrace();
+                if (directory != null) {
+                    LOGGER.log(Level.SEVERE,
+                            "Failed to load the service configuration in directory: " + directory
+                                    + " with loader for " + l.getServiceClass(),
+                            t);
+                } else {
+                    LOGGER.log(
+                            Level.SEVERE,
+                            "Failed to load the root service configuration with loader for "
+                                    + l.getServiceClass(), t);
+                }
             }
         }
     }
@@ -691,18 +742,20 @@ public abstract class GeoServerLoader {
         out.flush();
         out.close();
     }
-    
+
     /**
      * Helper method which uses xstream to depersist an object as xml from disk.
      */
     <T> T depersist( XStreamPersister xp, File f , Class<T> clazz ) throws IOException {
         BufferedInputStream in = new BufferedInputStream( new FileInputStream( f ) );
-        T obj = xp.load( in, clazz );
-
-        in.close();
-        return obj;
+        try {
+            return xp.load( in, clazz );
+        }
+        finally {
+            in.close();
+        }
     }
-    
+
     /**
      * Helper method for listing files in a directory.
      */

@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.template;
@@ -20,8 +21,6 @@ import org.geoserver.config.GeoServerDataDirectory;
 import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.platform.GeoServerResourceLoader;
 import org.opengis.feature.simple.SimpleFeatureType;
-import org.vfny.geoserver.global.GeoserverDataDirectory;
-
 import freemarker.cache.ClassTemplateLoader;
 import freemarker.cache.FileTemplateLoader;
 import freemarker.cache.TemplateLoader;
@@ -128,8 +127,14 @@ public class GeoServerTemplateLoader implements TemplateLoader {
      * @throws IOException
      */
     public GeoServerTemplateLoader(Class caller, GeoServerResourceLoader rl) throws IOException {
+        this(caller, new GeoServerDataDirectory(rl));
+    }
+
+    public GeoServerTemplateLoader(Class caller, GeoServerDataDirectory dd) throws IOException {
+        this.dd = dd;
+
         //create a file template loader to delegate to
-        fileTemplateLoader = new FileTemplateLoader(rl.getBaseDirectory());
+        fileTemplateLoader = new FileTemplateLoader(dd.root());
 
         //grab the catalog and store a reference
         catalog = (Catalog)GeoServerExtensions.bean("catalog");
@@ -138,8 +143,10 @@ public class GeoServerTemplateLoader implements TemplateLoader {
         if (caller != null) {
             classTemplateLoader = new ClassTemplateLoader(caller, "");
         }
-        
-        dd = new GeoServerDataDirectory(rl);
+    }
+
+    public void setCatalog(Catalog catalog) {
+        this.catalog = catalog;
     }
 
     /**
@@ -194,8 +201,9 @@ public class GeoServerTemplateLoader implements TemplateLoader {
         // 1. Relative to resource
         // 2. Relative to store of the resource
         // 3. Relative to workspace of resource
-        // 4. Relative to templates directory
-        // 5. Relative to the class
+        // 4. Relative to workspaces directory
+        // 5. Relative to templates directory
+        // 6. Relative to the class
         
         if ( resource != null ) {
             //first check relative to set resource
@@ -256,10 +264,34 @@ public class GeoServerTemplateLoader implements TemplateLoader {
             final String dirName;
             if (featureType != null) {
                 baseDirName = "featureTypes";
-                dirName = GeoserverDataDirectory.findFeatureTypeDirName(featureType);
+                String name = featureType.getTypeName();
+                String namespace = featureType.getName().getNamespaceURI();
+                FeatureTypeInfo ftInfo = null;
+                if(catalog != null && namespace != null) {
+                    NamespaceInfo nsInfo = catalog.getNamespaceByURI(namespace);
+                    if(nsInfo != null){
+                        ftInfo = catalog.getFeatureTypeByName( nsInfo.getPrefix(), name);
+                    }
+                }
+                if(catalog != null && ftInfo == null){ 
+                    ftInfo = catalog.getFeatureTypeByName(name);
+                }
+                if(ftInfo != null){
+                    String metadata = ftInfo.getMetadata().get("dirName",String.class);
+                    if( metadata != null ){
+                        dirName = metadata;
+                    }
+                    else {
+                        dirName = ftInfo.getNamespace().getPrefix() + "_" + ftInfo.getName();
+                    }
+                }
+                else {
+                    dirName = null; // unavaialble
+                }
             } else if (coverageName != null) {
                 baseDirName = "coverages";
-                dirName = GeoserverDataDirectory.findCoverageDirName(coverageName);
+                CoverageInfo coverageInfo = catalog.getCoverageByName(coverageName);
+                dirName = coverageInfo.getMetadata().get( "dirName", String.class );
             } else {
                 baseDirName = "featureTypes";
                 dirName = "";

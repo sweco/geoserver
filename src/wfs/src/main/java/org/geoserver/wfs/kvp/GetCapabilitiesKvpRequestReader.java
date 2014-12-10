@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2011 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -29,7 +30,10 @@ public class GetCapabilitiesKvpRequestReader extends WFSKvpRequestReader {
         //set the version attribute on the request
         if (kvp.containsKey("version")) {
             GetCapabilitiesRequest req = GetCapabilitiesRequest.adapt(request);
-            req.setAcceptVersions((String)kvp.get("version"));
+            //TODO: put this check in a cite hack
+            if (req.getAcceptVersions() == null || req.getAcceptVersions().isEmpty()) {
+                req.setAcceptVersions((String)kvp.get("version"));    
+            }
         }
 
         return request;

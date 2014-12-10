@@ -1,27 +1,36 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.web;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
+import org.apache.wicket.Session;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.FormComponent;
 import org.apache.wicket.util.tester.FormTester;
 import org.apache.wicket.util.tester.WicketTester;
-import org.geoserver.test.GeoServerTestSupport;
+import org.geoserver.data.test.SystemTestData;
+import org.geoserver.security.GeoServerSecurityTestSupport;
 import org.geoserver.web.wicket.WicketHierarchyPrinter;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.GrantedAuthorityImpl;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.context.SecurityContextImpl;
+import org.junit.After;
+import org.junit.BeforeClass;
 
-public abstract class GeoServerWicketTestSupport extends GeoServerTestSupport {
+public abstract class GeoServerWicketTestSupport extends GeoServerSecurityTestSupport {
     public static WicketTester tester;
 
-    public void oneTimeSetUp() throws Exception {        
-        super.oneTimeSetUp();
+    @BeforeClass
+    public static void disableBrowserDetection() {
+        // disable browser detection, makes testing harder for nothing
+        GeoServerApplication.DETECT_BROWSER = false;
+    }
+
+    @Override
+    protected void onSetUp(SystemTestData testData) throws Exception {
         // prevent Wicket from bragging about us being in dev mode (and run
         // the tests as if we were in production all the time)
         System.setProperty("wicket.configuration", "deployment");
@@ -30,31 +39,37 @@ public abstract class GeoServerWicketTestSupport extends GeoServerTestSupport {
         Locale.setDefault(Locale.ENGLISH);
         
         GeoServerApplication app = 
-            (GeoServerApplication) applicationContext.getBean("webApplication");
-        tester = new WicketTester(app);
+ (GeoServerApplication) applicationContext
+                .getBean("webApplication");
+        tester = new WicketTester(
+                (GeoServerApplication) applicationContext.getBean("webApplication"));
         app.init();
-        
+    }
+
+    @After
+    public void clearErrorMessages() {
+        Session.get().cleanupFeedbackMessages();
+    }
+
+    @Override
+    protected void onTearDown(SystemTestData testData) throws Exception {
+        super.onTearDown(testData);
+        tester.destroy();
     }
 
     public GeoServerApplication getGeoServerApplication(){
         return GeoServerApplication.get();
     }
 
+    /**
+     * Logs in as administrator.
+     */
     public void login(){
-        SecurityContextHolder.setContext(new SecurityContextImpl());
-        List<GrantedAuthority> l= new ArrayList<GrantedAuthority>();
-        l.add(new GrantedAuthorityImpl("ROLE_ADMINISTRATOR"));
-        
-        SecurityContextHolder.getContext().setAuthentication(
-            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("admin","geoserver",l));                                  
+        login("admin", "geoserver", "ROLE_ADMINISTRATOR");
     }
 
     public void logout(){
-        SecurityContextHolder.setContext(new SecurityContextImpl());
-        List<GrantedAuthority> l= new ArrayList<GrantedAuthority>();
-        l.add(new GrantedAuthorityImpl("ROLE_ANONYMOUS"));
-        SecurityContextHolder.getContext().setAuthentication(
-                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("anonymousUser","",l));                                  
+        login("anonymousUser","", "ROLE_ANONYMOUS");
     }
     
     /**
@@ -66,6 +81,10 @@ public abstract class GeoServerWicketTestSupport extends GeoServerTestSupport {
      * @param dumpValue if enabled, the component values are printed as well
      */
     public void print(Component c, boolean dumpClass, boolean dumpValue) {
+        if (isQuietTests()) {
+            return;
+        }
+
         WicketHierarchyPrinter.print(c, dumpClass, dumpValue);
     }
     
@@ -78,6 +97,10 @@ public abstract class GeoServerWicketTestSupport extends GeoServerTestSupport {
     * @param dumpValue if enabled, the component values are printed as well
     */
    public void print(Component c, boolean dumpClass, boolean dumpValue, boolean dumpPath) {
+       if (isQuietTests()) {
+           return;
+       }
+
        WicketHierarchyPrinter.print(c, dumpClass, dumpValue);
    }
     

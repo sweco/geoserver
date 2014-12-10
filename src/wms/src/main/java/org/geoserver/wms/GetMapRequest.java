@@ -1,13 +1,16 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
 
 import java.awt.Color;
 import java.awt.geom.Point2D;
+import java.awt.image.IndexColorModel;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -15,11 +18,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.geoserver.catalog.SLDHandler;
 import org.geoserver.ows.util.CaseInsensitiveMap;
-import org.geotools.image.palette.InverseColorMapOp;
 import org.geotools.styling.Style;
 import org.geotools.util.DateRange;
 import org.geotools.util.NumberRange;
+import org.geotools.util.Version;
 import org.opengis.filter.Filter;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
@@ -32,7 +36,7 @@ import com.vividsolutions.jts.geom.Envelope;
  * @author Simone Giannecchini
  * @version $Id$
  */
-public class GetMapRequest extends WMSRequest {
+public class GetMapRequest extends WMSRequest implements Cloneable {
 
     static final Color DEFAULT_BG = Color.white;
 
@@ -139,23 +143,79 @@ public class GetMapRequest extends WMSRequest {
 
     /**
      * Gets the url specified by the "SLD" parameter.
+     * <p>
+     * This parameter is an alias for "STYLE_URL".
+     * </p>
      */
     public URL getSld() {
-        return this.optionalParams.sld;
+        return getStyleUrl();
+    }
+
+    /**
+     * Gets the url specified by the "STYLE_URL" parameter.
+     * <p>
+     * This parameter is used to point to a remote style via url.
+     * </p>
+     */
+    public URL getStyleUrl() {
+        return this.optionalParams.styleUrl;
     }
 
     /**
      * Gets the string specified the "SLD_BODY" parameter.
+     * <p>
+     * This parameter is an alias for "STYLE_BODY".
+     * </p>
      */
     public String getSldBody() {
-        return this.optionalParams.sldBody;
+        return getStyleBody();
+    }
+
+    /**
+     * Gets the String specified by the "STYLE_BODY" parameter.
+     * <p>
+     * This parameter is used to directly supply a complete style in the request.
+     * </p>
+     */
+    public String getStyleBody() {
+        return this.optionalParams.styleBody;
     }
 
     /**
      * Gets the string specified by the "SLD_VERSION" parameter.
+     * <p>
+     * This parameter is an alias for "STYLE_VERSION".
+     * </p>
      */
     public String getSldVersion() {
-        return this.optionalParams.sldVersion;
+        return getStyleVersion();
+    }
+
+    /**
+     * Gets the String specified by the "STYLE_VERSION" parameter.
+     * <p>
+     * This parameter is used to supply a version of the style language being specified.
+     * It only applies when the style is being supplied directly in the request with one
+     * of the "STYLE_URL", "STYLE_BODY" parameters.
+     *
+     * </p>
+     */
+    public String getStyleVersion() {
+        return this.optionalParams.styleVersion;
+    }
+
+    /**
+     * Returns {@link #getStyleVersion()} as a Version object, or null if no version is set.
+     */
+    public Version styleVersion() {
+        return getStyleVersion() != null ? new Version(getStyleVersion()) : null;
+    }
+
+    /**
+     * Gets the string specified by the "STYLE_FORMAT" parameter.
+     */
+    public String getStyleFormat() {
+        return this.optionalParams.styleFormat;
     }
 
     /**
@@ -226,68 +286,12 @@ public class GetMapRequest extends WMSRequest {
         return this.optionalParams.buffer;
     }
 
-    public InverseColorMapOp getPalette() {
-        return this.optionalParams.paletteInverter;
+    public IndexColorModel getPalette() {
+        return this.optionalParams.icm;
     }
 
     public int getWidth() {
         return this.mandatoryParams.width;
-    }
-
-    /**
-     * @return the KML/KMZ score value for image vs. vector response
-     * @deprecated use <code>getFormatOptions().get( "kmscore" )</code>
-     */
-    public int getKMScore() {
-        Integer kmscore = (Integer) getFormatOptions().get("kmscore");
-
-        if (kmscore != null) {
-            return kmscore.intValue();
-        }
-
-        return 40; // old default
-    }
-
-    /**
-     * @return true: return full attribution for placemark <description>
-     * @deprecated use <code>getFormatOptions().get( "kmattr" )</code>
-     */
-    public boolean getKMattr() {
-        Boolean kmattr = (Boolean) getFormatOptions().get("kmattr");
-
-        if (kmattr != null) {
-            return kmattr.booleanValue();
-        }
-
-        return true; // old default
-    }
-
-    // /**
-    // * @return super overlay flag, <code>true</code> if super overlay requested.
-    // * @deprecated use <code>getFormatOptions().get( "superoverlay" )</code>
-    // */
-    // public boolean getSuperOverlay() {
-    // Boolean superOverlay = (Boolean) getFormatOptions().get("superoverlay");
-    //
-    // if (superOverlay != null) {
-    // return superOverlay.booleanValue();
-    // }
-    //
-    // return false; //old default
-    // }
-
-    /**
-     * @return kml legend flag, <code>true</code> if legend is enabled.
-     * @deprecated use <code>getFormatOptions().get( "legend" )</code>
-     */
-    public boolean getLegend() {
-        Boolean legend = (Boolean) getFormatOptions().get("legend");
-
-        if (legend != null) {
-            return legend.booleanValue();
-        }
-
-        return false; // old default
     }
 
     /**
@@ -410,21 +414,49 @@ public class GetMapRequest extends WMSRequest {
      * Sets the url specified by the "SLD" parameter.
      */
     public void setSld(URL sld) {
-        this.optionalParams.sld = sld;
+        setStyleUrl(sld);
+    }
+
+    /**
+     * Sets the url specified by the "STYLE_URL" parameter.
+     */
+    public void setStyleUrl(URL styleUrl) {
+        this.optionalParams.styleUrl = styleUrl;
     }
 
     /**
      * Sets the string specified by the "SLD_BODY" parameter
      */
     public void setSldBody(String sldBody) {
-        this.optionalParams.sldBody = sldBody;
+        setStyleBody(sldBody);
+    }
+
+    /**
+     * Sets the url specified by the "STYLE_BODY" parameter.
+     */
+    public void setStyleBody(String styleBody) {
+        this.optionalParams.styleBody = styleBody;
     }
 
     /**
      * Sets the string specified by the "SLD_VERSION" parameter
      */
     public void setSldVersion(String sldVersion) {
-        this.optionalParams.sldVersion = sldVersion;
+        setStyleVersion(sldVersion);
+    }
+
+    /**
+     * Sets the url specified by the "STYLE_VERSION" parameter.
+     */
+    public void setStyleVersion(String styleVersion) {
+        this.optionalParams.styleVersion = styleVersion;
+    }
+
+    /**
+     * Sets the string specified by the "STYLE_FORMAT" parameter
+     */
+    public void setStyleFormat(String styleFormat) {
+        this.optionalParams.styleFormat = styleFormat;
     }
 
     /**
@@ -488,8 +520,8 @@ public class GetMapRequest extends WMSRequest {
         this.optionalParams.buffer = buffer;
     }
 
-    public void setPalette(InverseColorMapOp paletteInverter) {
-        this.optionalParams.paletteInverter = paletteInverter;
+    public void setPalette(IndexColorModel icm) {
+        this.optionalParams.icm = icm;
     }
 
     public void setBuffer(Integer buffer) {
@@ -514,43 +546,6 @@ public class GetMapRequest extends WMSRequest {
 
     public void setWidth(Integer width) {
         this.mandatoryParams.width = width.intValue();
-    }
-
-    /**
-     * @param score
-     *            the KML/KMZ score value for image vs. vector response, from 0 to 100
-     * @deprecated use <code>getFormatOptions().put( "kmscore", new Integer( score ) );</code>
-     */
-    public void setKMScore(int score) {
-        getFormatOptions().put("kmscore", new Integer(score));
-    }
-
-    /**
-     * @param on
-     *            true: full attribution; false: no attribution
-     * @deprecated use <code>getFormatOptions().put( "kmattr", new Boolean( on ) );</code>
-     */
-    public void setKMattr(boolean on) {
-        getFormatOptions().put("kmattr", new Boolean(on));
-    }
-
-    /**
-     * Sets the super overlay parameter on the request.
-     * 
-     * @deprecated use
-     *             <code>getFormatOptions().put( "superoverlay", new Boolean( superOverlay ) );</code>
-     */
-    public void setSuperOverlay(boolean superOverlay) {
-        getFormatOptions().put("superoverlay", new Boolean(superOverlay));
-    }
-
-    /**
-     * Sets the kml legend parameter of the request.
-     * 
-     * @deprecated use <code>getFormatOptions().put( "legend", new Boolean( legend ) );</code>
-     */
-    public void setLegend(boolean legend) {
-        getFormatOptions().put("legend", new Boolean(legend));
     }
 
     /**
@@ -641,7 +636,20 @@ public class GetMapRequest extends WMSRequest {
         this.optionalParams.angle = rotation;
     }
 
-    private class MandatoryParameters {
+    public ScaleComputationMethod getScaleMethod() {
+        return this.optionalParams.scaleMethod;
+    }
+
+    /**
+     * Sets the scale computation method ({@link ScaleComputationMethod#OGC} by default)
+     * 
+     * @param rotation
+     */
+    public void setScaleMethod(ScaleComputationMethod scaleMethod) {
+        this.optionalParams.scaleMethod = scaleMethod;
+    }
+
+    private class MandatoryParameters implements Cloneable {
         /** ordered list of requested layers */
         List<MapLayerInfo> layers = Collections.emptyList();
 
@@ -658,9 +666,15 @@ public class GetMapRequest extends WMSRequest {
         int height;
 
         String format;
+        
+        @Override
+        public Object clone() throws CloneNotSupportedException {
+        	return super.clone();
+        } 
+
     }
 
-    private class OptionalParameters {
+    private class OptionalParameters implements Cloneable {
     	
         /**
          * Tells us whether or not we should loop forever in an ani,mated gif
@@ -717,8 +731,8 @@ public class GetMapRequest extends WMSRequest {
         /** the rendering buffer, in pixels **/
         int buffer;
 
-        /** The paletteInverter used for rendering, if any */
-        InverseColorMapOp paletteInverter;
+        /** The palette used for rendering, if any */
+        IndexColorModel icm;
 
         /**
          * time parameter, a list since many pattern setup can be possible, see for
@@ -731,20 +745,25 @@ public class GetMapRequest extends WMSRequest {
         List<Object> elevation = Collections.emptyList();
 
         /**
-         * SLD parameter
+         * STYLE_URL parameter
          */
-        URL sld;
+        URL styleUrl;
 
         /**
-         * SLD_BODY parameter
+         * STYLE_BODY parameter
          */
-        String sldBody;
+        String styleBody;
 
         /** 
-         * SLD_VERSION parameter
+         * STYLE_VERSION parameter
          */
-        String sldVersion;
-        
+        String styleVersion;
+
+        /**
+         * STYLE_FORMAT parameter
+         */
+        String styleFormat = SLDHandler.FORMAT;
+
         /** flag to validate SLD parameter */
         Boolean validateSLD = Boolean.FALSE;
 
@@ -764,6 +783,16 @@ public class GetMapRequest extends WMSRequest {
 
         /** map rotation */
         double angle;
+        
+        /** scale computation method */
+        ScaleComputationMethod scaleMethod;
+
+        @Override
+        public Object clone() throws CloneNotSupportedException {
+        	return super.clone();
+        	
+        } 
+
     }
 
     /**
@@ -806,10 +835,44 @@ public class GetMapRequest extends WMSRequest {
         return httpRequestHeaders == null ? null : httpRequestHeaders.get(headerName);
     }
 
+    @SuppressWarnings("unchecked")
     public void putHttpRequestHeader(String headerName, String value) {
         if (httpRequestHeaders == null) {
-            httpRequestHeaders = new HashMap<String, String>();
+            httpRequestHeaders = new CaseInsensitiveMap(new HashMap<String, String>());
         }
         httpRequestHeaders.put(headerName, value);
+    }
+    
+    @Override
+    public Object clone() {
+    	try {
+			GetMapRequest copy = (GetMapRequest) super.clone();
+			copy.mandatoryParams = (MandatoryParameters) mandatoryParams.clone();
+			copy.optionalParams = (OptionalParameters) optionalParams.clone();
+			
+			return copy;
+		} catch (CloneNotSupportedException e) {
+			throw new RuntimeException("Unexpected, could not clone GetMapRequest", e);
+		}
+    }
+
+    public List<String> getCustomDimension(String dimensionName) {
+        if (getRawKvp() != null) {
+            String key = "DIM_" + dimensionName;
+            String value = getRawKvp().get(key);
+            if (value != null) {
+
+                final ArrayList<String> values = new ArrayList<String>(1);
+                if (value.indexOf(",") > 0) {
+                    String[] elements = value.split("\\s*,\\s*");
+                    values.addAll(Arrays.asList(elements));
+                } else {
+                    values.add(value);
+                }
+                return values;
+            }
+        }
+
+        return null;
     }
 }

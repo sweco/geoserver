@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2014 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.featureinfo;
@@ -60,14 +61,6 @@ public class GetFeatureInfoKvpReader extends KvpRequestReader {
         GetFeatureInfoRequest request = (GetFeatureInfoRequest) super.read(req, kvp, rawKvp);
         request.setRawKvp(rawKvp);
 
-        request.setQueryLayers(new MapLayerInfoKvpParser("QUERY_LAYERS", wms).parse((String) rawKvp
-                .get("QUERY_LAYERS")));
-
-        if (request.getQueryLayers() == null || request.getQueryLayers().size() == 0) {
-            throw new ServiceException("No QUERY_LAYERS has been requested, or no "
-                    + "queriable layer in the request anyways");
-        }
-
         GetMapRequest getMapPart = new GetMapRequest();
         try {
             getMapPart = getMapReader.read(getMapPart, kvp, rawKvp);
@@ -78,9 +71,40 @@ public class GetFeatureInfoKvpReader extends KvpRequestReader {
         }
 
         request.setGetMapRequest(getMapPart);
+        
+        List<MapLayerInfo> getMapLayers = getMapPart.getLayers();
+        
+        if ((getMapPart.getSldBody() != null || getMapPart.getSld() != null)
+                && (rawKvp.get("QUERY_LAYERS") == null || "".equals(rawKvp.get("QUERY_LAYERS")))) {
+            // in this case we assume all layers in SLD body are to be queried (GS own extension)(
+            request.setQueryLayers(getMapLayers);
+        } else {
+            request.setQueryLayers(new MapLayerInfoKvpParser("QUERY_LAYERS", wms).parse((String) rawKvp
+                    .get("QUERY_LAYERS")));
+        }
+        
+        if (request.getQueryLayers().isEmpty()) {
+            throw new ServiceException("No QUERY_LAYERS has been requested, or no "
+                    + "queriable layer in the request anyways");
+        }
+        
+        if(kvp.containsKey("propertyName")) {
+            List<List<String>> propertyNames = (List<List<String>>) kvp.get("propertyName");
+            if(propertyNames.size() == 1 && request.getQueryLayers().size() > 1) {
+                // assume we asked the same list for all layers
+                while(propertyNames.size() < request.getQueryLayers().size()) {
+                    propertyNames.add(propertyNames.get(0));
+                }
+            }
+            if(propertyNames.size() != request.getQueryLayers().size()) {
+                throw new ServiceException("Mismatch between the property name set count " 
+                        + propertyNames.size() + " and the query layers count " + request.getQueryLayers().size(),
+                        "InvalidParameter", "propertyName");
+            }
+            request.setPropertyNames(propertyNames);
+        }
 
         // make sure they are a subset of layers
-        List<MapLayerInfo> getMapLayers = getMapPart.getLayers();
         List<MapLayerInfo> queryLayers = new ArrayList<MapLayerInfo>(request.getQueryLayers());
         queryLayers.removeAll(getMapLayers);
         if (queryLayers.size() > 0) {
@@ -89,6 +113,7 @@ public class GetFeatureInfoKvpReader extends KvpRequestReader {
             throw new ServiceException("QUERY_LAYERS contains layers not cited in LAYERS. "
                     + "It should be a proper subset of those instead");
         }
+
         for (MapLayerInfo l : request.getQueryLayers()) {
             LayerInfo layerInfo = l.getLayerInfo();
             if (!wms.isQueryable(layerInfo)) {
@@ -107,6 +132,8 @@ public class GetFeatureInfoKvpReader extends KvpRequestReader {
                 throw new ServiceException("Invalid format '" + format
                         + "', supported formats are " + infoFormats, "InvalidFormat", "info_format");
             }
+            if (wms.getAllowedFeatureInfoFormats().contains(format)==false)
+                throw wms.unallowedGetFeatureInfoFormatException(format);
         }
 
         request.setInfoFormat(format);

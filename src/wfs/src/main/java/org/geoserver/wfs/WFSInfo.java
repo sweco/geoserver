@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wfs;
 
 import java.util.Arrays;
@@ -228,5 +233,36 @@ public interface WFSInfo extends ServiceInfo {
      * set the response encoding option, featureMembers or featureMember
      */
     void setEncodeFeatureMember(boolean encodeFeatureMember);
+    
+    
+    /**
+     * Get the flag that determines if WFS hit requests (counts) will ignore
+     * the maximum features limit for this server
+     * @return hitsIgnoreMaxFeatures
+     */ 
+    boolean isHitsIgnoreMaxFeatures();
+    
+    /**
+     * Set the option to ignore the maximum feature limit for WFS hit counts
+     */
+    void setHitsIgnoreMaxFeatures(boolean hitsIgnoreMaxFeatures);
+    
+    /**
+     * Get the maximum number of features to be displayed in a layer preview.
+     * Can be defined by the user. By default, 50.
+     * @return maxNumberOfFeaturesForPreview
+     */
+    Integer getMaxNumberOfFeaturesForPreview();
+    
+    /**
+     * Set the maximum number of features to be displayed in a layer preview
+     */
+    void setMaxNumberOfFeaturesForPreview(Integer maxNumberOfFeaturesForPreview);
+    
+    /**
+     * The srs's that the WFS service will advertise in the capabilities document
+     */
+    List<String> getSRS();
+
     
 }

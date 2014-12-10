@@ -1,5 +1,11 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.geosearch.rest;
 
+import static junit.framework.Assert.assertEquals;
 import static org.custommonkey.xmlunit.XMLAssert.assertXpathEvaluatesTo;
 import static org.custommonkey.xmlunit.XMLAssert.assertXpathExists;
 import static org.geoserver.data.test.MockData.BASIC_POLYGONS;
@@ -11,35 +17,28 @@ import java.util.Set;
 
 import javax.xml.namespace.QName;
 
-import junit.framework.Test;
-
 import org.custommonkey.xmlunit.SimpleNamespaceContext;
 import org.custommonkey.xmlunit.XMLUnit;
 import org.custommonkey.xmlunit.XpathEngine;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.LayerInfo;
-import org.geoserver.config.GeoServerInfo;
+import org.geoserver.config.SettingsInfo;
 import org.geoserver.data.test.MockData;
-import org.geoserver.test.GeoServerTestSupport;
+import org.geoserver.data.test.SystemTestData;
+import org.geoserver.test.GeoServerSystemTestSupport;
+import org.junit.Test;
 import org.w3c.dom.Document;
 
 import com.mockrunner.mock.web.MockHttpServletResponse;
 
-public class GeoSearchIntegrationTest extends GeoServerTestSupport {
+public class GeoSearchIntegrationTest extends GeoServerSystemTestSupport {
 
     static QName[] indexed = { MockData.BASIC_POLYGONS, MockData.BRIDGES };
 
-    /**
-     * This is a READ ONLY TEST so we can use one time setup
-     */
-    public static Test suite() {
-        return new OneTimeTestSetup(new GeoSearchIntegrationTest());
-    }
-
+    
     @Override
-    protected void oneTimeSetUp() throws Exception {
-        super.oneTimeSetUp();
+    protected void onSetUp(SystemTestData testData) throws Exception {
         Catalog catalog = getCatalog();
         for (QName name : indexed) {
             String namespaceURI = name.getNamespaceURI();
@@ -57,7 +56,8 @@ public class GeoSearchIntegrationTest extends GeoServerTestSupport {
         namespaces.put("kml", "http://www.opengis.net/kml/2.2");
         XMLUnit.setXpathNamespaceContext(new SimpleNamespaceContext(namespaces));
     }
-
+    
+    @Test
     public void testSiteMap() throws Exception {
         Document dom = getAsDOM("/geosearch/sitemap.xml");
         // print(dom);
@@ -70,13 +70,14 @@ public class GeoSearchIntegrationTest extends GeoServerTestSupport {
         assertXpathEvaluatesTo("kml", "/sm:urlset/sm:url/geo:geo/geo:format", dom);
     }
 
+    @Test
     public void testKmlUrls() throws Exception {
         Document sitemap = getAsDOM("/geosearch/sitemap.xml");
         // print(sitemap);
 
         Set<String> expected = new HashSet<String>();
-        expected.add("http://localhost/geoserver/geosearch/cite%3ABasicPolygons.kml");
-        expected.add("http://localhost/geoserver/geosearch/cite%3ABridges.kml");
+        expected.add("http://localhost:8080/geoserver/geosearch/cite%3ABasicPolygons.kml");
+        expected.add("http://localhost:8080/geoserver/geosearch/cite%3ABridges.kml");
 
         XpathEngine xp = XMLUnit.newXpathEngine();
         String kmlUrl1 = xp.evaluate("/sm:urlset/sm:url[1]/sm:loc", sitemap);
@@ -88,20 +89,21 @@ public class GeoSearchIntegrationTest extends GeoServerTestSupport {
         assertEquals(expected, actual);
     }
 
+    @Test
     public void testKml() throws Exception {
 
         Document kml = getAsDOM("/geosearch/cite%3ABasicPolygons.kml");
-        print(kml);
+        // print(kml);
 
         FeatureTypeInfo ft = getCatalog().getFeatureTypeByName(BASIC_POLYGONS.getNamespaceURI(),
                 BASIC_POLYGONS.getLocalPart());
 
         assertXpathEvaluatesTo(ft.getTitle(), "/kml:kml/kml:Document/kml:name", kml);
 
-        GeoServerInfo global = getGeoServer().getGlobal();
+        SettingsInfo global = getGeoServer().getGlobal().getSettings();
 
         assertXpathEvaluatesTo(global.getContact().getContactPerson(),
-                "/kml:kml/kml:Document/atom:author", kml);
+                "/kml:kml/kml:Document/atom:author/atom:nameOrUriOrEmail", kml);
 
         assertXpathEvaluatesTo(global.getOnlineResource(), "/kml:kml/kml:Document/atom:link/@href",
                 kml);
@@ -112,6 +114,7 @@ public class GeoSearchIntegrationTest extends GeoServerTestSupport {
                 "/kml:kml/kml:Document/kml:NetworkLink/kml:name", kml);
     }
 
+    @Test
     public void testKmlResponseHeaders() throws Exception {
         MockHttpServletResponse response = getAsServletResponse("/geosearch/cite%3ABasicPolygons.kml");
         assertEquals(200, response.getStatusCode());

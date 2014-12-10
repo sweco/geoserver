@@ -1,8 +1,11 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.web.data.store;
+
+import static org.junit.Assert.*;
 
 import java.util.Arrays;
 import java.util.List;
@@ -13,6 +16,7 @@ import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.web.GeoServerWicketTestSupport;
 import org.geoserver.web.data.store.panel.WorkspacePanel;
 import org.geotools.data.property.PropertyDataStoreFactory;
+import org.junit.Test;
 
 /**
  * Test suite for {@link DataAccessNewPage}
@@ -40,6 +44,7 @@ public class DataAccessNewPageTest extends GeoServerWicketTestSupport {
         return page;
     }
 
+    @Test
     public void testInitCreateNewDataStoreInvalidDataStoreFactoryName() {
 
         final String dataStoreFactoryDisplayName = "_invalid_";
@@ -56,6 +61,7 @@ public class DataAccessNewPageTest extends GeoServerWicketTestSupport {
     /**
      * A kind of smoke test that only asserts the page is rendered when first loaded
      */
+    @Test
     public void testPageRendersOnLoad() {
 
         final PropertyDataStoreFactory dataStoreFactory = new PropertyDataStoreFactory();
@@ -69,6 +75,7 @@ public class DataAccessNewPageTest extends GeoServerWicketTestSupport {
         tester.assertComponent("dataStoreForm:workspacePanel", WorkspacePanel.class);
     }
 
+    @Test
     public void testDefaultWorkspace() {
 
         startPage();
@@ -89,6 +96,7 @@ public class DataAccessNewPageTest extends GeoServerWicketTestSupport {
 
     }
 
+    @Test
     public void testDefaultNamespace() {
 
         // final String namespacePath =
@@ -103,6 +111,7 @@ public class DataAccessNewPageTest extends GeoServerWicketTestSupport {
 
     }
 
+    @Test
     public void testDataStoreParametersAreCreated() {
         startPage();
         List parametersListViewValues = Arrays.asList(new Object[] { "directory", "namespace" });
@@ -113,6 +122,7 @@ public class DataAccessNewPageTest extends GeoServerWicketTestSupport {
      * Make sure in case the DataStore has a "namespace" parameter, its value is initialized to the
      * NameSpaceInfo one that matches the workspace
      */
+    @Test
     public void testInitCreateNewDataStoreSetsNamespaceParam() {
         final Catalog catalog = getGeoServerApplication().getCatalog();
 

@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -17,10 +18,14 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.measure.quantity.Quantity;
+import javax.measure.unit.Unit;
 
 import org.apache.commons.collections.MultiHashMap;
 import org.geoserver.catalog.AttributeTypeInfo;
@@ -35,14 +40,19 @@ import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.Keyword;
 import org.geoserver.catalog.KeywordInfo;
 import org.geoserver.catalog.LayerGroupInfo;
+import org.geoserver.catalog.LayerGroupInfo.Mode;
 import org.geoserver.catalog.LayerIdentifierInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.MetadataLinkInfo;
 import org.geoserver.catalog.MetadataMap;
 import org.geoserver.catalog.NamespaceInfo;
+import org.geoserver.catalog.PublishedInfo;
 import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.catalog.StoreInfo;
 import org.geoserver.catalog.StyleInfo;
+import org.geoserver.catalog.CoverageView;
+import org.geoserver.catalog.CoverageView.InputCoverageBand;
+import org.geoserver.catalog.CoverageView.CoverageBand;
 import org.geoserver.catalog.WMSLayerInfo;
 import org.geoserver.catalog.WMSStoreInfo;
 import org.geoserver.catalog.WorkspaceInfo;
@@ -76,6 +86,7 @@ import org.geoserver.config.GeoServerInfo;
 import org.geoserver.config.JAIInfo;
 import org.geoserver.config.LoggingInfo;
 import org.geoserver.config.ServiceInfo;
+import org.geoserver.config.SettingsInfo;
 import org.geoserver.config.impl.ContactInfoImpl;
 import org.geoserver.config.impl.CoverageAccessInfoImpl;
 import org.geoserver.config.impl.GeoServerImpl;
@@ -83,7 +94,10 @@ import org.geoserver.config.impl.GeoServerInfoImpl;
 import org.geoserver.config.impl.JAIInfoImpl;
 import org.geoserver.config.impl.LoggingInfoImpl;
 import org.geoserver.config.impl.ServiceInfoImpl;
+import org.geoserver.config.impl.SettingsInfoImpl;
 import org.geoserver.ows.util.OwsUtils;
+import org.geoserver.platform.GeoServerExtensions;
+import org.geoserver.security.GeoServerSecurityManager;
 import org.geoserver.security.SecureCatalogImpl;
 import org.geotools.coverage.grid.GeneralGridEnvelope;
 import org.geotools.coverage.grid.GridGeometry2D;
@@ -94,11 +108,14 @@ import org.geotools.jdbc.RegexpValidator;
 import org.geotools.jdbc.VirtualTable;
 import org.geotools.jdbc.VirtualTableParameter;
 import org.geotools.jdbc.VirtualTableParameter.Validator;
+import org.geotools.measure.Measure;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.geotools.referencing.crs.DefaultProjectedCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
+import org.geotools.referencing.wkt.Formattable;
 import org.geotools.util.Converters;
+import org.geotools.util.MeasureConverterFactory;
 import org.geotools.util.NumberRange;
 import org.geotools.util.logging.Logging;
 import org.opengis.coverage.grid.GridGeometry;
@@ -107,6 +124,7 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 
 import com.thoughtworks.xstream.XStream;
+import com.thoughtworks.xstream.converters.ConversionException;
 import com.thoughtworks.xstream.converters.Converter;
 import com.thoughtworks.xstream.converters.MarshallingContext;
 import com.thoughtworks.xstream.converters.SingleValueConverterWrapper;
@@ -136,7 +154,8 @@ import com.vividsolutions.jts.geom.Geometry;
  */
 public class XStreamPersister {
 
-    
+    private boolean unwrapNulls = true;
+   
     /**
      * Callback interface or xstream persister.
      */
@@ -168,7 +187,17 @@ public class XStreamPersister {
         protected void postEncodeLayerGroup( LayerGroupInfo ls, HierarchicalStreamWriter writer, MarshallingContext context ) {
         }
         
+        /**
+         * @deprecated use {@link #postEncodeReference(Object, String, String, HierarchicalStreamWriter, MarshallingContext)}
+         */
         protected void postEncodeReference( Object obj, String ref, HierarchicalStreamWriter writer, MarshallingContext context ) {
+        }
+
+        protected void postEncodeReference( Object obj, String ref, String prefix, HierarchicalStreamWriter writer, MarshallingContext context ) {
+            if (prefix == null) {
+                //call other method for backward compatability
+                postEncodeReference(obj, ref, writer, context);
+            }
         }
 
         protected void postEncodeWMSStore(WMSStoreInfo store, HierarchicalStreamWriter writer,  MarshallingContext context) {
@@ -212,7 +241,14 @@ public class XStreamPersister {
      */
     Map<String, Class<?>> forwardBreifMap = new HashMap<String, Class<?>>();
     Map<Class<?>, String> backwardBreifMap = new HashMap<Class<?>, String>();
+
+    private Level forceLevel = LOGGER.getLevel() == null? Level.INFO : LOGGER.getLevel();
     
+    /**
+     * Flag controlling whether the persister should perform encryption on password fields
+     */
+    boolean encryptPasswordFields = true;
+
     /**
      * Constructs the persister and underlying xstream.
      */
@@ -244,12 +280,27 @@ public class XStreamPersister {
         init(xs);
     }
     
+    /**
+     * Sets null handling in proxy objects.
+     * Defaults to unwrap. If set to false, proxy object are not transformed to nulls.
+     * 
+     * @param unwrapNulls
+     */
+    public void setUnwrapNulls(boolean unwrapNulls) {
+        this.unwrapNulls = unwrapNulls;
+    }
+
     protected void init(XStream xs) {
         // Default implementations
         initImplementationDefaults(xs);
         
+        // ignore unkonwn fields, this should help using data dirs that has new config elements
+        // with older versions of GeoServer
+        xs.ignoreUnknownElements();
+        
         // Aliases
         xs.alias("global", GeoServerInfo.class);
+        xs.alias("settings", SettingsInfo.class);
         xs.alias("logging", LoggingInfo.class);
         xs.alias("jai", JAIInfo.class);
         xs.alias("coverageAccess", CoverageAccessInfo.class);
@@ -264,22 +315,25 @@ public class XStreamPersister {
         xs.alias( "coverage", CoverageInfo.class);
         xs.alias( "wmsLayer", WMSLayerInfo.class);
         xs.alias( "coverageDimension", CoverageDimensionInfo.class);
+        xs.alias( "coverageBand", CoverageBand.class);
+        xs.alias( "inputCoverageBand", InputCoverageBand.class);
         xs.alias( "metadataLink", MetadataLinkInfo.class);
         xs.alias( "attribute", AttributeTypeInfo.class );
         xs.alias( "layer", LayerInfo.class);
         xs.alias( "layerGroup", LayerGroupInfo.class);
+        xs.alias( "published", PublishedInfo.class);
         xs.alias( "gridGeometry", GridGeometry2D.class);
         xs.alias( "projected", DefaultProjectedCRS.class);
         xs.alias( "attribution", AttributionInfo.class );
         xs.aliasField("abstract", ResourceInfoImpl.class, "_abstract" );
         xs.alias("AuthorityURL", AuthorityURLInfo.class);
         xs.alias("Identifier", LayerIdentifierInfo.class);
-        
+
         // GeoServerInfo
         xs.omitField(impl(GeoServerInfo.class), "clientProperties");
         xs.omitField(impl(GeoServerInfo.class), "geoServer");
         xs.registerLocalConverter(impl(GeoServerInfo.class), "metadata", new MetadataMapConverter());
-        
+
         // ServiceInfo
         xs.omitField(impl(ServiceInfo.class), "clientProperties");
         xs.omitField(impl(ServiceInfo.class), "geoServer");
@@ -326,6 +380,7 @@ public class XStreamPersister {
         
         // StyleInfo
         xs.omitField(impl(StyleInfo.class), "catalog");
+        xs.registerLocalConverter(impl(StyleInfo.class), "workspace", new ReferenceConverter(WorkspaceInfo.class));
         xs.registerLocalConverter(impl(StyleInfo.class), "metadata", new MetadataMapConverter() );
         
         // ResourceInfo
@@ -357,12 +412,16 @@ public class XStreamPersister {
         // LayerInfo
         //xs.omitField( LayerInfo.class), "resource");
         xs.registerLocalConverter( impl(LayerInfo.class), "resource", new ReferenceConverter( ResourceInfo.class ) );
-        xs.registerLocalConverter( impl(LayerInfo.class), "defaultStyle", new ReferenceConverter( StyleInfo.class ) );
+        xs.registerLocalConverter( impl(LayerInfo.class), "defaultStyle", new ReferenceConverter( StyleInfo.class) );
         xs.registerLocalConverter( impl(LayerInfo.class), "styles", new ReferenceCollectionConverter( StyleInfo.class ) );
         xs.registerLocalConverter( impl(LayerInfo.class), "metadata", new MetadataMapConverter() );
         
         // LayerGroupInfo
+        xs.registerLocalConverter(impl(LayerGroupInfo.class), "workspace", new ReferenceConverter(WorkspaceInfo.class));
+        xs.registerLocalConverter(impl(LayerGroupInfo.class), "rootLayer", new ReferenceConverter(LayerInfo.class));
+        xs.registerLocalConverter(impl(LayerGroupInfo.class), "rootLayerStyle", new ReferenceConverter(StyleInfo.class));        
         xs.registerLocalConverter(impl(LayerGroupInfo.class), "layers", new ReferenceCollectionConverter( LayerInfo.class ));
+        xs.registerLocalConverter(impl(LayerGroupInfo.class), "publishables", new ReferenceCollectionConverter( PublishedInfo.class, LayerInfo.class, LayerGroupInfo.class ));
         xs.registerLocalConverter(impl(LayerGroupInfo.class), "styles", new ReferenceCollectionConverter( StyleInfo.class ));
         xs.registerLocalConverter(impl(LayerGroupInfo.class), "metadata", new MetadataMapConverter() );
         
@@ -385,11 +444,14 @@ public class XStreamPersister {
         xs.registerConverter(new ProxyCollectionConverter( xs.getMapper() ) );
         xs.registerConverter(new VirtualTableConverter());
         xs.registerConverter(new KeywordInfoConverter());
+        xs.registerConverter(new SettingsInfoConverter());
+        xs.registerConverter(new MeasureConverter());
         
-        // register VirtulaTable handling
+        // register Virtual structure handling
         registerBreifMapComplexType("virtualTable", VirtualTable.class);
+        registerBreifMapComplexType("coverageView", CoverageView.class);
         registerBreifMapComplexType("dimensionInfo", DimensionInfoImpl.class);
-        
+
         callback = new Callback();
     }
     
@@ -403,7 +465,6 @@ public class XStreamPersister {
     public void registerBreifMapComplexType(String typeId, Class clazz) {
         forwardBreifMap.put(typeId, clazz);
         backwardBreifMap.put(clazz, typeId);
-        
     }
 
     public XStream getXStream() {
@@ -421,7 +482,11 @@ public class XStreamPersister {
     public void setGeoServer(GeoServer geoserver) {
         this.geoserver = geoserver;
     } 
-    
+
+    public GeoServerSecurityManager getSecurityManager() {
+        return GeoServerExtensions.bean(GeoServerSecurityManager.class);
+    }
+
     public void setCallback(Callback callback) {
         this.callback = callback;
     }
@@ -431,20 +496,48 @@ public class XStreamPersister {
     }
     
     public void setExcludeIds() {
-        xs.omitField( WorkspaceInfoImpl.class, "id");
-        xs.omitField( NamespaceInfoImpl.class, "id");
-        xs.omitField(StoreInfoImpl.class, "id");
-        xs.omitField(StyleInfoImpl.class, "id");
-        xs.omitField( ResourceInfoImpl.class, "id");
-        xs.omitField( LayerInfoImpl.class, "id");
-        xs.omitField(LayerGroupInfoImpl.class, "id" );
-        xs.omitField(AttributeTypeInfoImpl.class, "id");
+        xs.omitField(impl(WorkspaceInfo.class), "id");
+        xs.omitField(impl(NamespaceInfo.class), "id");
+        xs.omitField(impl(StoreInfo.class), "id");
+        xs.omitField(impl(StyleInfo.class), "id");
+        xs.omitField(impl(ResourceInfo.class), "id");
+        xs.omitField(impl(LayerInfo.class), "id");
+        xs.omitField(impl(LayerGroupInfo.class), "id" );
+        xs.omitField(impl(AttributeTypeInfo.class), "id");
+        xs.omitField(impl(ServiceInfo.class), "id");
     }
     
     public void setHideFeatureTypeAttributes() {
         xs.omitField(FeatureTypeInfoImpl.class, "attributes");
     }
-    
+
+    public void setEncryptPasswordFields(boolean encryptPasswordFields) {
+        this.encryptPasswordFields = encryptPasswordFields;
+    }
+
+    public boolean isEncryptPasswordFields() {
+        return encryptPasswordFields;
+    }
+
+    /**
+     * Sets the minimum level at which messages should be logged by the persister.
+     * <p>
+     * When this level is set even messages that the underlying logger is configured to emit will 
+     * be skipped.
+     * </p> 
+     */
+    public void setLoggingLevel(Level level) {
+        this.forceLevel = level;
+    }
+
+    /*
+     * Helper to log a message forgoing if level is <= forceLevel.
+     */
+    void log(Level level, String msg) {
+        if((LOGGER.isLoggable(level) && forceLevel.intValue() <= level.intValue())){
+            LOGGER.log(level, msg);
+        }
+    }
     /**
      * Saves an object to persistence.
      * 
@@ -458,7 +551,7 @@ public class XStreamPersister {
         obj = unwrapProxies( obj );
         xs.toXML(obj, new OutputStreamWriter( out, "UTF-8" ));
     }
-    
+
     /**
      * Unwraps any proxies around the object.
      * <p>
@@ -520,6 +613,7 @@ public class XStreamPersister {
     protected void initImplementationDefaults(XStream xs) {
         //configuration
         xs.addDefaultImplementation(GeoServerInfoImpl.class, GeoServerInfo.class);
+        xs.addDefaultImplementation(SettingsInfoImpl.class, SettingsInfo.class);
         xs.addDefaultImplementation(LoggingInfoImpl.class, LoggingInfo.class);
         xs.addDefaultImplementation(JAIInfoImpl.class, JAIInfo.class);
         xs.addDefaultImplementation(CoverageAccessInfoImpl.class, CoverageAccessInfo.class);
@@ -625,6 +719,8 @@ public class XStreamPersister {
      */
     protected class BreifMapConverter extends MapConverter {
         
+        static final String ENCRYPTED_FIELDS_KEY = "org.geoserver.config.encryptedFields";
+
         public BreifMapConverter() {
             super(getXStream().getMapper());
         }
@@ -637,7 +733,13 @@ public class XStreamPersister {
         @Override
         public void marshal(Object source, HierarchicalStreamWriter writer,
                 MarshallingContext context) {
-        
+
+            Set<String> encryptionFields = (Set<String>)context.get(ENCRYPTED_FIELDS_KEY);
+            if (encryptionFields==null) {
+                encryptionFields=Collections.emptySet();
+            }
+
+            GeoServerSecurityManager secMgr = encryptPasswordFields ? getSecurityManager() : null;
             Map map = (Map) source;
             for (Iterator iterator = map.entrySet().iterator(); iterator.hasNext();) {
                 Map.Entry entry = (Map.Entry) iterator.next();
@@ -656,6 +758,9 @@ public class XStreamPersister {
                         if(str == null) {
                             str = value.toString();
                         }
+                        if (encryptionFields.contains(entry.getKey()) && secMgr != null) {
+                            str = secMgr.getConfigPasswordEncryptionHelper().encode(str);
+                        }
                         writer.setValue(str);
                     } else {
                         writer.startNode(complexTypeId);
@@ -671,7 +776,7 @@ public class XStreamPersister {
         @Override
         protected void populateMap(HierarchicalStreamReader reader,
                 UnmarshallingContext context, Map map) {
-            
+
             while (reader.hasMoreChildren()) {
                 reader.moveDown();
                 
@@ -728,7 +833,7 @@ public class XStreamPersister {
                         reader.moveUp();    
                     }
                 }
-
+               
                 map.put(key, value);
 
                 reader.moveUp();
@@ -831,7 +936,7 @@ public class XStreamPersister {
     //class ReferenceConverter extends AbstractSingleValueConverter {
     class ReferenceConverter implements Converter {
         Class clazz;
-        
+
         public ReferenceConverter( Class clazz ) {
             this.clazz = clazz;
         }
@@ -851,16 +956,27 @@ public class XStreamPersister {
                 writer.startNode("id");
                 writer.setValue( id );
                 writer.endNode();
-                callback.postEncodeReference( source, id, writer, context );
+                callback.postEncodeReference( source, id, null, writer, context );
             }
             else {
                 //use name if no id set
                 String name = (String) OwsUtils.get( source, "name" );
+
+                //use workspace name as a prefix if available
+                String wsName = null;
+                if (OwsUtils.has(source, "workspace")) {
+                    WorkspaceInfo workspace = (WorkspaceInfo) OwsUtils.get(source, "workspace");
+                    if (workspace != null) {
+                        wsName = workspace.getName();
+                    }
+                }
+                
                 if ( name != null ) {
                     writer.startNode("name");
                     writer.setValue( name );
                     writer.endNode();
-                    callback.postEncodeReference( source, name, writer, context );
+
+                    callback.postEncodeReference( source, name, wsName, writer, context );
                 }
                 else {
                     throw new IllegalArgumentException( "Unable to marshal reference with no id or name.");
@@ -873,28 +989,60 @@ public class XStreamPersister {
                 UnmarshallingContext context) {
             
             String ref = null;
+            String pre = null;
             if ( reader.hasMoreChildren() ) {
-                reader.moveDown();
-                ref = reader.getValue();
-                reader.moveUp();
+                while(reader.hasMoreChildren()) {
+                    reader.moveDown();
+                    String nodeName = reader.getNodeName();
+                    if ("workspace".equals(nodeName)) {
+                        if (reader.hasMoreChildren()) {
+                            //specified as <workspace><name>[name]</name></workspace>
+                            reader.moveDown();
+                            pre = reader.getValue();
+                            reader.moveUp();
+                        }
+                        else {
+                            //specified as <workspace>[name]</workspace>
+                            pre = reader.getValue();
+                        }
+                    }
+                    else if("name".equals(nodeName) || "id".equals(nodeName) || "prefix".equals(nodeName)) {
+                        ref = reader.getValue();
+                    }
+                    
+                    reader.moveUp();
+                }
             }
             else {
                 ref = reader.getValue();
             }
-            Object proxy = ResolvingProxy.create( ref, clazz );
+
+            Object proxy = ResolvingProxy.create( ref, pre, clazz );
             Object resolved = proxy;
             if ( catalog != null ) {
                 resolved = ResolvingProxy.resolve( catalog, proxy );
             }
-            
-            return CatalogImpl.unwrap( resolved );
+            if(unwrapNulls) {
+                return CatalogImpl.unwrap( resolved );
+            } else {
+                return resolved != null ? CatalogImpl.unwrap( resolved ) : proxy;
+            }
+            //            
         }
     }
     class ReferenceCollectionConverter extends LaxCollectionConverter {
         Class clazz;
+        Class[] subclasses;
+
         public ReferenceCollectionConverter(Class clazz) {
             super( getXStream().getMapper() );
             this.clazz = clazz;
+        }
+        
+        public ReferenceCollectionConverter(Class clazz, Class... subclasses) {
+            super( getXStream().getMapper() );
+            this.clazz = clazz;
+            this.subclasses = subclasses;
         }
 
         @Override
@@ -908,15 +1056,39 @@ public class XStreamPersister {
                 elementName = cam.serializedClass( item.getClass() );
             }
             writer.startNode(elementName);
-            if(item != null)
+            if(item != null) {
+                if(subclasses != null) {
+                    Class theClass = null;
+                    for (Class clazz : subclasses) {
+                        if(clazz.isInstance(item)) {
+                            theClass = clazz;
+                            break;
+                        }
+                    }
+                    if(theClass == null) {
+                        throw new ConversionException("Unexpected item " 
+                                + item + " whose type is not among: " + subclasses);
+                    }
+                    String typeName = cam.serializedClass( theClass );
+                    writer.addAttribute("type", typeName);
+                }
+                
                 context.convertAnother( item, new ReferenceConverter( clazz ) );
+            }
             writer.endNode();
         }
         
         @Override
         protected Object readItem(HierarchicalStreamReader reader,
                 UnmarshallingContext context, Object current) {
-            return context.convertAnother( current, clazz, new ReferenceConverter( clazz ) );
+            Class theClass = clazz;
+            if(subclasses != null) {
+                String attribute = reader.getAttribute("type");
+                if(attribute != null) {
+                    theClass = mapper().realClass(attribute);
+                }
+            }
+            return context.convertAnother( current, theClass, new ReferenceConverter( theClass ) );
         }
     }
     /**
@@ -939,7 +1111,7 @@ public class XStreamPersister {
     /**
      * Converter for coordinate reference system objects that converts by SRS code.
      */
-    static class SRSConverter extends AbstractSingleValueConverter {
+    public static class SRSConverter extends AbstractSingleValueConverter {
         
         public boolean canConvert(Class type) {
             return CoordinateReferenceSystem.class.isAssignableFrom(type);
@@ -949,7 +1121,7 @@ public class XStreamPersister {
         public String toString(Object obj) {
             CoordinateReferenceSystem crs = (CoordinateReferenceSystem) obj;
             try {
-                Integer epsg = CRS.lookupEpsgCode(crs, true);
+                Integer epsg = CRS.lookupEpsgCode(crs, false);
                 if (epsg != null) {
                     return "EPSG:" + epsg;
                 }
@@ -958,7 +1130,7 @@ public class XStreamPersister {
                 XStreamPersister.LOGGER.warning( "Could not determine epsg code of crs, encoding as WKT");
             }
             
-            return crs.toWKT();
+            return new CRSConverter().toString(crs);
         }
         
         @Override
@@ -987,7 +1159,7 @@ public class XStreamPersister {
      * Converter for coordinate reference system objects that converts by WKT. 
      *
      */
-    static class CRSConverter extends AbstractSingleValueConverter {
+    public static class CRSConverter extends AbstractSingleValueConverter {
 
         @Override
         public boolean canConvert(Class type) {
@@ -996,7 +1168,7 @@ public class XStreamPersister {
 
         @Override
         public String toString(Object obj) {
-            return ((CoordinateReferenceSystem)obj).toWKT();
+            return ((Formattable)obj).toWKT(2, false);
         }
         
         @Override
@@ -1217,7 +1389,7 @@ public class XStreamPersister {
     /**
      * Base class for all custom reflection based converters.
      */
-    class AbstractReflectionConverter extends ReflectionConverter {
+    protected class AbstractReflectionConverter extends ReflectionConverter {
         Class clazz;
 
         public AbstractReflectionConverter() {
@@ -1276,6 +1448,20 @@ public class XStreamPersister {
         }
 
         @Override
+        protected void doMarshal(Object source, HierarchicalStreamWriter writer,
+                MarshallingContext context) {
+            GeoServerSecurityManager secMgr = encryptPasswordFields ? getSecurityManager() : null;
+            if (secMgr != null && secMgr.isInitialized()) {
+                //set the hint for the map converter as to which fields to encode in the connection
+                // parameter of this store
+                context.put(BreifMapConverter.ENCRYPTED_FIELDS_KEY, 
+                    secMgr.getConfigPasswordEncryptionHelper().getEncryptedFields((StoreInfo)source));
+            }
+
+            super.doMarshal(source, writer, context);
+        }
+        
+        @Override
         protected void postDoMarshal(Object result,
                 HierarchicalStreamWriter writer, MarshallingContext context) {
             
@@ -1327,7 +1513,14 @@ public class XStreamPersister {
                             : WMSStoreInfoImpl.DEFAULT_READ_TIMEOUT);
                 }
             }
-            LOGGER.info( "Loaded store '" +  store.getName() +  "', " + (store.isEnabled() ? "enabled" : "disabled") );
+
+            //process any parameters that require decryption 
+            GeoServerSecurityManager secMgr = encryptPasswordFields ? getSecurityManager() : null;
+            if (secMgr != null) {
+                secMgr.getConfigPasswordEncryptionHelper().decode(store);
+            }
+
+            log(Level.INFO, "Loaded store '" +  store.getName() +  "', " + (store.isEnabled() ? "enabled" : "disabled"));
             return store;
         }
     }
@@ -1384,7 +1577,7 @@ public class XStreamPersister {
      * Converter for handling maps containing workspaces and namespaces.
      *
      */
-    static class SpaceMapConverter implements Converter {
+    class SpaceMapConverter implements Converter {
 
         String name;
         
@@ -1431,7 +1624,7 @@ public class XStreamPersister {
                    if ( def ) {
                        map.put( null, ns );
                    }
-                   LOGGER.info( "Loading namespace '" + ns.getPrefix() + "'" );
+                   log(Level.INFO, "Loading namespace '" + ns.getPrefix() + "'" );
                }
                else {
                    WorkspaceInfoImpl ws = (WorkspaceInfoImpl) context.convertAnother( map, WorkspaceInfoImpl.class );
@@ -1439,7 +1632,8 @@ public class XStreamPersister {
                    if ( def ) {
                        map.put( null, ws );
                    }
-                   LOGGER.info( "Loading workspace '" + ws.getName() + "'" );
+
+                   log(Level.INFO,  "Loading workspace '" + ws.getName() + "'" );
                }
                
                reader.moveUp();
@@ -1470,8 +1664,7 @@ public class XStreamPersister {
             String type = obj instanceof CoverageInfo ? "coverage" : 
                 obj instanceof FeatureTypeInfo ? "feature type" : "resource";
             
-            LOGGER.info( "Loaded " + type + " '" + obj.getName() + "', " + enabled );
-            
+            log(Level.INFO, "Loaded " + type + " '" + obj.getName() + "', " + enabled);
             return obj;
         }
     }
@@ -1493,6 +1686,9 @@ public class XStreamPersister {
             //ensure null list does not result
             if ( featureType.getAttributes() == null ){
                 featureType.setAttributes(new ArrayList());
+            }
+            if ( featureType.getResponseSRS() == null) {
+                featureType.setResponseSRS(new ArrayList());
             }
             if( featureType.getMetadata() == null) {
                 featureType.setMetadata(new MetadataMap());
@@ -1618,7 +1814,39 @@ public class XStreamPersister {
 
             LayerGroupInfoImpl lgi = (LayerGroupInfoImpl) super
                     .doUnmarshal(result, reader, context);
+            
+            if (lgi.getMode() ==  null) {
+                lgi.setMode(Mode.SINGLE);
+            }
+            
+            lgi.convertLegacyLayers();
+            
             MetadataMap metadata = lgi.getMetadata();
+            
+            /**
+             * If we're upgrading from a 2.2.x server we have to read
+             * property 'title' from metadata
+             */
+            if (lgi.getTitle() == null && metadata != null) {
+                String title = metadata.get("title", String.class);
+                if (title != null) {
+                    lgi.setTitle(title);
+                    metadata.remove("title");
+                }
+            }
+
+            /**
+             * If we're upgrading from a 2.2.x server we have to read
+             * property 'abstract' from metadata
+             */
+            if (lgi.getAbstract() == null && metadata != null) {
+                String abstractTxt = metadata.get("abstract", String.class);
+                if (abstractTxt != null) {
+                    lgi.setAbstract(abstractTxt);
+                    metadata.remove("abstract");
+                }
+            }            
+            
             if (lgi.getAuthorityURLs() == null && metadata != null) {
                 String serialized = metadata.get("authorityURLs", String.class);
                 List<AuthorityURLInfo> authorities;
@@ -1667,7 +1895,8 @@ public class XStreamPersister {
             super.doMarshal(source, writer, context);
         }
     }
-    
+
+
     class VirtualTableConverter implements Converter {
 
         public void marshal(Object source, HierarchicalStreamWriter writer,
@@ -1678,6 +1907,9 @@ public class XStreamPersister {
             writer.endNode();
             writer.startNode("sql");
             writer.setValue(vt.getSql());
+            writer.endNode();
+            writer.startNode("escapeSql");
+            writer.setValue(Boolean.toString(vt.isEscapeSql()));
             writer.endNode();
             if(vt.getPrimaryKeyColumns() != null) {
                 for(String pk : vt.getPrimaryKeyColumns()) {
@@ -1731,7 +1963,8 @@ public class XStreamPersister {
         public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
             String name = readValue("name", String.class, reader);
             String sql = readValue("sql", String.class, reader);
-            VirtualTable vt = new VirtualTable(name, sql);
+                
+            VirtualTable vt = new VirtualTable(name, sql, false);
             List<String> primaryKeys = new ArrayList<String>();
             while(reader.hasMoreChildren()) {
                 reader.moveDown();
@@ -1758,6 +1991,8 @@ public class XStreamPersister {
                     }
                     
                     vt.addParameter(new VirtualTableParameter(pname, defaultValue, validator));
+                } else if(reader.getNodeName().equals("escapeSql")) {
+            		vt.setEscapeSql(Boolean.valueOf(reader.getValue()));
                 }
                 reader.moveUp();
             }
@@ -1768,15 +2003,19 @@ public class XStreamPersister {
         
         <T> T readValue(String name, Class<T> type, HierarchicalStreamReader reader) {
            if(!reader.hasMoreChildren()) {
-               throw new IllegalArgumentException("Expected element " + name + " but could not find it");
+                throw new IllegalArgumentException("Expected element " + name + " but could not find it");
            }
            reader.moveDown();
-           if(!name.equals(reader.getNodeName())) {
-               throw new IllegalArgumentException("Expected element " + name + " but found " + reader.getNodeName() + " instead");
+           try {
+               if(!name.equals(reader.getNodeName())) {
+                   throw new IllegalArgumentException("Expected element " + name + " but found " + reader.getNodeName() + " instead");
+               }
+               String value = reader.getValue();
+               return Converters.convert(value, type);
+           } finally {
+               reader.moveUp();
            }
-           String value = reader.getValue();
-           reader.moveUp();
-           return Converters.convert(value, type);
+           
         }
 
         public boolean canConvert(Class type) {
@@ -1828,6 +2067,37 @@ public class XStreamPersister {
             return sb.toString();
         }
     }
+    
+    static class MeasureConverter extends AbstractSingleValueConverter {
+
+    	org.geotools.util.Converter str2Measure = new MeasureConverterFactory().createConverter(String.class, Measure.class, null);
+    	org.geotools.util.Converter measure2Str = new MeasureConverterFactory().createConverter(Measure.class, String.class, null);
+
+    	
+        @Override
+        public boolean canConvert(Class type) {
+            return Measure.class.isAssignableFrom(type);
+        }
+
+        @Override
+        public Object fromString(String str) {
+        	try {
+				return str2Measure.convert(str, Measure.class);
+			} catch (Exception e) {
+				throw new IllegalArgumentException(e);
+			}
+        }
+
+        @Override
+        public String toString(Object obj) {
+        	try {
+				return measure2Str.convert(obj, String.class);
+			} catch (Exception e) {
+				throw new IllegalArgumentException(e);
+			}
+        }
+    }
+
 
     class KeywordListConverter extends LaxCollectionConverter {
 
@@ -1849,5 +2119,30 @@ public class XStreamPersister {
             writer.endNode();
         }
 
+    }
+    
+    /**
+     * Converter for SettingsInfo class
+     */
+    class SettingsInfoConverter extends AbstractReflectionConverter {
+        
+        public SettingsInfoConverter() {
+            super(SettingsInfo.class);
+        }
+        
+        public Object doUnmarshal(Object result,
+                HierarchicalStreamReader reader, UnmarshallingContext context) {
+            SettingsInfoImpl obj = (SettingsInfoImpl) super.doUnmarshal(result, reader, context);
+            if(obj.getMetadata() == null){
+                obj.setMetadata(new MetadataMap());
+            }
+            if(obj.getContact() == null){
+                obj.setContact(new ContactInfoImpl());
+            }
+            if(obj.getClientProperties() == null){
+                obj.setClientProperties(new HashMap<Object, Object>());
+            }
+            return obj;
+        }
     }
 }

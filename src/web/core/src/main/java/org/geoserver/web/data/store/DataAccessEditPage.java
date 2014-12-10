@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -50,7 +51,7 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
         
         if(dsi == null) {
             error(new ParamResourceModel("DataAccessEditPage.notFound", this, wsName, storeName).getString());
-            setResponsePage(StorePage.class);
+            doReturn(StorePage.class);
             return;
         }
 
@@ -58,7 +59,7 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
             initUI(dsi);
         } catch (IllegalArgumentException e) {
             error(e.getMessage());
-            setResponsePage(StorePage.class);
+            doReturn(StorePage.class);
             return;
         }
     }
@@ -79,7 +80,14 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
 
         initUI(dataStoreInfo);
     }
-    
+
+    /**
+     * Creates a new edit page directly from a store object.
+     */
+    public DataAccessEditPage(DataStoreInfo store) {
+        initUI(store);
+    }
+
     protected void initUI(final DataStoreInfo dataStoreInfo) {
         // the confirm dialog
         dialog = new GeoServerDialog("dialog");
@@ -87,9 +95,12 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
         
         super.initUI(dataStoreInfo);
 
-        final String wsId = dataStoreInfo.getWorkspace().getId();
-        workspacePanel.getFormComponent().add(
-                new CheckExistingResourcesInWorkspaceValidator(dataStoreInfo.getId(), wsId));
+        if (dataStoreInfo.getId() != null) {
+            //null id means detached from catalog, don't bother with uniqueness check
+            final String wsId = dataStoreInfo.getWorkspace().getId();
+            workspacePanel.getFormComponent().add(
+                    new CheckExistingResourcesInWorkspaceValidator(dataStoreInfo.getId(), wsId));
+        }
     }
 
     /**
@@ -119,7 +130,7 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
                 LOGGER.finer("connection parameters verified for store " + info.getName()
                         + ". Got a " + dataStore.getClass().getName());
                 doSaveStore(info);
-                setResponsePage(StorePage.class);
+                doReturn(StorePage.class);
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "Error obtaining datastore with the modified values", e);
                 confirmSaveOnConnectionFailure(info, requestTarget, e);
@@ -130,7 +141,7 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
         } else {
             // store's disabled, no need to check the connection parameters
             doSaveStore(info);
-            setResponsePage(StorePage.class);
+            doReturn(StorePage.class);
         }
     }
 
@@ -174,13 +185,19 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
             @Override
             public void onClose(AjaxRequestTarget target) {
                 if (accepted) {
-                    setResponsePage(StorePage.class);
+                    doReturn(StorePage.class);
                 }
             }
         });
     }
 
-    private void doSaveStore(final DataStoreInfo info) {
+    /**
+     * Performs the save of the store.
+     * <p>
+     * This method may be subclasses to provide custom save functionality.
+     * </p>
+     */
+    protected void doSaveStore(final DataStoreInfo info) {
         try {
             final Catalog catalog = getCatalog();
 
@@ -194,6 +211,7 @@ public class DataAccessEditPage extends AbstractDataAccessPage implements Serial
 
             ResourcePool resourcePool = catalog.getResourcePool();
             resourcePool.clear(info);
+            catalog.validate(info, false).throwIfInvalid();
             catalog.save(info);
             // save the resources after saving the store
             for (FeatureTypeInfo alreadyConfigured : configuredResources) {

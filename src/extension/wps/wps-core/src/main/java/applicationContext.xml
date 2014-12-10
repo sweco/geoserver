@@ -1,30 +1,68 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+ Copyright (C) 2014 - Open Source Geospatial Foundation. All rights reserved.
+ This code is licensed under the GPL 2.0 license, available at the root
+ application directory.
+ -->
 <!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
 <beans>
-    <bean id="wpsServiceLoader" class="org.geoserver.wps.WPSXStreamLoader">
+
+	<bean id="wpsFactoryExtension" class="org.geoserver.wps.WPSFactoryExtension"/>
+	
+    <!-- depend on the process factory so we can properly initialize the WPSInfo object with the 
+        appropriate factory/group info-->
+    <bean id="wpsServiceLoader" class="org.geoserver.wps.WPSXStreamLoader" 
+        depends-on="geoserverProcessFactory, deprecatedProcessFactory">
         <constructor-arg ref="resourceLoader"/>
     </bean>
 
     <!-- TODO: remove this thing -->    
     <bean id="wpsServiceLegacyLoader" class="org.geoserver.wps.WPSLegacyLoader"/>
 
+    <bean id="wpsLifecycleHandler" class="org.geoserver.wps.WPSLifecycleHandler">
+      <constructor-arg ref="geoServer"></constructor-arg>
+    </bean>
+    
     <!-- Resource manager -->
     <bean id="wpsResourceManager" class="org.geoserver.wps.resource.WPSResourceManager"/>
 
     <!--  Execution manager, the thing that actually orchestrates the process execution -->
     <bean id="executionManager" class="org.geoserver.wps.executor.WPSExecutionManager">
         <constructor-arg ref="wpsResourceManager" />
+        <constructor-arg ref="processStatusTracker"/>
     </bean>    
     
     <!-- The default process runner, others may be around -->
     <bean id="defaultProcessManager" class="org.geoserver.wps.executor.DefaultProcessManager">
       <constructor-arg ref="wpsResourceManager"/>
+      <property name="maxAsynchronousProcesses" value="10"/>
+      <property name="maxSynchronousProcesses" value="10"/>
     </bean>
+    
+    <bean id="processStatusTracker" class="org.geoserver.wps.executor.ProcessStatusTracker"/>
 
     <!-- WPS Service -->
-    <bean id="wpsService" class="org.geoserver.wps.DefaultWebProcessingService">
+    <bean id="wpsServiceTarget" class="org.geoserver.wps.DefaultWebProcessingService">
         <constructor-arg ref="geoServer" />
         <constructor-arg ref="executionManager" />
+        <constructor-arg ref="wpsResourceManager" />
+        <constructor-arg ref="processStatusTracker" />
+    </bean>
+    
+    <bean id="wpsLogger" class="org.geoserver.ows.util.EMFLogger">
+      <constructor-arg type="java.lang.String" value="org.geoserver.wps"/>
+    </bean>
+    <bean id="wpsService" class="org.springframework.aop.framework.ProxyFactoryBean">
+      <property name="proxyInterfaces">
+        <value>org.geoserver.wps.WebProcessingService</value>
+      </property>
+      <property name="interceptorNames">
+        <list>
+          <value>wpsLogger</value>
+          <value>wpsServiceInterceptor*</value>
+          <value>wpsServiceTarget</value>        
+        </list>
+      </property>
     </bean>
 
     <!-- Service Descriptor(s) -->
@@ -34,14 +72,15 @@
         <constructor-arg index="1" ref="wpsService" />
         <constructor-arg index="2" value="1.0.0" />
         <constructor-arg index="3">
-		  <list>
-		    <value>GetCapabilities</value>
-		    <value>DescribeProcess</value>
-		    <value>Execute</value>
-            <value>GetExecutionStatus</value>
-            <value>GetExecutionResult</value>
-		  </list>
-		</constructor-arg>
+            <list>
+              <value>GetCapabilities</value>
+              <value>DescribeProcess</value>
+              <value>Execute</value>
+              <value>Dismiss</value>
+              <value>GetExecutionStatus</value>
+              <value>GetExecutionResult</value>
+            </list>
+        </constructor-arg>
     </bean>
 
     <!-- KVP Parsers -->
@@ -58,6 +97,7 @@
     <bean id="executeKvpRequestReader" class="org.geoserver.wps.kvp.ExecuteKvpRequestReader"/>
     <bean id="statusKvpRequestReader" class="org.geoserver.wps.kvp.GetExecutionStatusKvpRequestReader"/>
     <bean id="resultKvpRequestReader" class="org.geoserver.wps.kvp.GetExecutionResultKvpRequestReader"/>
+    <bean id="dismisssKvpRequestReader" class="org.geoserver.wps.kvp.DismissKvpRequestReader"/>
     
 
     <!-- XML Configuration -->
@@ -92,8 +132,8 @@
  
 
     <!-- HTTP URL Mapping -->
-    <bean id="wpsURLMapping"
-        class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+	<bean id="wpsURLMapping" class="org.geoserver.ows.OWSHandlerMapping">
+		<constructor-arg ref="catalog"/>
         <property name="alwaysUseFullPath" value="true" />
         <property name="mappings">
             <props>
@@ -119,8 +159,8 @@
       <constructor-arg index="1" value="ExecuteResponse"/>
       <constructor-arg index="2" value="org.geoserver.wps.xml.WPSConfiguration"/>
     </bean>
-    <bean id="wpsStoredFileResponse" class="org.geoserver.wps.response.StoredFileResponse">
-      <constructor-arg index="0" ref="wpsStorageCleaner"/>
+    <bean id="wpsStoredResourceResponse" class="org.geoserver.wps.response.StoredResourceResponse">
+      <constructor-arg index="0" ref="wpsResourceManager"/>
     </bean>
     
     <!-- Exception handler, we need to output ows 1.1 exceptions -->
@@ -140,41 +180,30 @@
     <bean id="sldStylePPIO" class="org.geoserver.wps.ppio.SLDStylePPIO" />
     <bean id="urlPPIO" class="org.geoserver.wps.ppio.URLPPIO" />
     <bean id="jaitoolsRangePPIO" class="org.geoserver.wps.ppio.JAIToolsRangePPIO"/>
-    
+    <bean id="rawDataPPIO" class="org.geoserver.wps.ppio.RawDataPPIO">
+      <constructor-arg ref="wpsResourceManager" />
+    </bean>
     
     <!-- Register the GeoServer factory and processes -->
     <bean id="geoserverProcessFactory" class="org.geoserver.wps.jts.SpringBeanProcessFactory">
-      <constructor-arg index="0" value="GeoServer custom processes"/>
+      <constructor-arg index="0" value="GeoServer specific processes"/>
       <constructor-arg index="1" value="gs"/>
       <constructor-arg index="2" value="org.geotools.process.gs.GSProcess"/>
     </bean>
-    <bean id="boundsProcess" class="org.geotools.process.feature.gs.BoundsProcess"/>
-    <bean id="nearestProcess" class="org.geotools.process.feature.gs.NearestProcess"/>
-    <bean id="snapProcess" class="org.geotools.process.feature.gs.SnapProcess"/>
     <bean id="importProcess" class="org.geoserver.wps.gs.ImportProcess">
       <constructor-arg index="0" ref="catalog"/>
     </bean>
-    <bean id="reprojectProcess" class="org.geotools.process.feature.gs.ReprojectProcess"/>
-    <bean id="reprojectGeometryProcess" class="org.geotools.process.geometry.gs.ReprojectGeometry"/>
-    <bean id="queryProcess" class="org.geotools.process.feature.gs.QueryProcess"/>
-    <bean id="aggregateProcess" class="org.geotools.process.feature.gs.AggregateProcess"/>
-    <bean id="aggregateProcessResultPPIO" class="org.geoserver.wps.gs.AggregateProcessPPIO"/>
-    <bean id="countProcess" class="org.geotools.process.feature.gs.CountProcess"/>
-    <bean id="uniqueProcess" class="org.geotools.process.feature.gs.UniqueProcess"/>
-    <bean id="simplifyProcess" class="org.geotools.process.feature.gs.SimplifyProcess"/>
-    <bean id="rasterAsPointCollectionProcess" class="org.geotools.process.raster.gs.RasterAsPointCollectionProcess"/>
-    <bean id="contourProcess" class="org.geotools.process.raster.gs.ContourProcess"/>
-    <bean id="polygonExtractionProcess" class="org.geotools.process.raster.gs.PolygonExtractionProcess"/>
-    <bean id="rclipProcess" class="org.geotools.process.feature.gs.RectangularClipProcess"/>
-    <bean id="clipProcess" class="org.geotools.process.feature.gs.ClipProcess"/>
-    <bean id="collectGeometriesProcess" class="org.geotools.process.feature.gs.CollectGeometries" />
-    <bean id="cropCoverageProcess" class="org.geotools.process.raster.gs.CropCoverage" />
-    <bean id="scaleCoverageProcess" class="org.geotools.process.raster.gs.ScaleCoverage" />
-    <bean id="styleCoverageProcess" class="org.geotools.process.raster.gs.StyleCoverage" />
-    <bean id="areaGridProcess" class="org.geotools.process.raster.gs.AreaGridProcess" />
-    <bean id="storeCoverageProcess" class="org.geoserver.wps.gs.StoreCoverage" >
-      <constructor-arg index="0" ref="wpsStorageCleaner"></constructor-arg>
+    
+    <bean id="pagedUniqueProcess" class="org.geoserver.wps.gs.PagedUniqueProcess">
     </bean>
+    <bean id="pagedUniquePPIO" class="org.geoserver.wps.gs.PagedUniqueProcessPPIO"/>
+
+    <bean id="aggregateProcessResultPPIO" class="org.geoserver.wps.gs.AggregateProcessPPIO"/>
+
+    <bean id="storeCoverageProcess" class="org.geoserver.wps.gs.StoreCoverage" >
+      <constructor-arg index="0" ref="wpsResourceManager"></constructor-arg>
+    </bean>
+
     <bean id="vectorZonalStatistics" class="org.geotools.process.feature.gs.VectorZonalStatistics" />
     <bean id="pointBuffersProces" class="org.geotools.process.feature.gs.PointBuffers" />
     <bean id="rasterZonalStatistics" class="org.geotools.process.raster.gs.RasterZonalStatistics" />
@@ -184,10 +213,7 @@
     <bean id="featureClassStats" class="org.geotools.process.feature.gs.FeatureClassStats" />
     <bean id="classificationStatsPPIO" class="org.geoserver.wps.gs.ClassificationStatsPPIO"/>
     
-    <bean id="multiplyCoveragesProcess" class="org.geotools.process.raster.gs.MultiplyCoveragesProcess" />
-    <bean id="gridProcess" class="org.geotools.process.feature.gs.GridProcess" />
     <bean id="georectifyConfiguration" class="org.geoserver.wps.gs.GeorectifyConfiguration" /> 
-    
     <bean id="georectifyCoverage" class="org.geoserver.wps.gs.GeorectifyCoverage">
     	<property name="config" ref="georectifyConfiguration" /> 
       <property name="resourceManager" ref="wpsResourceManager" />
@@ -197,6 +223,12 @@
       <constructor-arg index="0" ref="catalog"/>
     </bean>
     
+    <!--
+    Factory for deprecated processes 
+    -->
+    <bean id="deprecatedProcessFactory" class="org.geoserver.wps.DeprecatedProcessFactory">
+    </bean>
+
     <!-- 
        ==================================================================
        Deal with temporary files
@@ -205,7 +237,8 @@
     
     <!-- Map dispatcher in order to publish the wcsTempStorage directory -->
     <bean id="wpsTempDirDispatcherMapping"
-      class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+      		class="org.geoserver.ows.OWSHandlerMapping">
+  	  <constructor-arg ref="catalog"/>
       <property name="alwaysUseFullPath" value="true" />
       <property name="mappings">
         <props>
@@ -216,7 +249,8 @@
   
     <!-- Temp storage cleanup -->
     <bean id="wpsStorageCleaner" class="org.geoserver.wps.WPSStorageCleaner">
-      <constructor-arg index="0" ref="dataDirectory" />
+      <constructor-arg index="0" ref="wpsResourceManager" />
+      <constructor-arg index="1" ref="processStatusTracker" />
     </bean>
   
     <!-- Definition of how often the scheduled task runs -->
@@ -248,6 +282,28 @@
       <constructor-arg index="0" ref="executionManager"/>
       <constructor-arg index="1" ref="defaultProcessManager"/>
       <constructor-arg index="2" ref="wpsStorageCleaner"/>
+      <constructor-arg index="3" ref="wpsResourceManager"/>
+      <constructor-arg index="4" ref="resourceLoader"/>
     </bean>
+
+    <!-- The uber-process factory used by GeoServer -->
+    <bean id="wpsProcessors" class="org.geoserver.wps.process.GeoServerProcessors"/>
+    
+    <!-- The default process filters -->
+    <bean id="unsupportedParameterTypeProcessFilter" class="org.geoserver.wps.UnsupportedParameterTypeProcessFilter"/>
+    <bean id="configuredProcessesFilter" class="org.geoserver.wps.DisabledProcessesSelector"/>
+
+    <bean id="wpsLocalWorkspaceURLManger" class="org.geoserver.ows.LocalWorkspaceURLMangler">
+      <constructor-arg value="wps"/>
+    </bean>
+    
+    <bean id="executionIdThreadLocalTransfer" class="org.geoserver.wps.resource.ExecutionIdThreadLocalTransfer">
+      <constructor-arg ref="wpsResourceManager"/>
+    </bean>
+
+    <bean id="coverageResourceListener" class="org.geoserver.wps.resource.CoverageResourceListener">
+      <constructor-arg ref="wpsResourceManager"/>
+    </bean>
+    
 
 </beans>

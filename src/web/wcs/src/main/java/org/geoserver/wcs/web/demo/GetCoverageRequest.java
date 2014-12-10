@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wcs.web.demo;
 
 import java.awt.geom.AffineTransform;
@@ -18,9 +23,6 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 class GetCoverageRequest implements Serializable {
     private static final long serialVersionUID = -1473018934663380028L;
 
-    static final List<String> FORMATS = Arrays.asList("GeoTIFF", "ArcGrid", "TIFF", "GIF", "BMP",
-            "PNG", "JPEG", "Text debug grid");
-    
     enum Version {
         v1_0_0("1.0.0"), v1_1_1("1.1.1");
         

@@ -1,13 +1,18 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.web.data.store;
 
+import static org.junit.Assert.*;
+
 import org.geoserver.web.GeoServerWicketTestSupport;
 import org.geoserver.web.data.store.panel.WorkspacePanel;
 import org.geotools.gce.arcgrid.ArcGridFormatFactory;
 import org.geotools.gce.gtopo30.GTopo30FormatFactory;
+import org.junit.Before;
+import org.junit.Test;
 import org.opengis.coverage.grid.Format;
 
 public class CoverageStoreNewPageTest extends GeoServerWicketTestSupport {
@@ -21,9 +26,9 @@ public class CoverageStoreNewPageTest extends GeoServerWicketTestSupport {
 
     String formatDescription;
 
-    @Override
     @SuppressWarnings("deprecation")
-    public void setUpInternal() {
+    @Before
+    public void init() {
         Format format = new GTopo30FormatFactory().createFormat();
         formatType = format.getName();
         formatDescription = format.getDescription();
@@ -42,6 +47,7 @@ public class CoverageStoreNewPageTest extends GeoServerWicketTestSupport {
         return page;
     }
 
+    @Test
     public void testInitCreateNewCoverageStoreInvalidDataStoreFactoryName() {
 
         final String formatName = "_invalid_";
@@ -56,6 +62,7 @@ public class CoverageStoreNewPageTest extends GeoServerWicketTestSupport {
     /**
      * A kind of smoke test that only asserts the page is rendered when first loaded
      */
+    @Test
     public void testPageRendersOnLoad() {
 
         startPage();
@@ -66,19 +73,22 @@ public class CoverageStoreNewPageTest extends GeoServerWicketTestSupport {
         tester.assertComponent("rasterStoreForm:workspacePanel", WorkspacePanel.class);
     }
 
+    @Test
     public void testInitialModelState() {
 
         CoverageStoreNewPage page = startPage();
+        // print(page, true, true);
 
         assertNull(page.getDefaultModelObject());
 
         tester.assertModelValue("rasterStoreForm:enabledPanel:paramValue", Boolean.TRUE);
         tester.assertModelValue("rasterStoreForm:workspacePanel:border:paramValue", getCatalog()
                 .getDefaultWorkspace());
-        tester.assertModelValue("rasterStoreForm:parametersPanel:urlPanel:border:paramValue",
+        tester.assertModelValue("rasterStoreForm:parametersPanel:url",
                 "file:data/example.extension");
     }
 
+    @Test
     public void testMultipleResources() {
 
         CoverageStoreNewPage page = startPage();
@@ -88,7 +98,7 @@ public class CoverageStoreNewPageTest extends GeoServerWicketTestSupport {
         tester.assertModelValue("rasterStoreForm:enabledPanel:paramValue", Boolean.TRUE);
         tester.assertModelValue("rasterStoreForm:workspacePanel:border:paramValue", getCatalog()
                 .getDefaultWorkspace());
-        tester.assertModelValue("rasterStoreForm:parametersPanel:urlPanel:border:paramValue",
+        tester.assertModelValue("rasterStoreForm:parametersPanel:url",
                 "file:data/example.extension");
 
     }

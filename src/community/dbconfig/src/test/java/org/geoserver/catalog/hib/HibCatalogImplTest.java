@@ -1,4 +1,11 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.catalog.hib;
+
+import static org.junit.Assert.*;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -18,6 +25,9 @@ import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.catalog.impl.CatalogImplTest;
 import org.geoserver.hibernate.HibUtil;
 import org.hibernate.SessionFactory;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.springframework.web.context.support.XmlWebApplicationContext;
 
 public class HibCatalogImplTest extends CatalogImplTest {
@@ -39,8 +49,8 @@ public class HibCatalogImplTest extends CatalogImplTest {
         return (Catalog) ctx.getBean("catalog");
     }
     
-    @Override
-    protected void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         super.setUp();
         
         sessionFactory = (SessionFactory) ctx.getBean("hibSessionFactory");
@@ -57,28 +67,32 @@ public class HibCatalogImplTest extends CatalogImplTest {
         for (StyleInfo s : dao.getStyles()){ dao.remove(s); }
     }
     
-    @Override
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         HibUtil.tearDownSession(sessionFactory, null);
     }
     
     @Override
+    @Test
     public void testProxyBehaviour() throws Exception {
         // do nothing, does not apply
     }
     
     @Override
+    @Test
     public void testProxyListBehaviour() throws Exception {
         // do nothing, does not apply
     }
     
     @Override
+    @Test
     public void testModifyMetadata() {
         // TODO: currently this does not work becuae hibernate does not intercept the change to the 
         // metadata map... figure out how to do this. 
     }
     
     @Override
+    @Test
     public void testGetNamespaceById() {
         catalog.add( ns );
         NamespaceInfo ns2 = catalog.getNamespace(ns.getId());
@@ -88,6 +102,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetNamespaceByPrefix() {
         catalog.add( ns );
 
@@ -105,6 +120,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetNamespaceByURI() {
         catalog.add( ns );
         NamespaceInfo ns2 = catalog.getNamespaceByURI(ns.getURI());
@@ -114,6 +130,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testModifyNamespace() {
   catalog.add( ns );
         
@@ -147,6 +164,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetWorkspaceById() {
         catalog.add( ws );
         WorkspaceInfo ws2 = catalog.getWorkspace(ws.getId());
@@ -156,6 +174,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetWorkspaceByName() {
         catalog.add( ws );
         WorkspaceInfo ws2 = catalog.getWorkspaceByName(ws.getName());
@@ -173,6 +192,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testModifyWorkspace() {
         catalog.add( ws );
         
@@ -194,6 +214,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetDataStoreById() {
         addDataStore();
         
@@ -203,6 +224,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetDataStoreByName() {
         addDataStore();
         
@@ -224,6 +246,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testModifyDataStore() {
         addDataStore();
         
@@ -239,6 +262,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetFeatureTypeById() {
         addFeatureType();
         FeatureTypeInfo  ft2 = catalog.getFeatureType(ft.getId());
@@ -248,6 +272,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetFeatureTypeByName() {
         addFeatureType();
         FeatureTypeInfo  ft2 = catalog.getFeatureTypeByName(ft.getName());
@@ -276,6 +301,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testModifyFeatureType() {
         addFeatureType();
         
@@ -291,6 +317,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetLayerById() {
         addLayer();
         
@@ -300,6 +327,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetLayerByName() {
         addLayer();
         
@@ -309,6 +337,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetLayerByResource() {
         addLayer();
         
@@ -320,6 +349,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testModifyLayer() {
         addLayer();
         
@@ -342,6 +372,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetStyleById() {
         addStyle();
         
@@ -351,6 +382,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetStyleByName() {
         addStyle();
         
@@ -360,6 +392,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
 
     @Override
+    @Test
     public void testModifyStyle() {
         addStyle();
         
@@ -391,6 +424,7 @@ public class HibCatalogImplTest extends CatalogImplTest {
     }
     
     @Override
+    @Test
     public void testGetLayerByIdWithConcurrentAdd() throws Exception {
         //disabling for now, requires lazy access to hibernate object in separate thread so need
         // to setu p session there, doable just need to refactor a bit the base test

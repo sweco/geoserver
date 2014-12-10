@@ -1,12 +1,12 @@
-/*
- * Copyright (c) 2001 - 2009 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 
 package org.geoserver.test;
 
-import junit.framework.Test;
+import org.junit.Test;
 
 import org.w3c.dom.Document;
 
@@ -15,23 +15,14 @@ import org.w3c.dom.Document;
  * 
  * @author Rini Angreani, CSIRO Earth Science and Resource Engineering
  */
-public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
-    /**
-     * Read-only test so can use one-time setup.
-     * 
-     * @return
-     */
-    public static Test suite() {
-        PolymorphismWfsTest test = new PolymorphismWfsTest();
-        Test suite = new OneTimeTestSetup(test);
-        return suite;
-    }
+public class PolymorphismWfsTest extends AbstractAppSchemaTestSupport {
 
     @Override
-    protected NamespaceTestData buildTestData() {
+    protected PolymorphismMockData createTestData() {
         return new PolymorphismMockData();
     }
 
+    @Test
     public void testPolymorphism() {
         Document doc = getAsDOM("wfs?request=GetFeature&version=1.1.0&typename=ex:PolymorphicFeature");
         LOGGER
@@ -50,6 +41,7 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
      * Test filtering polymorphism with feature chaining set up works. Also tests filtering when
      * mappingName is used as linkElement.
      */
+    @Test
     public void testFirstValueFilters() {
 //        <AttributeMapping>
 //        <!-- Test feature chaining and polymorphism -->
@@ -105,6 +97,7 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
      * Test filtering polymorphism with no feature chaining works. Also tests filtering when
      * mappingName is used as linkElement.
      */
+    @Test
     public void testSecondValueFilters() {
 //        <AttributeMapping>
 //        <!-- Test polymorphism with no feature chaining i.e. no linkField -->
@@ -167,6 +160,7 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
     /**
      * Tests filtering mapping of any type works.
      */
+    @Test
     public void testAnyTypeFilters() {
 //        <AttributeMapping>
 //        <!-- Test polymorphism with anyType  -->
@@ -220,6 +214,7 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
     /**
      * Tests filtering feature chaining where it's linked by mappingName.
      */
+    @Test
     public void testMappingNameFilters() {
 //        <AttributeMapping>
 //        <!-- Test polymorphism using normal feature chaining with no conditions -->
@@ -529,6 +524,15 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
                 "urn:ogc:def:nil:OGC::missing",
                 "//ex:PolymorphicFeature[@gml:id='f1']/ex:fourthValue/@xlink:href",
                 doc);
+        
+        assertXpathCount(1, "//ex:PolymorphicFeature[@gml:id='f1']/ex:fifthValue", doc);
+        assertXpathCount(0,
+                "//ex:PolymorphicFeature[@gml:id='f1']/ex:fifthValue/ex:firstParentFeature", doc);
+        assertXpathEvaluatesTo(
+                "urn:ogc:def:nil:OGC::missing",
+                "//ex:PolymorphicFeature[@gml:id='f1']/ex:fifthValue/@xlink:href",
+                doc);
+        
 
         // f2: make sure only 1 null reference is encoded
         assertXpathCount(1, "//ex:PolymorphicFeature[@gml:id='f2']/ex:fourthValue", doc);
@@ -537,6 +541,14 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
         assertXpathEvaluatesTo(
                 "urn:ogc:def:nil:OGC::missing",
                 "//ex:PolymorphicFeature[@gml:id='f2']/ex:fourthValue/@xlink:href",
+                doc);
+        
+        assertXpathCount(1, "//ex:PolymorphicFeature[@gml:id='f2']/ex:fifthValue", doc);
+        assertXpathCount(0,
+                "//ex:PolymorphicFeature[@gml:id='f2']/ex:fifthValue/ex:firstParentFeature", doc);
+        assertXpathEvaluatesTo(
+                "urn:ogc:def:nil:OGC::missing",
+                "//ex:PolymorphicFeature[@gml:id='f2']/ex:fifthValue/@xlink:href",
                 doc);
 
         // f3: make sure only 1 null reference is encoded
@@ -547,6 +559,14 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
                 "urn:ogc:def:nil:OGC::missing",
                 "//ex:PolymorphicFeature[@gml:id='f3']/ex:fourthValue/@xlink:href",
                 doc);
+        
+        assertXpathCount(1, "//ex:PolymorphicFeature[@gml:id='f3']/ex:fifthValue", doc);
+        assertXpathCount(0,
+                "//ex:PolymorphicFeature[@gml:id='f3']/ex:fifthValue/ex:firstParentFeature", doc);
+        assertXpathEvaluatesTo(
+                "urn:ogc:def:nil:OGC::missing",
+                "//ex:PolymorphicFeature[@gml:id='f3']/ex:fifthValue/@xlink:href",
+                doc);
 
         // f4: make sure only 1 null reference is encoded
         assertXpathCount(1, "//ex:PolymorphicFeature[@gml:id='f4']/ex:fourthValue", doc);
@@ -555,6 +575,14 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
         assertXpathEvaluatesTo(
                 "urn:ogc:def:nil:OGC::missing",
                 "//ex:PolymorphicFeature[@gml:id='f4']/ex:fourthValue/@xlink:href",
+                doc);
+        
+        assertXpathCount(1, "//ex:PolymorphicFeature[@gml:id='f4']/ex:fifthValue", doc);
+        assertXpathCount(0,
+                "//ex:PolymorphicFeature[@gml:id='f4']/ex:fifthValue/ex:firstParentFeature", doc);
+        assertXpathEvaluatesTo(
+                "urn:ogc:def:nil:OGC::missing",
+                "//ex:PolymorphicFeature[@gml:id='f4']/ex:fifthValue/@xlink:href",
                 doc);
 
         // f5: make sure only 1 null reference is encoded
@@ -565,6 +593,15 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
                 "urn:ogc:def:nil:OGC::missing",
                 "//ex:PolymorphicFeature[@gml:id='f5']/ex:fourthValue/@xlink:href",
                 doc);
+        
+        assertXpathCount(1, "//ex:PolymorphicFeature[@gml:id='f5']/ex:fifthValue", doc);
+        assertXpathCount(0,
+                "//ex:PolymorphicFeature[@gml:id='f5']/ex:fifthValue/ex:firstParentFeature", doc);
+        assertXpathEvaluatesTo(
+                "urn:ogc:def:nil:OGC::missing",
+                "//ex:PolymorphicFeature[@gml:id='f5']/ex:fifthValue/@xlink:href",
+                doc);
+
 
         // f6: make sure only 1 gsml:CGI_NumericValue is encoded
         assertXpathCount(1, "//ex:PolymorphicFeature[@gml:id='f6']/ex:fourthValue", doc);
@@ -579,6 +616,21 @@ public class PolymorphismWfsTest extends AbstractAppSchemaWfsTestSupport {
         assertXpathEvaluatesTo(
                 "m",
                 "//ex:PolymorphicFeature[@gml:id='f6']/ex:fourthValue/gsml:CGI_NumericValue/gsml:principalValue/@uom",
+                doc);
+        
+        // GEOT:4417
+        assertXpathCount(1, "//ex:PolymorphicFeature[@gml:id='f6']/ex:fifthValue", doc);
+        assertXpathCount(1,
+                "//ex:PolymorphicFeature[@gml:id='f6']/ex:fifthValue/gsml:CGI_NumericValue", doc);
+        assertXpathCount(0,
+                "//ex:PolymorphicFeature[@gml:id='f6']/ex:fifthValue/gsml:CGI_TermValue", doc);
+        assertXpathEvaluatesTo(
+                "1000.0",
+                "//ex:PolymorphicFeature[@gml:id='f6']/ex:fifthValue/gsml:CGI_NumericValue/gsml:principalValue",
+                doc);
+        assertXpathEvaluatesTo(
+                "m",
+                "//ex:PolymorphicFeature[@gml:id='f6']/ex:fifthValue/gsml:CGI_NumericValue/gsml:principalValue/@uom",
                 doc);
     }
 

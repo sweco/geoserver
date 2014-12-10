@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
@@ -7,6 +8,9 @@ package org.geoserver.wms;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+
+import org.geoserver.ows.Request;
+import org.geoserver.wms.describelayer.XMLDescribeLayerResponse;
 
 
 /**
@@ -18,6 +22,7 @@ import java.util.List;
  * </p>
  * 
  * @author Gabriel Roldan
+ * @author Carlo Cancellieri
  * @version $Id$
  */
 public class DescribeLayerRequest extends WMSRequest {
@@ -26,8 +31,42 @@ public class DescribeLayerRequest extends WMSRequest {
      * Holds the FeatureTypes parsed from the request's <code>LAYERS</code> parameter.
      */
     private List<MapLayerInfo> layers = new ArrayList<MapLayerInfo>(2);
+    
+    /**
+     * Holds the GetMap part of the GetFeatureInfo request, which is meant to provide enough context
+     * information about the map over the DescribeLayer request is being made.
+     */
+    private GetMapRequest getMapRequest;
 
-    public DescribeLayerRequest() {
+    /**
+     * Holder for the optional <code>EXCEPTIONS</code> parameter, defaults to
+     * <code>"application/vnd.ogc.se_xml"</code>
+     */
+    private static final String DEFAULT_EXCEPTION_FORMAT = "application/vnd.ogc.se_xml";
+    private String exeptionFormat = DEFAULT_EXCEPTION_FORMAT;
+
+    /**
+     * Holder for the <code>outputFormat</code> optional parameter
+     */
+    private String outputFormat=XMLDescribeLayerResponse.DESCLAYER_MIME_TYPE;
+
+    public GetMapRequest getGetMapRequest() {
+		return getMapRequest;
+	}
+
+	public void setGetMapRequest(GetMapRequest getMapRequest) {
+		this.getMapRequest = getMapRequest;
+	}
+
+	public String getExeptionFormat() {
+		return exeptionFormat;
+	}
+
+	public void setExeptionFormat(String exeptionFormat) {
+		this.exeptionFormat = exeptionFormat;
+	}
+
+	public DescribeLayerRequest() {
         super("DescribeLayer");
     }
 
@@ -46,6 +85,22 @@ public class DescribeLayerRequest extends WMSRequest {
     public void setLayers(List<MapLayerInfo> layers) {
         this.layers = layers;
     }
+    
+    /**
+     * @return Returns the describeFormat.
+     */
+    public String getOutputFormat() {
+        return outputFormat;
+    }
+
+    /**
+     * @param infoFormat
+     *            The describeFormat to set.
+     */
+    public void setOutputFormat(String outputFormat) {
+        this.outputFormat = outputFormat;
+    }
+
 
     public String toString() {
         StringBuffer sb = new StringBuffer("DescribeLayerRequest[layers=");

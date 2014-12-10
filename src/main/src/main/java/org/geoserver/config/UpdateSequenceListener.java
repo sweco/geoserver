@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -67,6 +68,27 @@ class UpdateSequenceListener implements CatalogListener, ConfigurationListener {
             List<Object> oldValues, List<Object> newValues) {
         // we use the post event
         
+    }
+
+    @Override
+    public void handleSettingsAdded(SettingsInfo settings) {
+        incrementSequence();
+    }
+
+    @Override
+    public void handleSettingsModified(SettingsInfo settings, List<String> propertyNames,
+            List<Object> oldValues, List<Object> newValues) {
+        // we use post event
+    }
+
+    @Override
+    public void handleSettingsPostModified(SettingsInfo settings) {
+        incrementSequence();
+    }
+
+    @Override
+    public void handleSettingsRemoved(SettingsInfo settings) {
+        incrementSequence();
     }
 
     public void handleLoggingChange(LoggingInfo logging, List<String> propertyNames,

@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.response;
@@ -59,7 +60,7 @@ public class LockFeatureTypeResponse extends WFSResponse {
         }
 
         String indent = wfs.isVerbose() ? "   " : "";
-        Charset charset = Charset.forName( wfs.getGeoServer().getGlobal().getCharset() );
+        Charset charset = Charset.forName( wfs.getGeoServer().getSettings().getCharset() );
         BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(output,charset));
 
         LockFeatureType lft = (LockFeatureType)operation.getParameters()[0];
@@ -124,7 +125,7 @@ public class LockFeatureTypeResponse extends WFSResponse {
     void write1_1(LockFeatureResponseType lockResponse, OutputStream output, Operation operation)
         throws IOException {
         Encoder encoder = new Encoder(configuration, configuration.schema());
-        encoder.setEncoding(Charset.forName( getInfo().getGeoServer().getGlobal().getCharset()) );
+        encoder.setEncoding(Charset.forName( getInfo().getGeoServer().getSettings().getCharset()) );
         
         LockFeatureType req = (LockFeatureType)operation.getParameters()[0];
         

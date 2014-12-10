@@ -1,13 +1,24 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wps;
 
-import static org.custommonkey.xmlunit.XMLAssert.*;
+import static org.custommonkey.xmlunit.XMLAssert.assertXpathExists;
+import static org.junit.Assert.assertEquals;
 
-import java.util.Collections;
+import java.util.HashMap;
 
 import javax.xml.namespace.QName;
 
+import org.geoserver.config.GeoServer;
 import org.geoserver.data.test.MockData;
+import org.geoserver.data.test.SystemTestData;
+import org.geoserver.data.test.SystemTestData.LayerProperty;
 import org.geoserver.wfs.WFSInfo;
+import org.junit.Before;
+import org.junit.Test;
 import org.w3c.dom.Document;
 
 public class SnapTest extends WPSTestSupport {
@@ -15,19 +26,22 @@ public class SnapTest extends WPSTestSupport {
     public static QName STREAMS = new QName(MockData.CITE_URI, "Streams", MockData.CITE_PREFIX);
     
     @Override
-    protected void populateDataDirectory(MockData dataDirectory) throws Exception {
-        super.populateDataDirectory(dataDirectory);
-        dataDirectory.addPropertiesType(STREAMS, MockData.class.getResource("Streams.properties"), Collections.EMPTY_MAP);
+    protected void onSetUp(SystemTestData testData) throws Exception {
+        super.onSetUp(testData);
+
+        testData.addVectorLayer(STREAMS, new HashMap<LayerProperty,Object>(), "Streams.properties", MockData.class, getCatalog());
     }
     
-    @Override
-    protected void oneTimeSetUp() throws Exception {
-    	super.oneTimeSetUp();
-    	WFSInfo wfs = getGeoServer().getService( WFSInfo.class );
+    @Before
+    public void oneTimeSetUp() throws Exception {
+        WFSInfo wfs = getGeoServer().getService( WFSInfo.class );
         wfs.setFeatureBounding(true);
-    	getGeoServer().save(wfs);
+        getGeoServer().save(wfs);
+        // workaround for GEOS-5650
+        getGeoServer().save(getGeoServer().getService(WPSInfo.class));
     }
 
+    @Test
     public void testFeatureCollectionInline4326Raw() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1'>" + 
@@ -65,6 +79,7 @@ public class SnapTest extends WPSTestSupport {
         assertXpathExists("/wfs:FeatureCollection/gml:featureMember", d);
     }
 
+    @Test
     public void testFeatureCollectionInline4326Doc() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1'>" + 
@@ -104,6 +119,7 @@ public class SnapTest extends WPSTestSupport {
         assertXpathExists("/wps:ExecuteResponse/wps:ProcessOutputs/wps:Output/wps:Data/wps:ComplexData/wfs:FeatureCollection/gml:featureMember", d);
     }
 
+    @Test
     public void testFeatureCollectionInline3338Raw() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1'>" + 
@@ -145,6 +161,7 @@ public class SnapTest extends WPSTestSupport {
         assertXpathExists("/wfs:FeatureCollection/gml:featureMember", d);
     }
 
+    @Test
     public void testFeatureCollectionInline3338Doc() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1'>" + 
@@ -188,6 +205,7 @@ public class SnapTest extends WPSTestSupport {
         assertXpathExists("/wps:ExecuteResponse/wps:ProcessOutputs/wps:Output/wps:Data/wps:ComplexData/wfs:FeatureCollection/gml:featureMember", d);
     }
 
+    @Test
     public void testFeatureCollectionInternalWFSRaw() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1' xmlns:xlink=\"http://www.w3.org/1999/xlink\" >" + 
@@ -230,6 +248,7 @@ public class SnapTest extends WPSTestSupport {
         assertXpathExists("/wfs:FeatureCollection/gml:featureMember", d);
     }
 
+    @Test
     public void testFeatureCollectionWFSFilter1Raw() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1' xmlns:xlink=\"http://www.w3.org/1999/xlink\" >" + 
@@ -282,6 +301,7 @@ public class SnapTest extends WPSTestSupport {
         assertXpathExists("/wfs:FeatureCollection/gml:featureMember", d);
     }
 
+    @Test
     public void testFeatureCollectionWFSFilter2Raw() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1' xmlns:xlink=\"http://www.w3.org/1999/xlink\" >" + 
@@ -336,6 +356,7 @@ public class SnapTest extends WPSTestSupport {
         assertXpathExists("/wfs:FeatureCollection/gml:featureMember", d);
     }
 
+    @Test
     public void testMissingFeatures() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1'>" + 
@@ -367,6 +388,7 @@ public class SnapTest extends WPSTestSupport {
         assertXpathExists("//wps:Status/wps:ProcessFailed", d);
     }
 
+    @Test
     public void testMissingPoint() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1'>" + 
@@ -394,6 +416,7 @@ public class SnapTest extends WPSTestSupport {
         assertXpathExists("//wps:Status/wps:ProcessFailed", d);
     }
 
+    @Test
     public void testWrongCRS() throws Exception {
         String xml = "<wps:Execute service='WPS' version='1.0.0' xmlns:wps='http://www.opengis.net/wps/1.0.0' " + 
               "xmlns:ows='http://www.opengis.net/ows/1.1'>" + 
@@ -431,6 +454,23 @@ public class SnapTest extends WPSTestSupport {
         // print(d);
         
         assertXpathExists("//wps:Status/wps:ProcessFailed", d);
+    }
+
+    /** 
+     * Test setting a WPS title.
+     */
+    @Test
+    public void testWpsTitle() {
+        final GeoServer geoserver = getGeoServer();
+        WPSInfo wps = geoserver.getService(WPSInfo.class);
+        assertEquals("Prototype GeoServer WPS", wps.getTitle());
+
+        final String updatedTitle = "WPS latest title";
+        wps.setTitle(updatedTitle);
+        geoserver.save(wps);
+        wps = geoserver.getService(WPSInfo.class);
+        assertEquals(updatedTitle, wps.getTitle());
+
     }
 
 }

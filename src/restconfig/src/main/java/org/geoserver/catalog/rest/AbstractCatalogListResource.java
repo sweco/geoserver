@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog.rest;
@@ -82,7 +83,7 @@ public abstract class AbstractCatalogListResource extends CatalogResourceBase {
     @Override
     protected void configureXStream(XStream xstream) {
         XStreamPersister xp = xpf.createXMLPersister();
-        final String name = xp.getClassAliasingMapper().serializedClass( clazz );
+        final String name = getItemName(xp);
         xstream.alias( name, clazz );
         
         xstream.registerConverter( 
@@ -136,6 +137,10 @@ public abstract class AbstractCatalogListResource extends CatalogResourceBase {
             }
         );
     }
+
+    protected String getItemName(XStreamPersister xp) {
+        return xp.getClassAliasingMapper().serializedClass( clazz );
+    }
     
     /**
      * Template method to alias the type of the collection.
@@ -146,7 +151,7 @@ public abstract class AbstractCatalogListResource extends CatalogResourceBase {
      */
     protected void aliasCollection( Object data, XStream xstream ) {
         XStreamPersister xp = xpf.createXMLPersister();
-        final String alias = xp.getClassAliasingMapper().serializedClass( clazz );
+        final String alias = getItemName(xp);
         xstream.alias(alias + "s", Collection.class, data.getClass());
     }
 }

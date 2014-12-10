@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.vfny.geoserver.servlets;
@@ -13,6 +14,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.geoserver.config.GeoServer;
 import org.geoserver.ows.OutputStrategyFactory;
 import org.geoserver.ows.ServiceStrategy;
+import org.geoserver.platform.GeoServerExtensions;
+import org.geoserver.platform.exception.GeoServerException;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -72,7 +75,7 @@ public class ServiceStrategyFactory implements OutputStrategyFactory, Applicatio
 
         if (serviceStrategy == null) {
             // none set, look up in web application context
-            serviceStrategy = getServletContext().getInitParameter("serviceStrategy");
+            serviceStrategy = GeoServerExtensions.getProperty("serviceStrategy");
         }
 
         // do a lookup

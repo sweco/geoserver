@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -19,6 +20,7 @@ import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.NamespaceInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.catalog.impl.CatalogImpl;
+import org.geoserver.web.ComponentAuthorizer;
 import org.geoserver.web.GeoServerSecuredPage;
 import org.geoserver.web.wicket.ParamResourceModel;
 import org.geoserver.web.wicket.URIValidator;
@@ -54,7 +56,7 @@ public class WorkspaceNewPage extends GeoServerSecuredPage {
                     catalog.setDefaultWorkspace(ws);
                 
                 //TODO: set the response page to be the edit 
-                setResponsePage(WorkspacePage.class );
+                doReturn(WorkspacePage.class);
             }
         };
         add(form);
@@ -89,7 +91,7 @@ public class WorkspaceNewPage extends GeoServerSecuredPage {
         AjaxLink cancelLink = new AjaxLink( "cancel" ) {
             @Override
             public void onClick(AjaxRequestTarget target) {
-                setResponsePage(WorkspacePage.class);
+                doReturn(WorkspacePage.class);
             }
         };
         form.add( cancelLink );

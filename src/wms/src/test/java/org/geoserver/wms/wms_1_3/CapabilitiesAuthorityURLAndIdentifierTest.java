@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wms.wms_1_3;
 
 import static org.custommonkey.xmlunit.XMLAssert.assertXpathEvaluatesTo;
@@ -14,6 +19,7 @@ import org.geoserver.catalog.impl.LayerIdentifier;
 import org.geoserver.data.test.MockData;
 import org.geoserver.wms.WMSInfo;
 import org.geoserver.wms.WMSTestSupport;
+import org.junit.Test;
 import org.w3c.dom.Document;
 
 public class CapabilitiesAuthorityURLAndIdentifierTest extends WMSTestSupport {
@@ -38,7 +44,8 @@ public class CapabilitiesAuthorityURLAndIdentifierTest extends WMSTestSupport {
         namespaces.put("wms", "http://www.opengis.net/wms");
         namespaces.put("ows", "http://www.opengis.net/ows");
     }
-
+    
+    @Test
     public void testRootLayer() throws Exception {
         WMSInfo serviceInfo = getWMS().getServiceInfo();
         addAuthUrl("rootAuth1", "http://geoserver/wms/auth1", serviceInfo.getAuthorityURLs());
@@ -82,10 +89,11 @@ public class CapabilitiesAuthorityURLAndIdentifierTest extends WMSTestSupport {
                 doc);
     }
 
+    @Test
     public void testLayer() throws Exception {
 
-        String layerName = getLayerId(MockData.PRIMITIVEGEOFEATURE);
-        LayerInfo layer = getCatalog().getLayerByName(layerName);
+        String layerId = getLayerId(MockData.PRIMITIVEGEOFEATURE);
+        LayerInfo layer = getCatalog().getLayerByName(layerId);
         addAuthUrl("layerAuth1", "http://geoserver/wms/auth1", layer.getAuthorityURLs());
         addIdentifier("layerAuth1", "layerId1", layer.getIdentifiers());
         getCatalog().save(layer);
@@ -94,6 +102,7 @@ public class CapabilitiesAuthorityURLAndIdentifierTest extends WMSTestSupport {
                 "sf/PrimitiveGeoFeature/wms?service=WMS&request=getCapabilities&version=1.3.0",
                 true);
 
+        String layerName = MockData.PRIMITIVEGEOFEATURE.getLocalPart();
         assertXpathExists("//wms:Layer[wms:Name='" + layerName
                 + "']/wms:AuthorityURL[@name = 'layerAuth1']", doc);
         assertXpathEvaluatesTo("http://geoserver/wms/auth1", "//wms:Layer[wms:Name='" + layerName

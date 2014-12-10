@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.test;
 
 import java.io.BufferedReader;
@@ -65,8 +70,11 @@ import org.geoserver.data.test.TestData;
 import org.geoserver.logging.LoggingUtils;
 import org.geoserver.ows.util.KvpUtils;
 import org.geoserver.ows.util.ResponseUtils;
+import org.geoserver.platform.ContextLoadedEvent;
 import org.geoserver.platform.GeoServerExtensions;
+import org.geoserver.platform.GeoServerExtensionsHelper;
 import org.geoserver.platform.GeoServerResourceLoader;
+import org.geoserver.security.GeoServerSecurityManager;
 import org.geotools.data.DataUtilities;
 import org.geotools.data.FeatureSource;
 import org.geotools.data.simple.SimpleFeatureSource;
@@ -78,7 +86,6 @@ import org.geotools.xml.XSD;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.DispatcherServlet;
 import org.springframework.web.servlet.HandlerInterceptor;
-import org.vfny.geoserver.global.GeoserverDataDirectory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -169,6 +176,9 @@ public abstract class GeoServerAbstractTestSupport extends OneTimeSetupTest {
             CRS.reset("all");
         }
         
+        // reset security services
+        //GeoserverServiceFactory.Singleton.reset();
+        
         // set up test data 
         testData = buildTestData();
         testData.setUp();
@@ -206,6 +216,7 @@ public abstract class GeoServerAbstractTestSupport extends OneTimeSetupTest {
                     servletContext);
             applicationContext.setUseLegacyGeoServerLoader(useLegacyDataDirectory());
             applicationContext.refresh();
+            applicationContext.publishEvent(new ContextLoadedEvent(applicationContext));
 
             // set the parameter after a refresh because it appears a refresh
             // wipes
@@ -285,7 +296,7 @@ public abstract class GeoServerAbstractTestSupport extends OneTimeSetupTest {
                 applicationContext.destroy();
                 
                 // kill static caches
-                new GeoServerExtensions().setApplicationContext(null);
+                GeoServerExtensionsHelper.init(null);
         
                 // some tests do need a kick on the GC to fully clean up
                 if(isMemoryCleanRequired()) {
@@ -294,9 +305,6 @@ public abstract class GeoServerAbstractTestSupport extends OneTimeSetupTest {
                 }
                 
                 if(getTestData() != null) {
-                    // this cleans up the data directory static loader, if we don't the next test
-                    // will keep on running on the current data dir
-                    GeoserverDataDirectory.destroy();
                     getTestData().tearDown();
                 }
             } finally {
@@ -331,7 +339,14 @@ public abstract class GeoServerAbstractTestSupport extends OneTimeSetupTest {
     protected GeoServer getGeoServer() {
         return (GeoServer) applicationContext.getBean("geoServer");
     }
-    
+
+    /**
+     * Accesssor for global security manager instance from the test application context.
+     */
+    protected GeoServerSecurityManager getSecurityManager() {
+        return (GeoServerSecurityManager) applicationContext.getBean("geoServerSecurityManager");
+    }
+
     /**
      * Flush XSD if exists.
      */
@@ -1147,10 +1162,18 @@ public abstract class GeoServerAbstractTestSupport extends OneTimeSetupTest {
      * Helper method to create the kvp params from the query string.
      */
     private void kvp(MockHttpServletRequest request, String path) {
-         Map<String, String> params = KvpUtils.parseQueryString(path);
+         Map<String, Object> params = KvpUtils.parseQueryString(path);
          for (String key : params.keySet()) {
-            String value = params.get(key);
-            request.setupAddParameter(key, value);
+            Object value = params.get(key);
+            if(value instanceof String) {
+                request.setupAddParameter(key, (String) value);
+            } else {
+                String[] values = (String[]) value;
+                for (String v: values) {
+                    request.setupAddParameter(key, v);
+                }
+            }
+            
         }
          
     }

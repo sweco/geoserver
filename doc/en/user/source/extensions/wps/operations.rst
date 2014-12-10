@@ -3,9 +3,8 @@
 WPS Operations
 ==============
 
-.. note:: For the official WPS specification, please go to http://www.opengeospatial.org/standards/wps.
-
-WPS defines three main operations for the publishing of geospatial processes.  These operations are modeled on similar operations in WFS and WMS.  They are named:
+WPS defines three operations for the discovery and execution of geospatial processes.  
+The operations are:
 
 * GetCapabilities
 * DescribeProcess
@@ -16,26 +15,37 @@ WPS defines three main operations for the publishing of geospatial processes.  T
 GetCapabilities
 ---------------
 
-The **GetCapabilities** operation requests the WPS server to provide details of service offerings.  This information includes server metadata and metadata describing all processes implemented.  The response from the service is an XML document called the **capabilities document**.
+The **GetCapabilities** operation requests details of the service offering,  
+including service metadata and metadata describing the available processes.  
+The response is an XML document called the **capabilities document**.
 
-To make a GetCapabilities request, use the following URL::
+The required parameters, as in all OGC GetCapabilities requests, are ``service=WPS``, ``version=1.0.0`` and ``request=GetCapabilities``.
+
+An example of a GetCapabilities request is::
 
   http://localhost:8080/geoserver/ows?
     service=WPS&
     version=1.0.0&
     request=GetCapabilities
 
-This URL assumes that GeoServer is located at ``http://localhost:8080/geoserver/``.
-
-The required parameters, as in all GetCapabilities requests,  are **service** (``service=WPS``), **version** (``version=1.0.0``), and **request** (``request=GetCapabilities``).
-
 
 DescribeProcess
 ----------------
 
-The **DescribeProcess** operation makes a request to the WPS server for a full description of a process known to the WPS.
+The **DescribeProcess** operation requests a description of a WPS process available through the service.
 
-An example GET request (again, assuming a GeoServer at ``http://localhost:8080/geoserver/``) using the process ``JTS:buffer``, would look like this::
+The parameter ``identifier`` specifies the process to describe.  
+Multiple processes can be requested, separated by commas (for example, ``identifier=JTS:buffer,gs:Clip``).
+At least one process must be specified.
+
+.. note:: As with all OGC parameters, the keys (``request``, ``version``, etc) are case-insensitive, and the values (``GetCapabilities``, ``JTS:buffer``, etc.) are case-sensitive.  GeoServer is generally more relaxed about case, but it is best to follow the specification.
+
+The response is an XML document containing metadata about each requested process, including the following:
+ 
+* Process name, title and abstract
+* For each input and output parameter: identifier, title, abstract, multiplicity, and supported datatype and format
+
+An example request for the process ``JTS:buffer`` is::
 
   http://localhost:8080/geoserver/ows?
     service=WPS&
@@ -43,11 +53,7 @@ An example GET request (again, assuming a GeoServer at ``http://localhost:8080/g
     request=DescribeProcess&
     identifier=JTS:buffer
 
-Here, the important parameter here is the ``identifier=JTS:buffer``, as this defines what process to describe.  Multiple processes can be requested, separated by commas (for example, ``identifier=JTS:buffer,gs:Clip``), but at least one process must be specified.
-
-.. warning:: As with all OGC parameters, the keys (``request``, ``version``, etc) are case insensitive, and the values (``GetCapabilities``, ``JTS:buffer``, etc.) are case sensitive.  GeoServer is generally more relaxed about case, but it is good to be aware of the specification.
-
-The response to this request contains the following information:
+The response XML document contains the following information:
 
 .. list-table:: 
    :widths: 20 80 
@@ -55,24 +61,37 @@ The response to this request contains the following information:
    * - **Title**
      - "Buffers a geometry using a certain distance"
    * - **Inputs**
-     - **distance**: "The distance (same unit of measure as the geometry)" *(double, mandatory)*
+     - **geom**: "The geometry to be buffered" *(geometry, mandatory)*
+     
+       **distance**: "The distance (same unit of measure as the geometry)" *(double, mandatory)*
 
        **quadrant segments**: "Number of quadrant segments. Use > 0 for round joins, 0 for flat joins, < 0 for mitred joins" *(integer, optional)*
 
-       **capstyle**: "The buffer cap style, round, flat, square" *(selection, optional)*
+       **capstyle**: "The buffer cap style, round, flat, square" *(literal value, optional)*
    * - **Output formats**
      - One of GML 3.1.1, GML 2.1.2, or WKT
-
-.. note:: The specific processes available in GeoServer are subject to change.
+     
+     
 
 Execute
 -------
 
-The **Execute** operation makes a request to the WPS server to perform the actual process.
+The **Execute** operation is a request to perform the process 
+with specified input values and required output data items.
+The request may be made as either a GET URL, or a POST with an XML request document.
+Because the request has a complex structure, the POST form is more typically used.
 
-The inputs required for this request depend on the process being executed.  For more information about WPS processes in GeoServer, please see the section on :ref:`wps_processes`.
+The inputs and outputs required for the request depend on the process being executed.
+GeoServer provides a wide variety of processes to process geometry, features, and coverage data. 
+For more information see the section :ref:`wps_processes`.
 
-This operation is cumbersome to view as a GET request, so below is an example of a POST request.  The specific process takes as an input a point at the origin (described in WKT as ``POINT(0 0)``) and runs a buffer operation (JTS:buffer) of 10 units with single quadrant segments and a flat style, and outputs GML 3.1.1.
+Below is an example of a ``Execute`` POST request.  
+The example process (``JTS:buffer``) takes as input 
+a geometry ``geom`` (in this case the point ``POINT(0 0)``),
+a ``distance`` (with the value ``10``),
+a quantization factor ``quadrantSegments`` (here set to be 1),
+and a ``capStyle`` (specified as ``flat``).
+The ``<ResponseForm>`` element specifies the format for the single output ``result`` to be GML 3.1.1.
 
 .. code-block:: xml
 
@@ -112,7 +131,9 @@ This operation is cumbersome to view as a GET request, so below is an example of
       </wps:ResponseForm>
     </wps:Execute>
 
-The response from such a request would be (numbers rounded for clarity):
+The process performs a buffer operation using the supplied inputs,
+and returns the outputs as specified.
+The response from the request is (with numbers rounded for clarity):
 
 .. code-block:: xml
 
@@ -133,7 +154,35 @@ The response from such a request would be (numbers rounded for clarity):
       </gml:exterior>
     </gml:Polygon>
 
-For help in generating WPS requests, you can use the built-in :ref:`wps_request_builder`.
+For help in generating WPS requests you can use the built-in interactive :ref:`wps_request_builder`.
 
+Dismiss
+-------
 
+According to the WPS specification, an asynchronous process execution returns a back link to a status 
+location that the client can ping to get progress report about the process, and eventually retrieve
+its final results.
 
+In GeoServer this link is implemented as a pseudo-operation called ``GetExecutionStatus``, and the link
+has the following structure::
+
+    http://host:port/geoserver/ows?service=WPS&version=1.0.0&request=GetExecutionStatus&executionId=397e8cbd-7d51-48c5-ad72-b0fcbe7cfbdb
+
+The ``executionId`` identifies the running request, and can be used in a the ``Dismiss`` vendor
+operation in order to cancel the execution of the process:
+
+   http://host:port/geoserver/ows?service=WPS&version=1.0.0&request=Dismiss&executionId=397e8cbd-7d51-48c5-ad72-b0fcbe7cfbdb
+
+Upon receipt GeoServer will do its best to stop the running process, and subsequent calls to ``Dismiss``
+or ``GetExecutionStatus`` will report that the executionId is not known anymore.
+Internally, GeoServer will stop any process that attempts to report progress, and poison input and
+outputs to break the execution of the process, but the execution of processes that already got their
+inputs, and are not reporting their progress back, will continue until its natural end.  
+
+For example, let's consider the "geo:Buffer" process, possibly working against a very large input 
+GML geometry, to be fetched from another host. The process itself does a single call to a  JTS function,
+which cannot report progress. Here are three possible scenarios, depending on when the Dismiss operation is invoked:
+
+* Dismiss is invoked while the GML is being retrieved, in this case the execution will stop immediately
+* Dismiss is invoked while the process is doing the buffering, in this case, the execution will stop as soon as the buffering is completed
+* Dismiss is invoked while the output GML is being encoded, also in this case the execution will stop immediately 

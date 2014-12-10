@@ -1,11 +1,15 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.QName;
@@ -16,6 +20,8 @@ import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.NamespaceInfo;
 import org.geoserver.wfs.request.DescribeFeatureTypeRequest;
+import org.geoserver.config.ResourceErrorHandling;
+import org.geotools.util.logging.Logging;
 
 
 /**
@@ -41,6 +47,8 @@ public class DescribeFeatureType {
      * WFS service
      */
     private WFSInfo wfs;
+    
+    private static Logger LOGGER = Logging.getLogger(DescribeFeatureType.class);
 
     /**
          * Creates a new wfs 1.0/1.1 DescribeFeatureType operation.
@@ -107,9 +115,24 @@ public class DescribeFeatureType {
         if (names.isEmpty()) {
             // if there are no specific requested types then get all the ones that
             // are enabled
+            final boolean skipMisconfigured = ResourceErrorHandling.SKIP_MISCONFIGURED_LAYERS.equals(
+                    getWFS().getGeoServer().getGlobal().getResourceErrorHandling());
+
             for (FeatureTypeInfo ftInfo : new ArrayList<FeatureTypeInfo>(catalog.getFeatureTypes())) {
                 if (ftInfo.enabled()) {
-                    requested.add(ftInfo);
+                    try {
+                        ftInfo.getFeatureType(); // check that we can get a connection to this ftype
+                        requested.add(ftInfo);
+                    } catch (IOException ioe) {
+                        if (skipMisconfigured) {
+                            LOGGER.log(Level.WARNING,
+                                    "Skipping DescribeFeature for " + ftInfo.getPrefixedName()
+                                        + " because we couldn't connect",
+                                    ioe);
+                        } else {
+                            throw new WFSException(ioe);
+                        }
+                    }
                 }
             }
         } else {

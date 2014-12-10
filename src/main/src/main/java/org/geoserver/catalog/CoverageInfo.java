@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -22,7 +23,6 @@ import org.opengis.util.ProgressListener;
  * @author Justin Deoliveira, The Open Planning Project
  * @uml.dependency supplier="org.geoserver.catalog.CoverageResource"
  */
-@SuppressWarnings("deprecation")
 public interface CoverageInfo extends ResourceInfo {
 
     /**
@@ -138,4 +138,15 @@ public interface CoverageInfo extends ResourceInfo {
     
     GridCoverageReader getGridCoverageReader( ProgressListener listener, Hints hints ) 
         throws IOException;
+    
+    /**
+     * Returns the native coverage name (might be null for single coverage formats)
+     * @return
+     */
+    String getNativeCoverageName();
+    
+    /**
+     * Sets the native coverage name (used to pick up a specific coverage from withing a reader)
+     */
+    void setNativeCoverageName(String nativeCoverageName);
  }

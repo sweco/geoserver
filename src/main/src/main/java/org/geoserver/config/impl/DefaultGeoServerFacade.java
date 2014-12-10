@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.config.impl;
 
 import java.lang.reflect.Proxy;
@@ -6,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.geoserver.catalog.MetadataMap;
 import org.geoserver.catalog.WorkspaceInfo;
@@ -15,11 +22,16 @@ import org.geoserver.config.GeoServerFacade;
 import org.geoserver.config.GeoServerInfo;
 import org.geoserver.config.LoggingInfo;
 import org.geoserver.config.ServiceInfo;
+import org.geoserver.config.SettingsInfo;
 import org.geoserver.ows.util.OwsUtils;
+import org.geotools.util.logging.Logging;
 
 public class DefaultGeoServerFacade implements GeoServerFacade {
+    
+    static final Logger LOGGER = Logging.getLogger(DefaultGeoServerFacade.class);
 
     GeoServerInfo global;
+    List<SettingsInfo> settings = new ArrayList<SettingsInfo>();
     LoggingInfo logging;
     List<ServiceInfo> services = new ArrayList<ServiceInfo>();
 
@@ -49,6 +61,7 @@ public class DefaultGeoServerFacade implements GeoServerFacade {
     
     public void setGlobal(GeoServerInfo global) {
         resolve(global);
+        setId(global.getSettings());
         this.global = global;
     }
     
@@ -64,7 +77,44 @@ public class DefaultGeoServerFacade implements GeoServerFacade {
         
         proxy.commit();
     }
-    
+
+    public SettingsInfo getSettings(WorkspaceInfo workspace) {
+        for (SettingsInfo s : settings) {
+            if (s.getWorkspace().equals(workspace)) {
+                return ModificationProxy.create(s, SettingsInfo.class);
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void add(SettingsInfo s) {
+        s = unwrap(s);
+        setId(s);
+        settings.add(s);
+    }
+
+    @Override
+    public void save(SettingsInfo settings) {
+        ModificationProxy proxy = 
+            (ModificationProxy) Proxy.getInvocationHandler( settings );
+        
+        List propertyNames = proxy.getPropertyNames();
+        List oldValues = proxy.getOldValues();
+        List newValues = proxy.getNewValues();
+        
+        settings = (SettingsInfo) proxy.getProxyObject();
+        geoServer.fireSettingsModified(settings, propertyNames, oldValues, newValues);
+
+        proxy.commit();
+    }
+
+    @Override
+    public void remove(SettingsInfo s) {
+        s = unwrap(s);
+        settings.remove(s);
+    }
+
     public LoggingInfo getLogging() {
         if ( logging == null ) {
             return null;
@@ -130,7 +180,13 @@ public class DefaultGeoServerFacade implements GeoServerFacade {
             if( id.equals( si.getId() ) ) {
                 return ModificationProxy.create( (T) si, clazz );
             }
-         }
+        }
+        
+        if(LOGGER.isLoggable(Level.FINE)) {
+            LOGGER.fine("Could not locate service of type " + clazz + " and id '" + id 
+                    + "', available services were " + services);
+        }
+        
         return null;
     }
 
@@ -155,6 +211,7 @@ public class DefaultGeoServerFacade implements GeoServerFacade {
 
     public void dispose() {
         if ( global != null ) global.dispose();
+        if ( settings != null) settings.clear();
         if ( services != null ) services.clear();
     }
 
@@ -182,8 +239,13 @@ public class DefaultGeoServerFacade implements GeoServerFacade {
                  return ModificationProxy.create( (T) si, clazz );
              }
           }
+         
+         if(LOGGER.isLoggable(Level.FINE)) {
+             LOGGER.fine("Could not locate service of type " + clazz + " in workspace " + workspace 
+                     + ", available services were " + services);
+         }
           
-          return null;
+         return null;
      }
 
  <T extends ServiceInfo> T findByName(String name, WorkspaceInfo workspace, Class<T> clazz, 
@@ -192,6 +254,11 @@ public class DefaultGeoServerFacade implements GeoServerFacade {
             if( name.equals( si.getName() ) && wsEquals(workspace, si.getWorkspace())) {
                 return ModificationProxy.create( (T) si, clazz );
             }
+        }
+        
+        if(LOGGER.isLoggable(Level.FINE)) {
+            LOGGER.fine("Could not locate service of type " + clazz + " in workspace " + workspace 
+                    + " and name '" + name + "', available services were " + services);
         }
 
         return null;

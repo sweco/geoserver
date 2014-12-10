@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2010 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -25,6 +26,16 @@ public interface ComponentAuthorizer extends Serializable {
      * authorizer that grants access if the user has admin credentials
      */
     static ComponentAuthorizer ADMIN = new AdminComponentAuthorizer();
+
+    /**
+     * authorizer that grants access if the user has workspace admin credentials
+     */
+    static ComponentAuthorizer WORKSPACE_ADMIN = new WorkspaceAdminComponentAuthorizer();
+    
+    /**
+     * authorizer that grants access if the user has authenticated
+     */
+    static ComponentAuthorizer AUTHENTICATED = new AuthenticatedComponentAuthorizer(); 
     
     /**
      * Determines if access is allowed to the component given the specified credentials.

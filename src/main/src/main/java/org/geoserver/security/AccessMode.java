@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -17,8 +18,12 @@ public enum AccessMode {
     /**
      * Write access, that is, see and modify
      */
-    WRITE("w");
-    
+    WRITE("w"),
+    /**
+     * Admin access, read+write and full configure
+     */
+    ADMIN("a");
+
     String alias;
     
     /**

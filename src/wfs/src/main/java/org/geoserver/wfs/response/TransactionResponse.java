@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.response;
@@ -70,7 +71,7 @@ public class TransactionResponse extends WFSResponse {
         throws IOException, ServiceException {
         TransactionResultsType result = response.getTransactionResults();
 
-        Charset charset = Charset.forName( getInfo().getGeoServer().getGlobal().getCharset() );
+        Charset charset = Charset.forName( getInfo().getGeoServer().getSettings().getCharset() );
         Writer writer = new OutputStreamWriter(output, charset);
         writer = new BufferedWriter(writer);
 
@@ -196,7 +197,7 @@ public class TransactionResponse extends WFSResponse {
         }
 
         Encoder encoder = new Encoder(configuration, configuration.schema());
-        encoder.setEncoding(Charset.forName( getInfo().getGeoServer().getGlobal().getCharset()) );
+        encoder.setEncoding(Charset.forName( getInfo().getGeoServer().getSettings().getCharset()) );
 
         TransactionType req = (TransactionType)operation.getParameters()[0];
         

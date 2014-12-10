@@ -1,14 +1,15 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.describelayer;
 
+import static org.junit.Assert.*;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
-import junit.framework.TestCase;
 
 import org.geoserver.catalog.impl.CatalogImpl;
 import org.geoserver.catalog.impl.CoverageInfoImpl;
@@ -24,6 +25,9 @@ import org.geoserver.wms.DescribeLayerRequest;
 import org.geoserver.wms.MapLayerInfo;
 import org.geoserver.wms.WMS;
 import org.geoserver.wms.WMSInfoImpl;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Unit test suite for {@link DescribeLayerKvpRequestReader}
@@ -31,7 +35,7 @@ import org.geoserver.wms.WMSInfoImpl;
  * @author Gabriel Roldan
  * @version $Id$
  */
-public class DescribeLayerKvpRequestReaderTest extends TestCase {
+public class DescribeLayerKvpRequestReaderTest {
 
     private GeoServerImpl geoServerImpl;
 
@@ -39,14 +43,16 @@ public class DescribeLayerKvpRequestReaderTest extends TestCase {
 
     private Map<String, String> params;
 
-    protected void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         geoServerImpl = new GeoServerImpl();
         geoServerImpl.add(new WMSInfoImpl());
         wms = new WMS(geoServerImpl);
         params = new HashMap<String, String>();
     }
 
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         wms = null;
         params = null;
     }
@@ -63,6 +69,7 @@ public class DescribeLayerKvpRequestReaderTest extends TestCase {
         return (DescribeLayerRequest) reader.read(req, kvp, rawKvp);
     }
 
+    @Test
     public void testGetRequestNoVersion() throws Exception {
         params.put("LAYERS", "topp:states");
         try {
@@ -73,6 +80,7 @@ public class DescribeLayerKvpRequestReaderTest extends TestCase {
         }
     }
 
+    @Test
     public void testGetRequestInvalidVersion() throws Exception {
         params.put("LAYERS", "topp:states");
         params.put("VERSION", "fakeVersion");
@@ -84,6 +92,7 @@ public class DescribeLayerKvpRequestReaderTest extends TestCase {
         }
     }
 
+    @Test
     public void testGetRequestNoLayerRequested() throws Exception {
         params.put("VERSION", "1.1.1");
         try {
@@ -94,6 +103,7 @@ public class DescribeLayerKvpRequestReaderTest extends TestCase {
         }
     }
 
+    @Test
     public void testGetRequest() throws Exception {
         CatalogImpl catalog = new CatalogImpl();
         geoServerImpl.setCatalog(catalog);

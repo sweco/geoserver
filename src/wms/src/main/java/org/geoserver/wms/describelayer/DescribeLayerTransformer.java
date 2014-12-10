@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.describelayer;
@@ -18,7 +19,6 @@ import javax.xml.transform.TransformerException;
 import org.geoserver.ows.URLMangler.URLType;
 import org.geoserver.wms.DescribeLayerRequest;
 import org.geoserver.wms.MapLayerInfo;
-import org.geotools.util.Version;
 import org.geotools.xml.transform.TransformerBase;
 import org.geotools.xml.transform.Translator;
 import org.xml.sax.ContentHandler;
@@ -150,8 +150,7 @@ public class DescribeLayerTransformer extends TransformerBase {
                 String owsUrl;
                 String owsType;
                 if (MapLayerInfo.TYPE_VECTOR == layer.getType()) {
-                    // REVISIT: not sure why we need WfsDispatcher, "wfs?" should suffice imho
-                    owsUrl = buildURL(baseURL, "wfs/WfsDispatcher", null, URLType.SERVICE);
+                    owsUrl = buildURL(baseURL, "wfs", null, URLType.SERVICE);
                     owsUrl = appendQueryString(owsUrl, "");
                     owsType = "WFS";
                     layerAtts.addAttribute("", "wfs", "wfs", "", owsUrl);
@@ -173,7 +172,7 @@ public class DescribeLayerTransformer extends TransformerBase {
                     layerAtts.addAttribute("", "owsType", "owsType", "", owsType);
                 }
 
-                layerAtts.setAttribute(0, "", "name", "name", "", layer.getName());
+                layerAtts.setAttribute(0, "", "name", "name", "", layer.getLayerInfo().prefixedName());
                 start("LayerDescription", layerAtts);
 
                 queryAtts.setAttribute(0, "", "typeName", "typeName", "", layer.getName());

@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.vfny.geoserver;
@@ -308,6 +309,6 @@ public class ServiceException extends org.geoserver.platform.ServiceException {
      * @return
      */
     public String getMimeType(GeoServer geoserver) {
-        return "text/xml; charset=" + geoserver.getGlobal().getCharset();
+        return "text/xml; charset=" + geoserver.getSettings().getCharset();
     }
 }

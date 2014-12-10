@@ -38,6 +38,12 @@
             <targetElement>ex:PolymorphicFeature</targetElement>
             <attributeMappings>
                 <AttributeMapping>
+			        <targetAttribute>ex:PolymorphicFeature</targetAttribute>			        							
+					<idExpression>
+                        <OCQL>ID</OCQL>
+                    </idExpression>
+			    </AttributeMapping>
+                <AttributeMapping>
                     <!-- Test feature chaining and polymorphism -->
                     <targetAttribute>ex:firstValue</targetAttribute>
                     <sourceExpression>
@@ -88,6 +94,18 @@
                     </sourceExpression>
                 </AttributeMapping>
                 <AttributeMapping>
+                    <!-- GEOT-4417: Test referential polymorphism with feature chaining -->
+                    <targetAttribute>ex:fifthValue</targetAttribute>
+                    <sourceExpression>
+                        <OCQL>ID</OCQL>
+                        <linkElement>
+						    if_then_else(lessEqualThan(NUMERIC_VALUE, 1), toXlinkHref('urn:ogc:def:nil:OGC::missing'),
+						        'NumericType')
+						</linkElement>
+						<linkField>FEATURE_LINK</linkField>
+                    </sourceExpression>
+                </AttributeMapping>
+                <AttributeMapping>
                     <!-- Test polymorphism with anyType  -->
                     <targetAttribute>ex:anyValue</targetAttribute>
                     <sourceExpression>
@@ -108,7 +126,7 @@
             <attributeMappings>
                 <AttributeMapping>
                     <targetAttribute>gsml:CGI_TermValue</targetAttribute>
-                    <idExpression><OCQL>strConcat('termvalue_', getID())</OCQL></idExpression>
+                    <idExpression><OCQL>strConcat('termvalue_', ID)</OCQL></idExpression>
                     <!-- GEOT-3304: Test client property with polymorphism -->
                     <ClientProperty>
                         <name>gsml:qualifier</name>
@@ -131,7 +149,7 @@
             <attributeMappings>
                  <AttributeMapping>
                     <targetAttribute>gsml:CGI_NumericValue</targetAttribute>
-                    <idExpression><OCQL>strConcat('numericvalue_', getID())</OCQL></idExpression>
+                    <idExpression><OCQL>strConcat('numericvalue_', ID)</OCQL></idExpression>
                 </AttributeMapping>
                 <AttributeMapping>
                     <targetAttribute>gsml:principalValue</targetAttribute>
@@ -148,7 +166,7 @@
 			            FEATURE_LINK
   		            </targetAttribute>
                     <sourceExpression>
-                        <OCQL>strTrim(getId())</OCQL>
+                        <OCQL>ID</OCQL>
                     </sourceExpression>
                 </AttributeMapping>
             </attributeMappings>

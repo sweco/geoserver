@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -11,17 +12,12 @@ import javax.media.jai.TileCache;
 
 import org.geoserver.config.JAIInfo;
 
-import com.sun.media.jai.util.SunTileCache;
-
 public class JAIInfoImpl implements Serializable, JAIInfo {
 
     public static final String KEY = "jai.info";
     
     private static final long serialVersionUID = 7121137497699361776L;
-    
-    transient JAI jai;
-    transient TileCache tileCache;
-    
+
     boolean allowInterpolation;
     
     public static final boolean DEFAULT_Recycling = false;
@@ -50,6 +46,11 @@ public class JAIInfoImpl implements Serializable, JAIInfo {
     
     public static final boolean DEFAULT_MosaicNative = false;
     boolean allowNativeMosaic = DEFAULT_MosaicNative;
+    
+    public static final boolean DEFAULT_WarpNative = false;
+    boolean allowNativeWarp = DEFAULT_WarpNative;
+    
+    PngEncoderType pngEncoderType = PngEncoderType.PNGJ;
 
     /**
      * @uml.property name="allowInterpolation"
@@ -160,19 +161,25 @@ public class JAIInfoImpl implements Serializable, JAIInfo {
     }
     
     public JAI getJAI() {
-        return jai;
+        return JAI.getDefaultInstance();
     }
     
     public void setJAI( JAI jai ) {
-        this.jai = jai;
+        // do nothing. REVISIT: we're using the singleton JAI instance and guess there's no way to
+        // get a non singleton one, so does this method make sense at all? In any case, this class
+        // is meant to be serializable, hence the change in getJAI() to return the singleton
+        // directly and avoid NPE's
     }
     
     public TileCache getTileCache() {
-        return tileCache;
+        return getJAI().getTileCache();
     }
     
     public void setTileCache( TileCache tileCache ) {
-        this.tileCache = tileCache;
+        // do nothing. REVISIT: we're using the singleton JAI instance and guess there's no way to
+        // get a non singleton one, so does this method make sense at all? In any case, this class
+        // is meant to be serializable, hence the change in getTileCache() to return the singleton
+        // directly and avoid NPE's
     }
 
     public boolean isAllowNativeMosaic() {
@@ -183,12 +190,21 @@ public class JAIInfoImpl implements Serializable, JAIInfo {
         this.allowNativeMosaic = allowNativeMosaic;
     }
     
+    public boolean isAllowNativeWarp() {
+        return allowNativeWarp;
+    }
+
+    public void setAllowNativeWarp(boolean allowNativeWarp) {
+        this.allowNativeWarp = allowNativeWarp;
+    }
+    
     @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;
         result = prime * result + (allowInterpolation ? 1231 : 1237);
         result = prime * result + (allowNativeMosaic ? 1231 : 1237);
+        result = prime * result + (allowNativeWarp ? 1231 : 1237);
         result = prime * result + (imageIOCache ? 1231 : 1237);
         result = prime * result + (jpegAcceleration ? 1231 : 1237);
         long temp;
@@ -200,6 +216,7 @@ public class JAIInfoImpl implements Serializable, JAIInfo {
         result = prime * result + (recycling ? 1231 : 1237);
         result = prime * result + tilePriority;
         result = prime * result + tileThreads;
+        result = prime * result + getPngEncoderType().hashCode();
         return result;
     }
 
@@ -215,6 +232,8 @@ public class JAIInfoImpl implements Serializable, JAIInfo {
         if (allowInterpolation != other.allowInterpolation)
             return false;
         if (allowNativeMosaic != other.allowNativeMosaic)
+            return false;
+        if (allowNativeWarp != other.allowNativeWarp)
             return false;
         if (imageIOCache != other.imageIOCache)
             return false;
@@ -234,6 +253,28 @@ public class JAIInfoImpl implements Serializable, JAIInfo {
             return false;
         if (tileThreads != other.tileThreads)
             return false;
+        if (getPngEncoderType() != other.getPngEncoderType())
+            return false;
         return true;
+    }
+    
+    public JAIInfoImpl clone() {
+        try {
+            return (JAIInfoImpl) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public PngEncoderType getPngEncoderType() {
+        if(pngEncoderType == null) {
+            return PngEncoderType.PNGJ;
+        } else {
+            return pngEncoderType;
+        }
+    }
+
+    public void setPngEncoderType(PngEncoderType pngEncoderType) {
+        this.pngEncoderType = pngEncoderType;
     }
 }

@@ -1,14 +1,13 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog;
 
-import java.io.Serializable;
 import java.util.List;
-import java.util.Set;
-
 import org.geotools.geometry.jts.ReferencedEnvelope;
+
 
 /**
  * A map in which the layers grouped together can be referenced as 
@@ -17,22 +16,105 @@ import org.geotools.geometry.jts.ReferencedEnvelope;
  * @author Justin Deoliveira, The Open Planning Project
  *
  */
-public interface LayerGroupInfo extends CatalogInfo {
+public interface LayerGroupInfo extends PublishedInfo {
 
     /**
-     * The name of the layer group.
+     * Enumeration for mode of layer group.
      */
-    String getName();
+    public enum Mode {
+        /**
+         * The layer group is seen as a single exposed layer with a name.
+         */
+        SINGLE {
+            public String getName() {
+                return "Single";
+            }
+            
+            public Integer getCode() {
+                return 0;
+            }
+        },
+        /**
+         * The layer group retains a Name in the layer tree, but also exposes its nested layers in the capabilities document.
+         */
+        NAMED {
+            public String getName() {
+                return "Named Tree";
+            }
+                        
+            public Integer getCode() {
+                return 1;
+            }
+        },
+        /**
+         * The layer group is exposed in the tree, but does not have a Name element, showing structure but making it impossible to get all the layers at once.
+         */
+        CONTAINER {
+            public String getName() {
+                return "Container Tree";
+            }
+                                    
+            public Integer getCode() {
+                return 2;
+            }
+
+        },
+        /**
+         * A special mode created to manage the earth observation requirements.
+         */
+        EO {
+            public String getName() {
+                return "Earth Observation Tree";
+            }
+                            
+            public Integer getCode() {
+                return 3;
+            }
+        };
+
+        public abstract String getName();
+        public abstract Integer getCode();
+    }
+        
+    /**
+     * Layer group mode.
+     */
+    Mode getMode();
 
     /**
-     * Sets the name of the layer group.
+     * Sets layer group mode.
      */
-    void setName( String name );
+    void setMode( Mode mode );    
+
+    /**
+     * Returns a workspace or <code>null</code> if global.
+     */
+    WorkspaceInfo getWorkspace();    
     
     /**
-     * The layers in the group.
+     * Get root layer.
      */
-    List<LayerInfo> getLayers();
+    LayerInfo getRootLayer();
+    
+    /**
+     * Set root layer.
+     */
+    void setRootLayer(LayerInfo rootLayer);
+    
+    /**
+     * Get root layer style.
+     */
+    StyleInfo getRootLayerStyle();
+
+    /**
+     * Set root layer style.
+     */
+    void setRootLayerStyle(StyleInfo style);
+    
+    /**
+     * The layers and layer groups in the group.
+     */
+    List<PublishedInfo> getLayers();
     
     /**
      * The styles for the layers in the group.
@@ -43,6 +125,19 @@ public interface LayerGroupInfo extends CatalogInfo {
     List<StyleInfo> getStyles();
     
     /**
+     * 
+     * @return
+     */
+    List<LayerInfo> layers();
+
+    /**
+     * 
+     * 
+     * @return
+     */
+    List<StyleInfo> styles();  
+        
+    /**
      * The bounds for the base map.
      */
     ReferencedEnvelope getBounds();
@@ -51,30 +146,10 @@ public interface LayerGroupInfo extends CatalogInfo {
      * Sets the bounds for the base map.
      */
     void setBounds( ReferencedEnvelope bounds );
-    
-    /**
-     * A persistent map of metadata.
-     * <p>
-     * Data in this map is intended to be persisted. Common case of use is to
-     * have services associate various bits of data with a particular layer group. 
-     * An example might include caching information.
-     * </p>
-     * <p>
-     * The key values of this map are of type {@link String} and values are of
-     * type {@link Serializable}.
-     * </p>
-     * 
-     */
-    MetadataMap getMetadata();
 
     /**
-     * @return the list of this layer's authority URLs
+     * Sets the workspace.
      */
-    List<AuthorityURLInfo> getAuthorityURLs();
-    
-    /**
-     * @return the list of this layer's identifiers
-     */
-    List<LayerIdentifierInfo> getIdentifiers();
+    void setWorkspace(WorkspaceInfo workspace);
     
 }

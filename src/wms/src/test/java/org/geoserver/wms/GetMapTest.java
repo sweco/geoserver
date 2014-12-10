@@ -1,19 +1,23 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms;
+
+import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 
-import junit.framework.TestCase;
-
 import org.geoserver.platform.ServiceException;
 import org.geoserver.wms.WMSMockData.DummyRasterMapProducer;
 import org.geotools.data.wms.response.GetMapResponse;
 import org.geotools.factory.CommonFactoryFinder;
+import org.geotools.filter.function.EnvFunction;
+import org.junit.Before;
+import org.junit.Test;
 import org.opengis.filter.FilterFactory;
 
 import com.vividsolutions.jts.geom.Envelope;
@@ -29,7 +33,7 @@ import com.vividsolutions.jts.geom.Point;
  *         https://svn.codehaus.org/geoserver/branches/1.7.x/geoserver/wms/src/test/java/org/vfny
  *         /geoserver/wms/responses/GetMapResponseTest.java $
  */
-public class GetMapTest extends TestCase {
+public class GetMapTest {
 
     private WMSMockData mockData;
 
@@ -37,8 +41,8 @@ public class GetMapTest extends TestCase {
 
     private GetMap getMapOp;
 
-    @Override
-    protected void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         mockData = new WMSMockData();
         mockData.setUp();
 
@@ -50,24 +54,23 @@ public class GetMapTest extends TestCase {
         getMapOp = new GetMap(mockData.getWMS());
     }
 
-    @Override
-    protected void tearDown() throws Exception {
-
-    }
 
     /**
      * Test method for {@link GetMapResponse#execute(org.vfny.geoserver.Request)}.
      */
+    @Test
     public void testExecuteNoExtent() {
         request.setBbox(null);
         assertInvalidMandatoryParam("MissingBBox");
     }
 
+    @Test
     public void testExecuteEmptyExtent() {
         request.setBbox(new Envelope());
         assertInvalidMandatoryParam("InvalidBBox");
     }
 
+    @Test
     public void testSingleVectorLayer() throws IOException {
         request.setFormat(DummyRasterMapProducer.MIME_TYPE);
 
@@ -89,11 +92,13 @@ public class GetMapTest extends TestCase {
         assertTrue(producer.produceMapCalled);
     }
 
+    @Test
     public void testExecuteNoLayers() throws Exception {
         request.setLayers(null);
         assertInvalidMandatoryParam("LayerNotDefined");
     }
 
+    @Test
     public void testExecuteNoWidth() {
         request.setWidth(0);
         assertInvalidMandatoryParam("MissingOrInvalidParameter");
@@ -102,6 +107,7 @@ public class GetMapTest extends TestCase {
         assertInvalidMandatoryParam("MissingOrInvalidParameter");
     }
 
+    @Test
     public void testExecuteNoHeight() {
         request.setHeight(0);
         assertInvalidMandatoryParam("MissingOrInvalidParameter");
@@ -110,24 +116,28 @@ public class GetMapTest extends TestCase {
         assertInvalidMandatoryParam("MissingOrInvalidParameter");
     }
 
+    @Test
     public void testExecuteInvalidFormat() {
         request.setFormat("non-existent-output-format");
         assertInvalidMandatoryParam("InvalidFormat");
     }
 
+    @Test
     public void testExecuteNoFormat() {
         request.setFormat(null);
         assertInvalidMandatoryParam("InvalidFormat");
     }
 
+    @Test
     public void testExecuteNoStyles() {
         request.setStyles(null);
         assertInvalidMandatoryParam("StyleNotDefined");
     }
 
+    @Test
     public void testEnviroment() {
         final FilterFactory ff = CommonFactoryFinder.getFilterFactory(null);
-        request.setEnv(Collections.singletonMap("myParam", 23));
+        EnvFunction.setLocalValues(Collections.singletonMap("myParam", (Object) 23));
 
         final DummyRasterMapProducer producer = new DummyRasterMapProducer() {
             @Override

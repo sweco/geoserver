@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.map;
@@ -108,15 +109,8 @@ public final class TIFFMapResponse extends RenderedImageMapResponse {
             LOGGER.fine("Writing tiff image ...");
         }
 
-        // get the one required by the GetMapRequest
-        GetMapRequest request = mapContent.getRequest();
-        final String format = request.getFormat();
-
         // do we want it to be 8 bits?
-        if (format.equalsIgnoreCase(IMAGE_TIFF8) || (mapContent.getPaletteInverter() != null)) {
-            InverseColorMapOp paletteInverter = mapContent.getPaletteInverter();
-            image = forceIndexed8Bitmask(image, paletteInverter);
-        }
+        image = applyPalette(image, mapContent, IMAGE_TIFF8, false);
 
         // write it out
         try {

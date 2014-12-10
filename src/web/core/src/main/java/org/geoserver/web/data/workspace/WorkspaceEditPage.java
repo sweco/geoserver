@@ -1,14 +1,14 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.web.data.workspace;
 
 import java.io.Serializable;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.wicket.AttributeModifier;
@@ -18,11 +18,11 @@ import org.apache.wicket.PageParameters;
 import org.apache.wicket.ResourceReference;
 import org.apache.wicket.WicketRuntimeException;
 import org.apache.wicket.ajax.AjaxRequestTarget;
-import org.apache.wicket.ajax.markup.html.AjaxLink;
+import org.apache.wicket.ajax.form.AjaxFormComponentUpdatingBehavior;
 import org.apache.wicket.ajax.markup.html.form.AjaxCheckBox;
+import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.CheckBox;
-import org.apache.wicket.markup.html.form.ChoiceRenderer;
 import org.apache.wicket.markup.html.form.DropDownChoice;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.FormComponentPanel;
@@ -33,28 +33,36 @@ import org.apache.wicket.markup.html.link.BookmarkablePageLink;
 import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
-import org.apache.wicket.markup.html.panel.Panel;
 import org.apache.wicket.model.CompoundPropertyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.LoadableDetachableModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.model.StringResourceModel;
+import org.apache.wicket.validation.validator.MinimumValidator;
+import org.apache.wicket.validation.validator.UrlValidator;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.NamespaceInfo;
 import org.geoserver.catalog.WorkspaceInfo;
+import org.geoserver.config.ContactInfo;
 import org.geoserver.config.GeoServer;
+import org.geoserver.config.GeoServerInfo;
 import org.geoserver.config.ServiceInfo;
+import org.geoserver.config.SettingsInfo;
 import org.geoserver.config.impl.ServiceInfoImpl;
 import org.geoserver.ows.util.OwsUtils;
+import org.geoserver.web.ComponentAuthorizer;
 import org.geoserver.web.GeoServerApplication;
 import org.geoserver.web.GeoServerBasePage;
 import org.geoserver.web.GeoServerSecuredPage;
-import org.geoserver.web.MenuPageInfo;
+import org.geoserver.web.admin.ContactPanel;
+import org.geoserver.web.admin.GlobalSettingsPage;
 import org.geoserver.web.data.namespace.NamespaceDetachableModel;
+import org.geoserver.web.data.settings.SettingsPluginPanelInfo;
 import org.geoserver.web.services.BaseServiceAdminPage;
 import org.geoserver.web.services.ServiceMenuPageInfo;
 import org.geoserver.web.wicket.GeoServerDialog;
+import org.geoserver.web.wicket.HelpLink;
 import org.geoserver.web.wicket.ParamResourceModel;
 import org.geoserver.web.wicket.URIValidator;
 import org.geoserver.web.wicket.XMLNameValidator;
@@ -72,6 +80,7 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
     IModel nsModel;
     boolean defaultWs;
 
+    SettingsPanel settingsPanel;
     ServicesPanel servicesPanel;
     GeoServerDialog dialog;
     
@@ -85,7 +94,7 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
         
         if(wsi == null) {
             error(new ParamResourceModel("WorkspaceEditPage.notFound", this, wsName).getString());
-            setResponsePage(WorkspacePage.class);
+            doReturn(WorkspacePage.class);
             return;
         }
         
@@ -109,13 +118,20 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
                 try {
                     saveWorkspace();
                 } catch (RuntimeException e) {
-                    error(e.getMessage());
+                    LOGGER.log(Level.WARNING, "Failed to save workspace", e);
+                    error(e.getMessage() == null ? "Failed to save workspace, no error message available, see logs for details" : e.getMessage());
                 }
             }
         };
         add(form);
+
+        //check for full admin, we don't allow workspace admins to change all settings
+        boolean isFullAdmin = isAuthenticatedAsAdmin();
+        
         TextField name = new TextField("name", new PropertyModel(wsModel, "name"));
         name.setRequired(true);
+        name.setEnabled(isFullAdmin);
+
         name.add(new XMLNameValidator());
         form.add(name);
         TextField uri = new TextField("uri", new PropertyModel(nsModel, "uRI"), String.class);
@@ -124,29 +140,26 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
         form.add(uri);
         CheckBox defaultChk = new CheckBox("default", new PropertyModel(this, "defaultWs"));
         form.add(defaultChk);
-        
+        defaultChk.setEnabled(isFullAdmin);
+
         //stores
 //        StorePanel storePanel = new StorePanel("storeTable", new StoreProvider(ws), false);
 //        form.add(storePanel);
         
+        add(dialog = new GeoServerDialog("dialog"));
+
+        //local settings
+        form.add(settingsPanel = new SettingsPanel("settings", wsModel));
+        form.add(new HelpLink("settingsHelp").setDialog(dialog));
+
         //local services
         form.add(servicesPanel = new ServicesPanel("services", wsModel));
-        form.add(new AjaxLink("servicesHelp") {
-            @Override
-            public void onClick(AjaxRequestTarget target) {
-                dialog.showInfo(target, 
-                    new StringResourceModel("servicesHelp.title",WorkspaceEditPage.this, null), 
-                    new StringResourceModel("servicesHelp.message.1",WorkspaceEditPage.this, null),
-                    new StringResourceModel("servicesHelp.message.2",WorkspaceEditPage.this, null));
-            }
-        });
+        form.add(new HelpLink("servicesHelp").setDialog(dialog));
 
         SubmitLink submit = new SubmitLink("save");
         form.add(submit);
         form.setDefaultButton(submit);
         form.add(new BookmarkablePageLink("cancel", WorkspacePage.class));
-
-        add(dialog = new GeoServerDialog("dialog"));
     }
 
     private void saveWorkspace() {
@@ -165,8 +178,26 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
             catalog.setDefaultWorkspace(workspaceInfo);
         }
 
-        //persist/depersist any services configured local to this workspace
         GeoServer geoServer = getGeoServer();
+
+        //persist/depersist any settings configured local to the workspace
+        Settings set = settingsPanel.set;
+        if (set.enabled) {
+            if (set.model instanceof NewSettingsModel) {
+                geoServer.add(set.model.getObject());
+            }
+            else {
+                geoServer.save(set.model.getObject());
+            }
+        }
+        else {
+            //remove if necessary
+            if (set.model instanceof ExistingSettingsModel) {
+                geoServer.remove(set.model.getObject());
+            }
+        }
+        
+        //persist/depersist any services configured local to this workspace
         for (Service s : servicesPanel.services) {
             if (s.enabled) {
                 if (s.model instanceof ExistingServiceModel) {
@@ -183,7 +214,130 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
                 }
             }
         }
-        setResponsePage(WorkspacePage.class);
+        doReturn(WorkspacePage.class);
+    }
+
+    @Override
+    protected ComponentAuthorizer getPageAuthorizer() {
+        return ComponentAuthorizer.WORKSPACE_ADMIN;
+    }
+
+    /*
+     * Data object to hold onto transient settings, and maintain state of enabled for the workspace.
+     */
+    static class Settings implements Serializable {
+        /** track selection */
+        Boolean enabled;
+
+        /** created settings, not yet added to configuration */
+        IModel<SettingsInfo> model;
+    }
+
+    static class ExistingSettingsModel extends LoadableDetachableModel<SettingsInfo> {
+
+        IModel<WorkspaceInfo> wsModel;
+
+        ExistingSettingsModel(IModel<WorkspaceInfo> wsModel) {
+            this.wsModel = wsModel;
+        }
+
+        @Override
+        protected SettingsInfo load() {
+            GeoServer gs = GeoServerApplication.get().getGeoServer();
+            return gs.getSettings(wsModel.getObject());
+        }
+
+    }
+
+    static class NewSettingsModel extends Model<SettingsInfo> {
+
+        IModel<WorkspaceInfo> wsModel;
+        SettingsInfo info;
+
+        NewSettingsModel(IModel<WorkspaceInfo> wsModel) {
+            this.wsModel = wsModel;
+        }
+
+        @Override
+        public SettingsInfo getObject() {
+            if (info == null) {
+                GeoServer gs = GeoServerApplication.get().getGeoServer();
+                info = gs.getFactory().createSettings();
+                
+                //initialize from global settings
+                SettingsInfo global = gs.getGlobal().getSettings();
+
+                //hack, we need to copy out composite objects separately to get around proxying
+                // madness
+                ContactInfo contact = gs.getFactory().createContact();
+                OwsUtils.copy(global.getContact(), contact, ContactInfo.class);
+
+                OwsUtils.copy(global, info, SettingsInfo.class);
+                info.setContact(contact);
+
+                info.setWorkspace(wsModel.getObject());
+            }
+            return info;
+        }
+    }
+
+    class SettingsPanel extends FormComponentPanel {
+
+        WebMarkupContainer settingsContainer;
+        ContactPanel contactPanel;
+        WebMarkupContainer otherSettingsPanel;
+        Settings set;
+
+        public SettingsPanel(String id, IModel<WorkspaceInfo> model) {
+            super(id, new Model());
+
+            SettingsInfo settings = getGeoServer().getSettings(model.getObject());
+
+            set = new Settings();
+            set.enabled = settings != null;
+            set.model = settings != null ? 
+                new ExistingSettingsModel(wsModel) : new NewSettingsModel(wsModel); 
+
+            add(new CheckBox("enabled", new PropertyModel<Boolean>(set, "enabled")).
+                add(new AjaxFormComponentUpdatingBehavior("onclick") {
+                    @Override
+                    protected void onUpdate(AjaxRequestTarget target) {
+                        contactPanel.setVisible(set.enabled);
+                        otherSettingsPanel.setVisible(set.enabled);
+                        target.addComponent(settingsContainer);
+                    }
+                }));
+
+            settingsContainer = new WebMarkupContainer("settingsContainer");
+            settingsContainer.setOutputMarkupId(true);
+            add(settingsContainer);
+
+            contactPanel = 
+                new ContactPanel("contact", new CompoundPropertyModel<ContactInfo>(
+                    new PropertyModel<ContactInfo>(set.model, "contact")));
+            contactPanel.setOutputMarkupId(true);
+            contactPanel.setVisible(set.enabled);
+            settingsContainer.add(contactPanel);
+
+            otherSettingsPanel = new WebMarkupContainer("otherSettings", 
+                new CompoundPropertyModel<GeoServerInfo>(set.model));
+            otherSettingsPanel.setOutputMarkupId(true);
+            otherSettingsPanel.setVisible(set.enabled);
+            otherSettingsPanel.add(new CheckBox("verbose"));
+            otherSettingsPanel.add(new CheckBox("verboseExceptions"));
+            otherSettingsPanel.add(new CheckBox("localWorkspaceIncludesPrefix"));
+            otherSettingsPanel.add(new TextField<Integer>("numDecimals").add(new MinimumValidator<Integer>(0)));
+            otherSettingsPanel.add(new DropDownChoice("charset", GlobalSettingsPage.AVAILABLE_CHARSETS));
+            otherSettingsPanel.add(new TextField("proxyBaseUrl").add(new UrlValidator()));
+            
+            // Addition of pluggable extension points
+            ListView extensions = SettingsPluginPanelInfo.createExtensions("extensions", set.model, 
+                    getGeoServerApplication());
+            otherSettingsPanel.add(extensions);
+            
+            settingsContainer.add(otherSettingsPanel);
+
+        }
     }
 
     /*
@@ -296,7 +450,7 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
                                 }
                                 
                             }
-                            ((BaseServiceAdminPage)page).responsePage(WorkspaceEditPage.this);
+                            ((BaseServiceAdminPage)page).setReturnPage(WorkspaceEditPage.this);
                             setResponsePage(page);
                         }
                     };

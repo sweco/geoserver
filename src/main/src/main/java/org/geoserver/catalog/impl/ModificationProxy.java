@@ -1,26 +1,32 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.catalog.impl;
 
+import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.geoserver.catalog.Catalog;
+import org.geoserver.catalog.CatalogInfo;
 import org.geoserver.catalog.Info;
+import org.geoserver.catalog.MetadataMap;
 import org.geoserver.ows.util.ClassProperties;
 import org.geoserver.ows.util.OwsUtils;
+import org.geoserver.platform.GeoServerExtensions;
+import org.geotools.factory.CommonFactoryFinder;
+import org.opengis.filter.FilterFactory;
 
 /**
  * Proxies an object storing any modifications to it.
@@ -42,7 +48,7 @@ import org.geoserver.ows.util.OwsUtils;
  * TODO: this class should use BeanUtils for all reflection stuff
  *
  */
-public class ModificationProxy implements InvocationHandler, Serializable {
+public class ModificationProxy implements WrappingProxy, Serializable {
 
     /** 
      * the proxy object 
@@ -101,13 +107,11 @@ public class ModificationProxy implements InvocationHandler, Serializable {
                         // in this case there is nothing we can do
                         return null;
                     }
-                    Collection wrap = real.getClass().newInstance();
-                    wrap.addAll( real );
+                    Collection wrap = ModificationProxyCloner.cloneCollection(real, true);
                     properties().put( property, wrap );
                     // we also need to store a clone of the initial state as the collection
                     // might be a live one
-                    Collection clone = real.getClass().newInstance();
-                    clone.addAll( real );
+                    Collection clone = ModificationProxyCloner.cloneCollection(real, false);
                     oldCollectionValues().put(property, clone);
                     return wrap;
                 } else if(Map.class.isAssignableFrom( method.getReturnType() )) {
@@ -116,13 +120,11 @@ public class ModificationProxy implements InvocationHandler, Serializable {
                         // in this case there is nothing we can do
                         return null;
                     }
-                    Map wrap = real.getClass().newInstance();
-                    wrap.putAll( real );
+                    Map wrap = ModificationProxyCloner.cloneMap(real, true);
                     properties().put( property, wrap );
                     // we also need to store a clone of the initial state as the collection
                     // might be a live one
-                    Map clone = real.getClass().newInstance();
-                    clone.putAll( real );
+                    Map clone = ModificationProxyCloner.cloneMap(real, false);
                     oldCollectionValues().put(property, clone);
                     return wrap;
                 } else {
@@ -428,44 +430,125 @@ public class ModificationProxy implements InvocationHandler, Serializable {
         return s;
     }
 
+    private Object readResolve() throws ObjectStreamException {
+        // replace the main proxy object
+        if(proxyObject instanceof CatalogInfo) {
+            CatalogInfo replacement = replaceCatalogInfo((CatalogInfo) proxyObject);
+            if(replacement != null) {
+                proxyObject = unwrap(replacement);
+            }
+        }
+        
+        // any dirty property value
+        if(properties != null) {
+            for (Entry<String, Object> property : properties.entrySet()) {
+                Object value = property.getValue();
+                if(value instanceof CatalogInfo) {
+                    CatalogInfo replacement = replaceCatalogInfo((CatalogInfo) value);
+                    if(replacement != null) {
+                        property.setValue(unwrap(replacement));
+                    }
+                } else if(value instanceof Collection) {
+                    Collection clone = cloneCollection((Collection) value);
+                    property.setValue(clone);
+                } else if(value instanceof MetadataMap) {
+                    MetadataMap clone = cloneMetadataMap((MetadataMap) value);
+                    property.setValue(clone);
+                }
+            }
+        }
+        
+        // and eventually also contents of old collections, they might also be
+        if(oldCollectionValues != null) {
+            for (Entry<String, Object> oce : oldCollectionValues.entrySet()) {
+                Object value = oce.getValue();
+                if(value instanceof Collection) {
+                    Collection oldCollection = (Collection) value;
+                    Collection clone = cloneCollection(oldCollection);
+                    oce.setValue(clone);
+                } else if(value instanceof MetadataMap) {
+                    MetadataMap clone = cloneMetadataMap((MetadataMap) value);
+                    oce.setValue(clone);
+                }
+            }
+        }
+        
+        return this;
+    }
+
+    private MetadataMap cloneMetadataMap(MetadataMap original) {
+        MetadataMap clone = new MetadataMap();
+        for (Entry<String, Serializable> entry : original.entrySet()) {
+            String key = entry.getKey();
+            Serializable value = entry.getValue();
+            if(value instanceof CatalogInfo) {
+                CatalogInfo replacement = replaceCatalogInfo((CatalogInfo) value);
+                if(replacement != null) {
+                    value = replacement;
+                }
+            }
+            
+            clone.put(key, value);
+        }
+        
+        return clone;
+    }
+
+    private Collection cloneCollection(Collection oldCollection) {
+        Class<? extends Collection> oldCollectionClass = oldCollection.getClass();
+        try {
+            Collection clone = oldCollectionClass.newInstance();
+            for (Object o : oldCollection) {
+                if(o instanceof CatalogInfo) {
+                    CatalogInfo replacement = replaceCatalogInfo((CatalogInfo) o);
+                    if(replacement != null) {
+                        clone.add(unwrap(replacement));
+                    } else {
+                        clone.add(o);
+                    }
+                } else {
+                    clone.add(o);
+                }
+            }
+            
+            return clone;
+        } catch(Exception e) {
+            throw new RuntimeException("Unexpected failure while cloning collection of class " + oldCollectionClass, e);
+        }
+    }
+
+    private CatalogInfo replaceCatalogInfo(CatalogInfo ci) {
+        String id = ci.getId();
+        Catalog catalog = (Catalog) GeoServerExtensions.bean("catalog");
+        FilterFactory ff = CommonFactoryFinder.getFilterFactory();
+        Class iface = getCatalogInfoInterface(ci.getClass());
+        CatalogInfo replacement = catalog.get(iface, ff.equal(ff.property("id"), ff.literal(id), true));
+        return replacement;
+    }
+
+    /**
+     * Gathers the most specific CatalogInfo sub-interface from the specified class object
+     * @param class1
+     * @return
+     */
+    private Class getCatalogInfoInterface(Class<? extends CatalogInfo> clazz) {
+        Class result = CatalogInfo.class;
+        for (Class c : clazz.getInterfaces()) {
+            if(result.isAssignableFrom(c)) {
+                result = c;
+            }
+        }
+        
+        return result;
+    }
+
     /**
      * Wraps an object in a proxy.
      * 
      * @throws RuntimeException If creating the proxy fails.
      */
     public static <T> T create( T proxyObject, Class<T> clazz ) {
-        InvocationHandler h = new ModificationProxy( proxyObject );
-        
-        // proxy all interfaces implemented by the source object
-        List<Class> proxyInterfaces = (List) Arrays.asList( proxyObject.getClass().getInterfaces() );
-        
-        // ensure that the specified class is included
-        boolean add = true;
-        for ( Class interfce : proxyObject.getClass().getInterfaces() ) {
-            if ( clazz.isAssignableFrom( interfce) ) {
-                add = false;
-                break;
-            }
-        }
-        if( add ) {
-            // make the list mutable (Arrays.asList is not) and then add the extra interfaces
-            proxyInterfaces = new ArrayList<Class>(proxyInterfaces);
-            proxyInterfaces.add( clazz );
-        }
-        
-        Class proxyClass = Proxy.getProxyClass( clazz.getClassLoader(), 
-            (Class[]) proxyInterfaces.toArray(new Class[proxyInterfaces.size()]) );
-        
-        T proxy;
-        try {
-            proxy = (T) proxyClass.getConstructor(
-                new Class[] { InvocationHandler.class }).newInstance(new Object[] { h } );
-        }
-        catch( Exception e ) {
-            throw new RuntimeException( e );
-        }
-        
-        return proxy;
+        return ProxyUtils.createProxy(proxyObject, clazz, new ModificationProxy( proxyObject ));
     }
     
     /**
@@ -486,17 +569,7 @@ public class ModificationProxy implements InvocationHandler, Serializable {
      * 
      */
     public static <T> T unwrap( T object ) {
-        if ( object instanceof Proxy ) {
-            ModificationProxy h = handler( object );
-            if ( h != null ) {
-                return (T) h.getProxyObject();
-            }
-        }
-        if ( object instanceof ProxyList ) {
-            return (T) ((ProxyList)object).proxyList;
-        }
-        
-        return object;
+        return ProxyUtils.unwrap(object, ModificationProxy.class);
     }
     
     /**
@@ -507,15 +580,9 @@ public class ModificationProxy implements InvocationHandler, Serializable {
      * </p>
      */
     public static ModificationProxy handler( Object object ) {
-        if ( object instanceof Proxy ) {
-            InvocationHandler h = Proxy.getInvocationHandler( object );
-            if ( h instanceof ModificationProxy ) {
-                return (ModificationProxy) h;
-            }
-        }
-        
-        return null;
+        return ProxyUtils.handler(object, ModificationProxy.class);
     }
+
     static class list<T> extends ProxyList {
 
         list( List<T> list, Class<T> clazz ) {

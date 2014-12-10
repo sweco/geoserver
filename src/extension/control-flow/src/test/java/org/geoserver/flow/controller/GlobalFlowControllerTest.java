@@ -1,29 +1,38 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.flow.controller;
 
-import org.geoserver.flow.controller.GlobalFlowController;
+import static junit.framework.Assert.*;
+
 import org.geoserver.flow.controller.FlowControllerTestingThread.ThreadState;
 import org.geoserver.ows.Request;
+import org.junit.Test;
 
 public class GlobalFlowControllerTest extends AbstractFlowControllerTest {
     private static final long MAX_WAIT = 1000;
     
+    @Test
     public void testPriority() {
         GlobalFlowController controller = new GlobalFlowController(1);
         // priority == queue size
         assertEquals(1, controller.getPriority());
     }
 
+    @Test
     public void testSingleDelay() throws Exception {
         // create a single item flow controller 
         GlobalFlowController controller = new GlobalFlowController(1);
 
         // make three testing threads that will "process" forever, until we interrupt them
-        FlowControllerTestingThread t1 = new FlowControllerTestingThread(controller, new Request(),
-                0, Long.MAX_VALUE);
-        FlowControllerTestingThread t2 = new FlowControllerTestingThread(controller, new Request(),
-                0, Long.MAX_VALUE);
-        FlowControllerTestingThread t3 = new FlowControllerTestingThread(controller, new Request(),
-                0, Long.MAX_VALUE);
+        FlowControllerTestingThread t1 = new FlowControllerTestingThread(new Request(), 0,
+                Long.MAX_VALUE, controller);
+        FlowControllerTestingThread t2 = new FlowControllerTestingThread(new Request(), 0,
+                Long.MAX_VALUE, controller);
+        FlowControllerTestingThread t3 = new FlowControllerTestingThread(new Request(), 0,
+                Long.MAX_VALUE, controller);
         try {
             // start threads making sure every one of them managed to block somewhere before 
             // starting the next one
@@ -63,16 +72,17 @@ public class GlobalFlowControllerTest extends AbstractFlowControllerTest {
         }
     }
     
+    @Test
     public void testTimeout() {
         // create a single item flow controller 
         GlobalFlowController controller = new GlobalFlowController(1);
 
         // make two testing threads that will "process" for 400ms, but with a timeout of 200 on the
         // flow controller
-        FlowControllerTestingThread t1 = new FlowControllerTestingThread(controller, new Request(),
-                100, 400);
-        FlowControllerTestingThread t2 = new FlowControllerTestingThread(controller, new Request(),
-                100, 400);
+        FlowControllerTestingThread t1 = new FlowControllerTestingThread(new Request(), 100,
+                400, controller);
+        FlowControllerTestingThread t2 = new FlowControllerTestingThread(new Request(), 100,
+                400, controller);
         
         // start t1 first, let go t2 after
         try {

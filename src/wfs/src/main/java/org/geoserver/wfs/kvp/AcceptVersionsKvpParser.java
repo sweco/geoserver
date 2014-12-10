@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.kvp;
@@ -7,8 +8,8 @@ package org.geoserver.wfs.kvp;
 import net.opengis.ows10.AcceptVersionsType;
 import net.opengis.ows10.Ows10Factory;
 
-import org.geoserver.ows.KvpParser;
-import org.geoserver.ows.util.KvpUtils;
+import org.eclipse.emf.ecore.EObject;
+import org.geoserver.wfs.WFSInfo;
 
 
 /**
@@ -18,16 +19,14 @@ import org.geoserver.ows.util.KvpUtils;
  * @author Justin Deoliveira, The Open Planning Project
  *
  */
-public class AcceptVersionsKvpParser extends KvpParser {
+public class AcceptVersionsKvpParser extends org.geoserver.ows.kvp.AcceptVersionsKvpParser {
+    
     public AcceptVersionsKvpParser() {
-        super("acceptversions", AcceptVersionsType.class);
+        super(AcceptVersionsType.class);
+        setVersion(WFSInfo.Version.V_11.getVersion());
     }
 
-    public Object parse(String value) throws Exception {
-        AcceptVersionsType acceptVersions = Ows10Factory.eINSTANCE
-            .createAcceptVersionsType();
-        acceptVersions.getVersion().addAll(KvpUtils.readFlat(value, KvpUtils.INNER_DELIMETER));
-
-        return acceptVersions;
+    protected EObject createObject() {
+        return Ows10Factory.eINSTANCE.createAcceptVersionsType();
     }
 }

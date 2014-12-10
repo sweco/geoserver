@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -24,6 +25,7 @@ import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.StoreInfo;
 import org.geoserver.catalog.WMSStoreInfo;
 import org.geoserver.web.CatalogIconFactory;
+import org.geoserver.web.ComponentAuthorizer;
 import org.geoserver.web.GeoServerSecuredPage;
 import org.geoserver.web.data.SelectionRemovalLink;
 import org.geoserver.web.data.resource.ResourceConfigurationPage;
@@ -119,7 +121,8 @@ public class LayerPage extends GeoServerSecuredPage {
         IModel storeModel = STORE.getModel(model);
         String wsName = (String) WORKSPACE.getModel(model).getObject();
         String storeName = (String) storeModel.getObject();
-        StoreInfo store = getCatalog().getStoreByName(wsName, storeName, StoreInfo.class);
+        LayerInfo layer = (LayerInfo) model.getObject();
+        StoreInfo store = layer.getResource().getStore();
         if(store instanceof DataStoreInfo) {
             return new SimpleBookmarkableLink(id, DataAccessEditPage.class, storeModel, 
                     DataAccessEditPage.STORE_NAME, storeName, 
@@ -141,4 +144,8 @@ public class LayerPage extends GeoServerSecuredPage {
                 "name", (String) nameModel.getObject());
     }
 
+    @Override
+    protected ComponentAuthorizer getPageAuthorizer() {
+        return ComponentAuthorizer.WORKSPACE_ADMIN;
+    }
 }

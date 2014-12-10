@@ -1,8 +1,11 @@
-/* Copyright (c) 2011 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.gwc.wms;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -16,7 +19,6 @@ import org.geoserver.wms.GetMapRequest;
 import org.geoserver.wms.WebMap;
 import org.geoserver.wms.WebMapService;
 import org.geotools.util.logging.Logging;
-import org.springframework.util.Assert;
 
 /**
  * {@link WebMapService#getMap(GetMapRequest)} Spring's AOP method interceptor to seed a (meta)tile
@@ -47,13 +49,13 @@ public class CacheSeedingWebMapService implements MethodInterceptor {
     public WebMap invoke(MethodInvocation invocation) throws Throwable {
 
         final Method method = invocation.getMethod();
-        Assert.isTrue(method.getDeclaringClass().equals(WebMapService.class));
-        Assert.isTrue("getMap".equals(method.getName()));
+        checkArgument(method.getDeclaringClass().equals(WebMapService.class));
+        checkArgument("getMap".equals(method.getName()));
 
         final Object[] arguments = invocation.getArguments();
 
-        Assert.isTrue(arguments.length == 1);
-        Assert.isInstanceOf(GetMapRequest.class, arguments[0]);
+        checkArgument(arguments.length == 1);
+        checkArgument(arguments[0] instanceof GetMapRequest);
 
         final GetMapRequest request = (GetMapRequest) arguments[0];
 

@@ -134,16 +134,16 @@ The PSC is responsible for defining project policies and practiced. Examples inc
 Current PSC
 -----------
 
- * Ben Caradoc-Davies
  * Alessio Fabiani
  * Andrea Aime
+ * Ben Caradoc-Davies
  * Chris Holmes (Chair)
  * Christian Mueller
  * Gabriel Roldan
- * Justin Deoliveira
  * Jody Garnett
- * Mark Leslie
- * Rob Atkinson
+ * Jukka Rahkonen
+ * Justin Deoliveira
+ * Phil Scadden
  * Simone Giannecchini
 
 PSC Voting procedure
@@ -177,4 +177,4 @@ That is to say, status on PSC is lost if not active at all in a two month period
 Dissolution of PSC
 ------------------
 
-If there are no suitable replacements, the PSC can decide to go down in number.  If the number of active PSC members drops below 5, however, then `TOPP <http://topp.openplans.org>`_ reserves the right to take back active control of the project or to pass it on to an organization that will effectively steer it.  We sincerely hope that will never happen, but want a policy in place so that we avoid a zombie project, forcing someone else to eventually fork GeoServer or some such.  
+If there are no suitable replacements, the PSC can decide to go down in number.  If the number of active PSC members drops below 5, however, then we may wish to ask the OSGeo Board for assistance. For more information check out the `OSGeo Governance FAQ <http://www.osgeo.org/faq>`_.

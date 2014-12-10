@@ -11,11 +11,11 @@
            </legend>
            <ul>
              <li>
-               <label for="version">Version</label>
+               <label for="version"><wicket:message key="geoserverVersion">Version</wicket:message></label>
                <span id="version"><wicket:message key="version"></wicket:message></span>
              </li>
              <li>
-               <label for="buildRevision"><wicket:message key="svnRevision">Subversion Revision</wicket:message></label>
+               <label for="buildRevision"><wicket:message key="gitRevision">Git Revision</wicket:message></label>
                <span id="buildRevision"><wicket:message key="build.revision"></wicket:message></span>
              </li>
              <li>
@@ -28,12 +28,18 @@
                  <span wicket:id="geotoolsVersion"></span> (rev <span wicket:id="geotoolsRevision"></span>)
                </span>
              </li>
+             <li>
+               <label for="geowebcacheInfo"><wicket:message key="geowebcacheVersion">GeoWebCache Version</wicket:message></label>
+               <span id="geotoolsInfo">
+                 <span wicket:id="geowebcacheVersion"></span> (rev <span wicket:id="geowebcacheRevision"></span>)
+               </span>
+             </li>
            </ul>
          </fieldset>
        </li>
        <li>
          <fieldset>
-           <legend><span>More Information</span></legend>
+           <legend><span><wicket:message key="moreInformation">More Information</wicket:message></span></legend>
            <p style="margin-top: 1em;">
              <wicket:message key="introduction"></wicket:message>
            </p>

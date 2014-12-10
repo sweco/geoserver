@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.catalog;
 
 import java.io.Serializable;
@@ -15,6 +20,12 @@ public class Keyword implements Serializable, KeywordInfo {
         if (value == null) {
             throw new NullPointerException("value must be non-null");
         }
+    }
+    
+    public Keyword(Keyword other) {
+        this.value = other.value;
+        this.language = other.language;
+        this.vocabulary = other.vocabulary;
     }
 
     @Override

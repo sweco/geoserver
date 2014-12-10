@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.georss;
@@ -22,7 +23,7 @@ import org.geoserver.wms.map.XMLTransformerMap;
 public class RSSGeoRSSMapOutputFormat implements GetMapOutputFormat {
 
     /** the actual mime type for the response header */
-    private static String MIME_TYPE = "application/xml";
+    private static String MIME_TYPE = "application/rss+xml";
     
     static final MapProducerCapabilities RSS_CAPABILITIES = new MapProducerCapabilities(false, false, false, true, null);
 

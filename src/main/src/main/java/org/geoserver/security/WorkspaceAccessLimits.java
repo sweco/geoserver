@@ -1,8 +1,14 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.security;
+
+import org.geoserver.platform.GeoServerExtensions;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * Access limits to a workspace (the write flag controls also direct access to data stores, though
@@ -17,10 +23,23 @@ public class WorkspaceAccessLimits extends AccessLimits {
 
     boolean writable;
 
+    boolean adminable;
+
     public WorkspaceAccessLimits(CatalogMode mode, boolean readable, boolean writable) {
+        this(mode, readable, writable, isAuthenticatedAsAdmin());
+    }
+
+    private static boolean isAuthenticatedAsAdmin() {
+        
+        return GeoServerExtensions.bean(GeoServerSecurityManager.class).
+                checkAuthenticationForAdminRole();
+    }
+
+    public WorkspaceAccessLimits(CatalogMode mode, boolean readable, boolean writable, boolean adminable) {
         super(mode);
         this.readable = readable;
         this.writable = writable;
+        this.adminable = adminable;
     }
 
     public boolean isReadable() {
@@ -29,6 +48,10 @@ public class WorkspaceAccessLimits extends AccessLimits {
 
     public boolean isWritable() {
         return writable;
+    }
+
+    public boolean isAdminable() {
+        return adminable;
     }
 
     @Override
@@ -61,6 +84,4 @@ public class WorkspaceAccessLimits extends AccessLimits {
             return false;
         return true;
     }
-    
-    
 }

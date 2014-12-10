@@ -1,12 +1,22 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wps.gs;
+
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
 
 import java.io.InputStream;
 
 import org.geoserver.data.test.MockData;
+import org.geoserver.data.test.SystemTestData;
 import org.geoserver.wps.WPSTestSupport;
 import org.geotools.gce.arcgrid.ArcGridFormat;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.junit.Test;
 import org.opengis.coverage.grid.GridCoverage;
 
 import com.mockrunner.mock.web.MockHttpServletResponse;
@@ -20,15 +30,17 @@ public class RangeLookupTest extends WPSTestSupport {
     private final static double DELTA = 1E-6;
     
     @Override
-    protected void populateDataDirectory(MockData dataDirectory) throws Exception {
-        super.populateDataDirectory(dataDirectory);
-        dataDirectory.addWcs11Coverages();
+    protected void onSetUp(SystemTestData testData) throws Exception {
+        super.onSetUp(testData);
+        
+        addWcs11Coverages(testData);
     }
 
+    @Test
     public void testRangeLookup() throws Exception {
         String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                 + "<wps:Execute version=\"1.0.0\" service=\"WPS\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"http://www.opengis.net/wps/1.0.0\" xmlns:wfs=\"http://www.opengis.net/wfs\" xmlns:wps=\"http://www.opengis.net/wps/1.0.0\" xmlns:ows=\"http://www.opengis.net/ows/1.1\" xmlns:gml=\"http://www.opengis.net/gml\" xmlns:ogc=\"http://www.opengis.net/ogc\" xmlns:wcs=\"http://www.opengis.net/wcs/1.1.1\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xsi:schemaLocation=\"http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd\">\n"
-                + "  <ows:Identifier>gs:RangeLookup</ows:Identifier>\n"
+                + "  <ows:Identifier>ras:RangeLookup</ows:Identifier>\n"
                 + "  <wps:DataInputs>\n"
                 + "    <wps:Input>\n"
                 + "      <ows:Identifier>coverage</ows:Identifier>\n"
@@ -122,6 +134,7 @@ public class RangeLookupTest extends WPSTestSupport {
                 + "  </wps:ResponseForm>\n" + "</wps:Execute>\n" + "\n" + "";
 
         MockHttpServletResponse response = postAsServletResponse(root(), xml);
+        //System.out.println(response.getOutputStreamContent());
         InputStream is = getBinaryInputStream(response);
         
         ArcGridFormat format = new ArcGridFormat();

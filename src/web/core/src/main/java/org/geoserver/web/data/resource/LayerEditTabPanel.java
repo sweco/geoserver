@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -7,6 +8,7 @@ package org.geoserver.web.data.resource;
 import org.apache.wicket.markup.html.panel.Panel;
 import org.apache.wicket.model.IModel;
 import org.geoserver.catalog.LayerInfo;
+import org.geoserver.catalog.ResourceInfo;
 
 /**
  * Extension point for panels which appear in separate tabs on the layer edit page.
@@ -39,4 +41,13 @@ public abstract class LayerEditTabPanel extends Panel {
         return (LayerInfo) getDefaultModel().getObject();
     }
 
+    /**
+     * Called by {@link ResourceConfigurationPage} to save the state of this tab's model.
+     * <p>
+     * This default implementation does nothing, as by default {@link ResourceConfigurationPage} is
+     * in charge of saving its layer and group info models.
+     */
+    public void save() {
+        // do nothing
+    }
 }

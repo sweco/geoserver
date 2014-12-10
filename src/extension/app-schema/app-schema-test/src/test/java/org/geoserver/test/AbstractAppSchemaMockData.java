@@ -1,26 +1,35 @@
-/* 
- * Copyright (c) 2001 - 2009 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 
 package org.geoserver.test;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.geoserver.data.CatalogWriter;
 import org.geoserver.data.test.MockData;
+import org.geoserver.data.test.SystemTestData;
 import org.geoserver.data.util.IOUtils;
+import org.geoserver.test.onlineTest.setup.AppSchemaTestOracleSetup;
+import org.geoserver.test.onlineTest.setup.AppSchemaTestPostgisSetup;
+import org.geoserver.test.onlineTest.support.AbstractReferenceDataSetup;
 import org.geotools.data.complex.AppSchemaDataAccessTest;
+import org.geotools.xml.resolver.SchemaCatalog;
 
 import com.vividsolutions.jts.geom.Envelope;
 
@@ -29,8 +38,9 @@ import com.vividsolutions.jts.geom.Envelope;
  * 
  * @author Ben Caradoc-Davies, CSIRO Exploration and Mining
  */
-public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
-
+public abstract class AbstractAppSchemaMockData extends SystemTestData 
+    implements NamespaceTestData {
+    
     /**
      * Folder for for test data.
      */
@@ -52,6 +62,31 @@ public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
     public static final String GSML_SCHEMA_LOCATION_URL = "http://www.geosciml.org/geosciml/2.0/xsd/geosciml.xsd";
 
     /**
+     * PRefix for spec namespace.
+     */
+    public static final String SPEC_PREFIX = "spec";
+
+    /**
+     * Map of namespace prefix to namespace URI for GML 32 schema.
+     */
+    @SuppressWarnings("serial")
+    protected static final Map<String, String> GML32_NAMESPACES = Collections
+            .unmodifiableMap(new TreeMap<String, String>() {
+                {
+                    put("cgu", "urn:cgi:xmlns:CGI:Utilities:3.0.0");
+                    put("gco", "http://www.isotc211.org/2005/gco");
+                    put("gmd", "http://www.isotc211.org/2005/gmd");
+                    put("gml", "http://www.opengis.net/gml/3.2");
+                    put("gsml", "urn:cgi:xmlns:CGI:GeoSciML-Core:3.0.0");
+                    put("sa", "http://www.opengis.net/sampling/2.0");
+                    put("spec", "http://www.opengis.net/samplingSpecimen/2.0");
+                    put("swe", "http://www.opengis.net/swe/1.0/gml32");
+                    put("wfs", "http://www.opengis.net/wfs/2.0");
+                    put("xlink", "http://www.w3.org/1999/xlink");
+                }
+            });
+    
+    /**
      * Map of namespace prefix to namespace URI.
      */
     @SuppressWarnings("serial")
@@ -68,7 +103,7 @@ public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
                     put("sml", "http://www.opengis.net/sensorML/1.0.1");
                 }
             });
-
+                        
     /**
      * Use FeatureTypeInfo constants for srs handling as values
      */
@@ -115,13 +150,30 @@ public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
     
     private final Map<String, String> layerStyles = new LinkedHashMap<String,String>();
 
-    private File data;
-    
     private File styles;
 
     /** the 'featureTypes' directory, under 'data' */
     private File featureTypesBaseDir;
+    
+    /**
+     * Pair of property file name and feature type directory to create db tables for online tests
+     */
+    private Map<String, File> propertiesFiles;
 
+    /**
+     * Indicates fixture id (postgis or oracle) if running in online mode
+     */
+    private String onlineTestId;
+    
+    /**
+     * SchemaCatalog to work with AppSchemaValidator for test requests validation. 
+     */
+    private SchemaCatalog catalog;
+
+    /**
+     * True if running 3D online test. Only matters for Oracle, since a special wkt parser is needed.
+     */
+	private boolean is3D = false;
     /**
      * Constructor with the default namespaces, schema directory, and catalog file.
      */
@@ -129,16 +181,18 @@ public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
         this(NAMESPACES);
     }
 
-    public AbstractAppSchemaMockData(Map<String, String> namespaces) {
-        this.namespaces = new LinkedHashMap<String, String>(namespaces);
-        // create the mock data directory
+    static File newRandomDirectory() {
         try {
-            data = IOUtils.createRandomDirectory("target", "app-schema-mock", "data");
+            return IOUtils.createRandomDirectory("target", "app-schema-mock", "data");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        data.delete();
-        data.mkdir();
+    }
+
+    public AbstractAppSchemaMockData(Map<String, String> namespaces) {
+        super(newRandomDirectory());
+        this.namespaces = new LinkedHashMap<String, String>(namespaces);
+
         // create a featureTypes directory
         featureTypesBaseDir = new File(data, "featureTypes");
         featureTypesBaseDir.mkdir();
@@ -147,8 +201,46 @@ public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
         styles = new File(data, "styles");
         styles.mkdir();
         
+        propertiesFiles = new HashMap<String, File>();
+
         addContent();
+        // create corresponding tables in the test db using the properties files
+        if (!propertiesFiles.isEmpty()) {
+            try {
+                createTablesInTestDatabase();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
         setUpCatalog();
+    }
+    
+    public boolean isOracleOnlineTest() {
+        return "oracle".equals(onlineTestId); 
+    }
+    
+    public boolean isPostgisOnlineTest() {
+        return "postgis".equals(onlineTestId);
+    }
+
+    /**
+     * 
+     * @param catalogLocation
+     *            file location relative to test-data dir.
+     */
+    protected void setSchemaCatalog(String catalogLocation) {
+        if (catalogLocation != null) {
+            URL resolvedCatalogLocation = getClass().getResource(TEST_DATA + catalogLocation);
+            if (resolvedCatalogLocation == null) {
+                throw new RuntimeException(
+                        "Test catalog location must be relative to test-data directory!");
+            }
+            this.catalog = SchemaCatalog.build(resolvedCatalogLocation);
+        }
+    }
+
+    public SchemaCatalog getSchemaCatalog() {
+        return catalog;
     }
 
     /**
@@ -210,11 +302,17 @@ public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
      * 
      * @see org.geoserver.data.test.TestData#setUp()
      */
-    public void setUp() {
+    public void setUp() throws IOException {
         setUpCatalog();
+        setUpSecurity();
         copy(MockData.class.getResourceAsStream("services.xml"), "services.xml");
     }
 
+    @Override
+    public void setUpDefault() throws Exception {
+        //do nothing
+    }
+    
     /**
      * Removes the mock data directory.
      * 
@@ -260,6 +358,33 @@ public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
             IOUtils.copy(input, new File(data, location));
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+    
+    /**
+     * Copies a String content to a file in the path under the mock data directory.
+     * 
+     * @param content
+     *            file content
+     * @param location
+     *            path relative to mock data directory
+     */
+    private void copy(String content, String location) {
+        File file = new File(data, location);
+        FileWriter writer = null;
+        try {
+            writer = new FileWriter(file);
+            writer.write(content);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } finally {
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
     }
 
@@ -392,10 +517,51 @@ public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }    
+    
+    /**
+     * The same as {@link #addFeatureType(String, String, String, String...)} except this to enable 3D WKT parser for Oracle. 
+     * Use this one for tests with 3D data that needs to be run online.
+     * 
+     * @param namespacePrefix
+     *            namespace prefix of the WFS feature type
+     * @param typeName
+     *            local name of the WFS feature type
+     * @param mappingFileName
+     *            file name of the app-schema mapping file
+     * @param supportFileNames
+     *            names of other files to be copied into the feature type directory
+     */
+    public void add3DFeatureType(String namespacePrefix, String typeName, String mappingFileName,
+            String... supportFileNames) {
+        addFeatureType(namespacePrefix, typeName, mappingFileName, supportFileNames);
+        this.is3D = true;
     }
     
-    
-       
+    /**
+     * Determine which setup class to use based on the fixture id specified in the vm arg.
+     * 
+     * @throws Exception
+     */
+    private void createTablesInTestDatabase() throws Exception {
+        AbstractReferenceDataSetup setup = null;
+        if (isOracleOnlineTest()) {
+            if (is3D) {
+                setup = AppSchemaTestOracleSetup.get3DInstance(propertiesFiles);
+            } else {
+                setup = AppSchemaTestOracleSetup.getInstance(propertiesFiles);
+            }
+            // Run the sql script through setup
+            setup.setUp();
+            setup.tearDown();
+        } else if (isPostgisOnlineTest()) {
+            setup = AppSchemaTestPostgisSetup.getInstance(propertiesFiles);
+            // Run the sql script through setup
+            setup.setUp();
+            setup.tearDown();
+        }
+    }
+
     /**
      * Adds the specified style to the data directory
      * @param styleId the style id
@@ -499,10 +665,104 @@ public abstract class AbstractAppSchemaMockData implements NamespaceTestData {
      */
     private void copyMappingAndSupportFiles(String namespacePrefix, String typeName,
             String mappingFileName, String... supportFileNames) {
-        copyFileToFeatureTypeDir(namespacePrefix, typeName, mappingFileName);
-        for (String propertyFileName : supportFileNames) {
-            copyFileToFeatureTypeDir(namespacePrefix, typeName, propertyFileName);
+        onlineTestId = System.getProperty("testDatabase");
+        if (onlineTestId != null) {
+            onlineTestId = onlineTestId.toLowerCase().trim();
+            // special handling for running app-schema-test with online mode
+            try {
+                // new content with modified dataStore "parameters" tag
+                String newContent = modifyOnlineMappingFileContent(mappingFileName);
+                copy(newContent, "featureTypes/"
+                        + getDataStoreName(namespacePrefix, typeName)
+                        + "/"
+                        + mappingFileName.substring(mappingFileName.lastIndexOf("/") + 1,
+                                mappingFileName.length()));
+
+                for (String propertyFileName : supportFileNames) {
+                    if (propertyFileName.endsWith(".xml")) {
+                        // also update the datastore "parameters" for supporting mapping files
+                        newContent = modifyOnlineMappingFileContent(propertyFileName);
+                        copy(newContent, "featureTypes/"
+                                + getDataStoreName(namespacePrefix, typeName)
+                                + "/"
+                                + propertyFileName.substring(propertyFileName.lastIndexOf("/") + 1,
+                                        propertyFileName.length()));
+                    } else {
+                        copyFileToFeatureTypeDir(namespacePrefix, typeName, propertyFileName);
+                        if (propertyFileName.endsWith(".properties")) {
+                            propertiesFiles.put(propertyFileName, getFeatureTypeDir(
+                                    featureTypesBaseDir, namespacePrefix, typeName));
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            copyFileToFeatureTypeDir(namespacePrefix, typeName, mappingFileName);
+            for (String propertyFileName : supportFileNames) {
+                copyFileToFeatureTypeDir(namespacePrefix, typeName, propertyFileName);
+            }
         }
+    }
+    
+    /**
+     * Modify the mapping file stream that is to be copied to the target directory. This is so the
+     * mapping file copy has the right datastore parameters to use the test database.
+     * 
+     * @param mappingFileName
+     *            Mapping file to be copied
+     * @return Modified content string
+     * @throws IOException
+     */
+    private String modifyOnlineMappingFileContent(String mappingFileName) throws IOException {
+        InputStream is = AppSchemaDataAccessTest.class.getResourceAsStream(TEST_DATA
+                + mappingFileName);
+        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+        StringBuffer content = new StringBuffer();
+        boolean parametersStartFound = false;
+        boolean parametersEndFound = false;
+        boolean isOracle = onlineTestId.equals("oracle");
+        for (String line = br.readLine(); line != null; line = br.readLine()) {
+            if (!parametersStartFound || (parametersStartFound && parametersEndFound)) {
+                // before <parameters> or after </parameters>
+                if (!parametersStartFound) {
+                    // look for start tag
+                    if (line.trim().equals("<parameters>")) {
+                        parametersStartFound = true;
+                        // copy <parameters> with new db params
+                        if (isOracle) {
+                            content.append(AppSchemaTestOracleSetup.DB_PARAMS);
+                        } else {
+                            content.append(AppSchemaTestPostgisSetup.DB_PARAMS);
+                        }
+                    } else {
+                        // copy content
+                        content.append(line);
+                    }
+                } else if (line.trim().startsWith("<sourceType>")) {
+                    // make everything upper case due to OracleDialect not wrapping them in quotes
+                    line = line.trim();
+                    String sourceTypeTag = "<sourceType>";
+                    content.append(sourceTypeTag);
+                    String tableName = line.substring(line.indexOf(sourceTypeTag)
+                            + sourceTypeTag.length(), line.indexOf("</sourceType>"));
+                    content.append(tableName.toUpperCase());
+                    content.append("</sourceType>");
+                    content.append("\n");
+                } else {
+                    content.append(line);
+                }
+                content.append("\n");
+            } else {
+                // else skip <parameters> content and do nothing
+                // look for end tag
+                if (line.trim().equals("</parameters>")) {
+                    parametersEndFound = true;
+                }
+            }
+        }
+        return content.toString();
     }
 
 }

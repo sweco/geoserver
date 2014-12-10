@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wfs.response;
 
 import java.io.IOException;
@@ -43,7 +48,7 @@ public class GeometryResponse extends WFSResponse {
             throws IOException, ServiceException {
     
         Encoder encoder = new Encoder( new GMLConfiguration() );
-        encoder.setEncoding(Charset.forName( getInfo().getGeoServer().getGlobal().getCharset() ));
+        encoder.setEncoding(Charset.forName( getInfo().getGeoServer().getSettings().getCharset() ));
         
         if ( value instanceof Point ) {
             encoder.encode( value, GML.Point, output );

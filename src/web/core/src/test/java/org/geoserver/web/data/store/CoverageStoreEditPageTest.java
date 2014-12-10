@@ -1,36 +1,58 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.web.data.store;
 
+import static org.junit.Assert.*;
+
+import java.io.IOException;
 import java.util.List;
 
 import org.apache.wicket.util.tester.FormTester;
 import org.geoserver.catalog.Catalog;
+import org.geoserver.catalog.CatalogBuilder;
 import org.geoserver.catalog.CoverageInfo;
 import org.geoserver.catalog.CoverageStoreInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.data.test.MockData;
+import org.geoserver.data.test.SystemTestData;
 import org.geoserver.web.GeoServerWicketTestSupport;
+import org.junit.Before;
+import org.junit.Test;
 
 public class CoverageStoreEditPageTest extends GeoServerWicketTestSupport {
 
     CoverageStoreInfo coverageStore;
 
     @Override
-    protected void populateDataDirectory(MockData dataDirectory) throws Exception {
-        super.populateDataDirectory(dataDirectory);
-        dataDirectory.addWellKnownCoverageTypes();
+    protected void setUpTestData(SystemTestData testData) throws Exception {
+        super.setUpTestData(testData);
+        testData.setUpDefaultRasterLayers();
     }
 
-    @Override
-    protected void setUpInternal() throws Exception {
+    @Before
+    public void init() throws IOException {
         login();
         
         coverageStore = getCatalog().getStoreByName(MockData.TASMANIA_BM.getLocalPart(),
                 CoverageStoreInfo.class);
+        if(coverageStore == null) {
+        	// revert the bluemable modified change
+            Catalog cat = getCatalog();
+            CoverageStoreInfo c = cat.getCoverageStoreByName("BlueMarbleModified");
+            if (c != null) {
+                c.setName("BlueMarble");
+                cat.save(c);
+            }
+            coverageStore = getCatalog().getStoreByName(MockData.TASMANIA_BM.getLocalPart(),
+                    CoverageStoreInfo.class);
+        }
         tester.startPage(new CoverageStoreEditPage(coverageStore.getId()));
-
-        // print(tester.getLastRenderedPage(), true, true);
     }
 
+    @Test
     public void testLoad() {
         tester.assertRenderedPage(CoverageStoreEditPage.class);
         tester.assertNoErrorMessage();
@@ -39,6 +61,7 @@ public class CoverageStoreEditPageTest extends GeoServerWicketTestSupport {
         tester.assertModelValue("rasterStoreForm:namePanel:border:paramValue", "BlueMarble");
     }
 
+    @Test
     public void testChangeName() {
         FormTester form = tester.newFormTester("rasterStoreForm");
         form.setValue("namePanel:border:paramValue", "BlueMarbleModified");
@@ -50,6 +73,7 @@ public class CoverageStoreEditPageTest extends GeoServerWicketTestSupport {
         assertNotNull(getCatalog().getStoreByName("BlueMarbleModified", CoverageStoreInfo.class));
     }
 
+    @Test
     public void testNameRequired() {
         FormTester form = tester.newFormTester("rasterStoreForm");
         form.setValue("namePanel:border:paramValue", null);
@@ -64,6 +88,7 @@ public class CoverageStoreEditPageTest extends GeoServerWicketTestSupport {
      * Test that changing a datastore's workspace updates the datastore's "namespace" parameter as
      * well as the namespace of its previously configured resources
      */
+    @Test
     public void testWorkspaceSyncsUpWithNamespace() {
         final Catalog catalog = getCatalog();
 
@@ -103,4 +128,26 @@ public class CoverageStoreEditPageTest extends GeoServerWicketTestSupport {
         }
     }
 
+    @Test
+    public void testEditDetached() throws Exception {
+        final Catalog catalog = getCatalog();
+        CoverageStoreInfo store = catalog.getFactory().createCoverageStore();
+        new CatalogBuilder(catalog).updateCoverageStore(store, coverageStore);
+        assertNull(store.getId());
+
+        tester.startPage(new CoverageStoreEditPage(store));
+        tester.assertNoErrorMessage();
+        
+        FormTester form = tester.newFormTester("rasterStoreForm");
+        form.setValue("namePanel:border:paramValue", "foo");
+        form.submit();
+        tester.clickLink("rasterStoreForm:save");
+        tester.assertNoErrorMessage();
+
+        assertNotNull(store.getId());
+        assertEquals("foo", store.getName());
+        assertNotNull(catalog.getStoreByName(coverageStore.getName(), CoverageStoreInfo.class));
+        assertNotNull(catalog.getStoreByName("foo", CoverageStoreInfo.class));
+
+    }
 }

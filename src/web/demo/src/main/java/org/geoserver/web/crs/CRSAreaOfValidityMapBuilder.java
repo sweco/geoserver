@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2010 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -29,6 +30,8 @@ import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.factory.GeoTools;
+import org.geotools.feature.DefaultFeatureCollection;
+import org.geotools.feature.DefaultFeatureCollections;
 import org.geotools.feature.FeatureCollections;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
@@ -223,6 +226,8 @@ class CRSAreaOfValidityMapBuilder {
         renderingHints.put(StreamingRenderer.CONTINUOUS_MAP_WRAPPING, Boolean.TRUE);
         renderer.setRendererHints(renderingHints);
         renderer.paint(graphics, paintArea, areaOfInterest);
+        
+        mapContent.dispose();
     }
 
     private SimpleFeature createCrsBoundsFeature(Geometry geom, CoordinateReferenceSystem crs) {
@@ -244,8 +249,7 @@ class CRSAreaOfValidityMapBuilder {
     }
 
     private Layer createCrsLayer(Geometry geom, CoordinateReferenceSystem crs) {
-        SimpleFeatureCollection collection = FeatureCollections
-                .newCollection();
+        DefaultFeatureCollection collection = new DefaultFeatureCollection();
         collection.add(createCrsBoundsFeature(geom, crs));
 
         Style style = getStyle("crs.sld");

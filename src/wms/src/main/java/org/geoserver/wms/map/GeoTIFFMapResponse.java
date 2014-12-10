@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.map;
@@ -13,7 +14,6 @@ import java.util.logging.Logger;
 import javax.imageio.stream.ImageOutputStream;
 
 import org.geoserver.platform.ServiceException;
-import org.geoserver.wms.GetMapRequest;
 import org.geoserver.wms.MapProducerCapabilities;
 import org.geoserver.wms.RasterCleaner;
 import org.geoserver.wms.WMS;
@@ -24,7 +24,6 @@ import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.GeneralEnvelope;
 import org.geotools.image.io.ImageIOExt;
-import org.geotools.image.palette.InverseColorMapOp;
 import org.geotools.util.logging.Logging;
 
 /**
@@ -78,14 +77,8 @@ public class GeoTIFFMapResponse extends RenderedImageMapResponse {
             LOGGER.fine("Writing tiff image ...");
         }
 
-        // get the one required by the GetMapRequest
-        GetMapRequest request = mapContent.getRequest();
-        final String format = request.getFormat();
         // do we want it to be 8 bits?
-        InverseColorMapOp paletteInverter = mapContent.getPaletteInverter();
-        if (IMAGE_GEOTIFF8.equalsIgnoreCase(format) || (paletteInverter != null)) {
-            image = forceIndexed8Bitmask(image, paletteInverter);
-        }
+        image = applyPalette(image, mapContent, IMAGE_GEOTIFF8, false);
         
         // crating a grid coverage
         final GridCoverage2D gc = factory.create("geotiff", image,

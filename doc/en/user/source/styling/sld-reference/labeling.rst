@@ -3,83 +3,51 @@
 Labeling
 ========
 
-Controlling Label Placement
----------------------------
+This section discusses the details of controlling label placement
+via the standard SLD options.
+It also describes a number of GeoServer enhanced options for label placement 
+that provide better cartographic output.
 
-Controlling where the WMS server places labels with SLD is bit complex. The SLD specification only defines the most basic way of controlling placement explicitly says that defining more control is "a real can of worms". Geoserver fully supports the SLD specification plus adds a few extra parameters so you can make pretty maps.
+LabelPlacement
+--------------
 
+The SLD specification defines two alternative 
+label placement strategies which can be used in the ``<LabelPlacement>`` element:
 
-Basic SLD Placement
--------------------
-
-The SLD specification indicates two types of LabelPlacement:
-
-  * for Point Geometries ("PointPlacement")
-  * for Linear (line) geometries ("LinePlacement")
-
-.. note:: Relative to Where?
-
-  See below for the actual algorithm details, but:
-    * Polygons are intersected with the viewport and the centroid is used.
-    * Lines are intersected with the viewport and the middle of the line is used.
-
-
-Code
-````
-
-.. code-block:: xml
-
-  <xsd:element name="PointPlacement">
-      <xsd:complexType>
-        <xsd:sequence>
-          <xsd:element ref="sld:AnchorPoint" minOccurs="0"/>
-          <xsd:element ref="sld:Displacement" minOccurs="0"/>
-          <xsd:element ref="sld:Rotation" minOccurs="0"/>
-        </xsd:sequence>
-      </xsd:complexType>
-    </xsd:element>
-    ...
-    <xsd:element name="LinePlacement">    
-        <xsd:complexType>
-          <xsd:sequence>
-            <xsd:element ref="sld:PerpendicularOffset" minOccurs="0"/>
-          </xsd:sequence>
-        </xsd:complexType>
-    </xsd:element>
-
+* ``<PointPlacement>`` places labels at a single point
+* ``<LinePlacement>`` places labels along a line
 
 PointPlacement
 --------------
 
-When you use a <PointPlacement> element, the geometry you are labeling will be reduced to a single point (usually the "middle" of the geometry - see algorithm below for details). You can control where the label is relative to this point using the options:
+When ``<PointPlacement>`` is used the geometry is labelled at a single **label point**.
+For lines, this point lies at the middle of the visible portion of the line.
+For polygons, the point is the centroid of the visible portion of the polygon. 
+The position of the label relative to the label point can be controlled by the following
+sub-elements:
 
 .. list-table::
    :widths: 30 70 
 
-   * - **Option** 
-     - **Meaning** (Name)
-   * - AnchorPoint
+   * - **Element** 
+     - **Description**
+   * - ``<AnchorPoint>``
      - This is relative to the LABEL. Using this you can do things such as center the label on top of the point, have the label to the left of the point, or have the label centered under the point.
-   * - Displacement
-     - This is in PIXELS and lets you fine-tune the location of the label.
-   * - Rotation
-     - This is the clockwise rotation of the label in degrees.
+   * - ``<Displacement>``
+     - Offsets the label from the anchor point by a given number pixels in X and Y.
+   * - ``<Rotation>``
+     - Rotates the label clockwise by a given number of degrees.
  	
-The best way to understand these is with examples:
+The best way to explain these options is with examples.
 
+	
 AnchorPoint
-```````````
+^^^^^^^^^^^
 
-The anchor point determines where the label is placed relative to the label point. These measurements are relative to the bounding box of the label. The (x,y) location inside the label's bounding box (specified by the AnchorPoint) is placed at the label point.
-
-.. figure:: img/label_bbox.gif
-   :align: center
-
-The anchor point is defined relative to the label's bounding box. The bottom left is (0,0), the top left is (1,1), and the middle is (0.5,0.5).
+The anchor point determines where the label is placed relative to the label point.
 
 .. code-block:: xml 
 
-  <PointPlacement>
     <AnchorPoint>
        <AnchorPointX>
        0.5
@@ -88,36 +56,46 @@ The anchor point is defined relative to the label's bounding box. The bottom lef
        0.5
        </AnchorPointY>
     </AnchorPoint>
-  </PointPlacement>	
+    
+The anchor point values  are specified relative to the bounding box of the label. 
+The bottom left of the box is (0, 0), the top left is (1, 1), and the middle is (0.5, 0.5).
+The (X,Y) location of the anchor point inside the label's bounding box is placed at the label point.
 
-By changing the values, you can control where the label is placed.
-	
-	
-.. figure:: img/point_x0y0_5.gif	
+.. figure:: img/label_bbox.png
+   :align: center
 
-(x=0,y=0.5) DEFAULT - place the label to the right of the label point 	
 
-.. figure:: img/point_x0_5y0_5.gif
+The following examples show how changing the anchor point affects the position of labels:
 
-(x=0.5,y=0.5) - place the centre of the label at the label point
 
-.. figure:: img/point_x15y0_5.gif
+.. figure:: img/point_x0y0_5.png	
 
-(x=1,y=0.5) - place the label to the left of the label point 	
+*X=0, Y=0.5 - (default) places the label to the right of the label point* 	
 
-.. figure:: img/point_x0_5y0.gif
+.. figure:: img/point_x0_5y0_5.png
 
-(x=0.5,y=0) - place the label centered above the label point
+*X=0.5, Y=0.5 - places the centre of the label at the label point*
+
+.. figure:: img/point_x15y0_5.png
+
+*X=1, Y=0.5 - places the label to the left of the label point*	
+
+.. figure:: img/point_x0_5y0.png
+
+*X=0.5, Y=0 - places the label horizontally centred above the label point*
 
 
 Displacement
-````````````
+^^^^^^^^^^^^
 
-Displacement allows fine control of the placement of the label. The displacement values are in pixels and simply move the location of the label on the resulting image.
+Displacement allows fine control of the placement of the label.
+The displacement values offset the location of the label 
+from the anchor point
+by a specified number of pixels.
+The element syntax is:
 
 .. code-block:: xml 
 
-  <PointPlacement>
    <Displacement>
      <DisplacementX>
         10
@@ -126,24 +104,24 @@ Displacement allows fine control of the placement of the label. The displacement
          0
      </DisplacementY>
    </Displacement>
-  </PointPlacement>
 
+Examples:
 
-.. figure:: img/point_x0y0_5_displacex10.gif
+.. figure:: img/point_x0y0_5_displacex10.png
    :align: center
 	
-displacement of x=10 pixels, compare with anchor point (x=0,y=0.5) above 	
+*Displacement of X=10 pixels (compare with default anchor point of (X=0, Y=0.5) shown above)*	
 
-.. figure:: img/point_x0y1_displacey10.gif
+.. figure:: img/point_x0y1_displacey10.png
    :align: center
 
-displacement of y=-10 pixels, compare with anchor point (x=0.5,y=1.0) not shown
+*Displacement of Y=-10 pixels (compare with anchor point (X= 0.5, Y=1.0) - not shown)*
 
 
 Rotation
-````````
+^^^^^^^^
 
-Rotation is simple - it rotates the label clockwise the number of degrees you specify. See the examples below for how it interacts with AnchorPoints and displacements.
+The optional ``<Rotation>`` element specifies that labels should be rotated clockwise by a given number of degrees
 
 .. code-block:: xml
   
@@ -151,44 +129,43 @@ Rotation is simple - it rotates the label clockwise the number of degrees you sp
     45
   </Rotation>
 
-.. figure:: img/rot1.gif
+The examples below show how the rotation interacts with anchor points and displacements.
+  
+.. figure:: img/rot1.png
 
-simple 45 degrees rotation 	
+*45 degree rotation* 	
 
-.. figure:: img/rot2.gif
+.. figure:: img/rot2.png
 
-45 degrees rotation with anchor point (x=0.5,y=0.5)
+*45 degree rotation with anchor point (X=0.5, Y=0.5)*
 	
-.. figure:: img/rot3.gif
+.. figure:: img/rot3.png
 	
-45 degrees with 40 pixel X displacement 	
+*45 degree rotation with 40-pixel X displacement* 	
 
-.. figure:: img/rot4.gif
+.. figure:: img/rot4.png
 
-45 degrees rotation with 40 pixel Y displacement with anchor point (x=0.5,y=0.5)
+*45 degree rotation with 40-pixel Y displacement with anchor point (X=0.5, Y=0.5)*
 
 
 LinePlacement
-`````````````
+-------------
 
-When you are labeling a line (i.e. a road or river), you can specify a <LinePlacement> element. This tells the labeling system two things:
-(a) that you want Geoserver to determine the best rotation and placement for the label (b) a minor option to control how the label is placed relative to the line.
+To label linear features (such as a road or river), the ``<LinePlacement>`` element can be specified. 
+This indicates that the styler should determine the best placement and rotation for the labels 
+along the lines. 
 
-The line placement option is very simple - it only allows you to move a label up-and-down from a line.
+The standard SLD LinePlacement element provides one optional sub-element, ``<PerpendicularOffset>``.
+GeoServer provides much more control over line label placement via vendor-specific options;
+see below for details.
 
-.. code-block:: xml 
+PerpendicularOffset
+^^^^^^^^^^^^^^^^^^^
 
-  <xs:elementname="LinePlacement">
-   <xs:complexType>
-     <xs:sequence>
-       <xs:element ref="sld:PerpendicularOffset" minOccurs="0"/>
-     </xs:sequence>
-   </xs:complexType>
-  </xs:element>
-  ...
-  <xs:element name="PerpendicularOffset" type="sld:ParameterValueType"/>
-
-This is very similiar to the DisplacementY option (see above).
+The optional ``<PerpendicularOffset>`` element allows you to position a label above or below a line.
+(This is similiar to the ``<DisplacementY>`` for label points described above.)
+The displacement value is specified in pixels.  
+A positive value displaces upwards, a negative value downwards.
 
 .. code-block:: xml 
 
@@ -200,21 +177,24 @@ This is very similiar to the DisplacementY option (see above).
     </LinePlacement>
   </LabelPlacement>
 
-.. figure:: img/lp_1.gif
+Examples:
+
+.. figure:: img/lp_1.png
 	
+*PerpendicularOffset = 0 (default)*	
 
-PerpendicularOffset=0 	
+.. figure:: img/lp_2.png
 
-.. figure:: img/lp_2.gif
-
-
-PerpendicularOffset=10 pixels
+*PerpendicularOffset = 10*
 
 
 Composing labels from multiple attributes
-`````````````````````````````````````````
+-----------------------------------------
 
-The <Label> element in TextSymbolizer is said to be mixed, that is, its content can be a mixture of plain text and OGC Expressions. The mix gets interepreted as a concatenation, this means you can leverage it to get complex labels out of multiple attributes.
+The ``<Label>`` element in `<TextSymbolizer>` allows mixed content.
+This means its content can be a mixture of plain text and :ref:`Filter Expressions <sld_reference_parameter_expressions>`. 
+The mix gets interepreted as a concatenation.
+You can leverage this to create complex labels out of multiple attributes.
 
 For example, if you want both a state name and its abbreviation to appear in a label, you can do the following:
 
@@ -224,9 +204,10 @@ For example, if you want both a state name and its abbreviation to appear in a l
     <ogc:PropertyName>STATE_NAME</ogc:PropertyName> (<ogc:PropertyName>STATE_ABBR</ogc:PropertyName>)
   </Label>
 
-and you'll get a label such as **Texas (TX)**.
+and you'll get a label looking like ``Texas (TX)``.
 
-If you need to add extra white space or newline, you'll stumble into an xml oddity.  The whitespace handling in the Label element is following a XML mandated rule called "collapse", in which all leading and trailing whitespaces have to be removed, whilst all whitespaces (and newlines) in the middle of the xml element are collapsed into a single whitespace.
+If you need to add extra white space or newline, you'll stumble into an XML oddity.  
+The whitespace handling in the Label element is following a XML rule called "collapse", in which all leading and trailing whitespaces have to be removed, whilst all whitespaces (and newlines) in the middle of the xml element are collapsed into a single whitespace.
 
 So, what if you need to insert a newline or a sequence of two or more spaces between your property names? Enter CDATA. CDATA is a special XML section that has to be returned to the interpreter as-is, without following any whitespace handling rule.
 So, for example, if you wanted to have the state abbreviation sitting on the next line you'd use the following:
@@ -238,19 +219,38 @@ So, for example, if you wanted to have the state abbreviation sitting on the nex
   ]]>(<ogc:PropertyName>STATE_ABBR</ogc:PropertyName>)
   </Label>
 
-Geoserver Specific Enhanced Options
+Geoserver Enhanced Options
 -----------------------------------
 
-The following options are all extensions of the SLD specification.  Using these options gives much more control over how the map looks, since the SLD standard isn't expressive enough to handle all the options one might want.  In time we hope to have them be an official part of the specification.  
+GeoServer provides a number of label styling options as extensions to the SLD specification.
+Using these options gives more control over how the map looks, 
+since the SLD standard isn't expressive enough to provide all the options one might want.
+
+These options are specified as subelements of ``<TextSymbolizer>``.
+
 
 .. _labeling_priority:
 
-Priority Labeling (<Priority>)
-``````````````````````````````
+Priority Labeling 
+^^^^^^^^^^^^^^^^^
 
-GeoServer has extended the standard SLD to also include priority labeling. This allows you to control which labels are rendered in preference to other labels.
+The optional ``<Priority>`` element allows specifying label priority.
+This controls how conflicts (overlaps) between labels are resolved during rendering.
+The element content may be an :ref:`expression <sld_reference_parameter_expressions>` 
+to retrieve or calculate a relative priority value for each feature in a layer.
+Alternatively, the content may be a constant value,
+to set the priority of a layer's labels relative to other layers on a rendered map.
 
-For example, lets assume you have a data set like this::
+The default priority for labels is 1000.
+
+
+.. note:: **Standard SLD Conflict Resolution**
+
+  If the ``<Priority>`` element is not present, or if a group of labels all have the same priority,
+  then standard SLD label conflict resolution is used.
+  Under this strategy, the label to display out of a group of conflicting labels is chosen essentially at random.
+
+For example, take the following dataset of cities::
 
    City Name   | population
    ------------+------------
@@ -259,120 +259,157 @@ For example, lets assume you have a data set like this::
    Newark      |     280,123
    New York    |   8,107,916
 
-Most people don't know where "Yonkers" city is, but do know where "New York" city is. On our map, we want to give "New York" priority so its more likely to be labeled when it's in conflict (overlapping) "Yonkers".
+.. figure:: img/priority_all.png
+   :align: center
 
-.. note:: **Standard SLD Behavior**
+*City locations (large scale map)*
 
-  If you do not have a <Priority> tag in your SLD then you get the default SLD labeling behavior. This basically means that if there's a conflict between two labels, there is no 'dispute' mechanism and its random which label will be displayed.
-
-In our TextSymbolizer we can put an Expression to retreive or calculate the priority for each feature:
+More people know where New York City is than where Jersey City is. 
+Thus we want to give the label "New York" priority so it will be visible when in conflict with (overlapping) "Jersey City".
+To do this we include the following code in the ``<TextSymbolizer>``:
 
 .. code-block:: xml 
 
   <Priority>
       <PropertyName>population</PropertyName>
   </Priority>
+  
+This ensures that at small scales New York is labeled in preference to the less populous cities nearby: 
 
-
-.. figure:: img/priority_all.gif
+.. figure:: img/priority_some.png
    :align: center
 
+*City locations (small scale map)*
+   
+Without priority labeling, Jersey City could be labeled in preference to New York, 
+making it difficult to interpret the map.
+At scales showing many features, 
+priority labeling is essential to ensure that larger cities are more visible than smaller cities.
 
-Location of the cities (see population data above)
-
-.. figure:: img/priority_some.gif
+.. figure:: img/priority_lots.png
    :align: center
 
-
-New York is labeled in preference to the less populated cities. Without priority labeling, "Yonkers" could be labeled in preference to New York, making a difficult to interpret map.
-
-.. figure:: img/priority_lots.gif
-   :align: center
-
-Notice that larger cities are more readily named than smaller cities.
 
 .. _labeling_group:
 
-Grouping Geometries (<VendorOption name="group">)
-`````````````````````````````````````````````````
+Grouping Features (group)
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Sometimes you will have a set of related features that you only want a single label for. The grouping option groups all features with the same label text, then finds a representative geometry for the group.
-
-Roads data is an obvious example - you only want a single label for all of "main street", not a label for every piece of "main street."
-
-.. figure:: img/group_not.gif
-   :align: center
-
-When the grouping option is off (default), grouping is not performed and each geometry is labeled (space permitting).
-
-.. figure:: img/group_yes.gif
-   :align: center
-
-With the grouping option on, all the geometries with the same label are grouped together and the label position is determined from ALL the geometries.
-
-.. list-table::
-   :widths: 30 70 
-
-   * - **Geometry** 
-     - **Representative Geometry**
-   * - Point Set
-     - 	first point inside the view rectangle is used.
-   * - Line Set
-     - lines are (a) networked together (b) clipped to the view rectangle (c) middle of the longest network path is used.
-   * - Polygon Set
-     - polygons are (a) clipped to the view rectangle (b) the centroid of the largest polygon is used.
+The ``group`` option allows displaying a single label for multiple features
+in a logical group.
 
 .. code-block:: xml
  
   <VendorOption name="group">yes</VendorOption>
 
+Grouping works by collecting all features with the same label text, 
+then choosing a representative geometry for the group,
+according to the following rules:
 
-.. warning::  Watch out - you could group together two sets of features by accident. For example, you could create a single group for "Paris" which contains features for Paris (France) and Paris (Texas).
+.. list-table::
+   :widths: 20 80 
+
+   * - **Geometry** 
+     - **Label Point**
+   * - Point Set
+     - The first point inside the view rectangle is used.
+   * - Line Set
+     - Lines are joined together, clipped to the view rectangle, and the longest path is used.
+   * - Polygon Set
+     - Polygons are clipped to the view rectangle, and the largest polygon is used.
+
+If desired the labeller can be forced to label every element in a group by specifying the :ref:`labeling_all_group` option.
+     
+.. warning::  
+   Be careful that the labels truly indicate features that should be grouped together. 
+   For example, grouping on city name alone might end up creating a group
+   containing both *Paris* (France) and *Paris* (Texas).
+
+Road data is a classic example to show why grouping is useful.  
+It is usually desirable to display only a single label for all of "Main Street", 
+not a label for every block of "Main Street."
+
+When the ``group`` option is off (the default), grouping is not performed and every block feature is labeled 
+(subject to label deconfliction):
+
+.. figure:: img/group_not.png
+   :align: center
+
+When the ``group`` option is used, geometries with the same label are grouped together 
+and the label position is determined from the entire group.
+This produces a much less cluttered map:
+
+.. figure:: img/group_yes.png
+   :align: center
+
+.. _labeling_all_group:
+
+labelAllGroup
+^^^^^^^^^^^^^
+
+The ``labelAllGroup`` option can be used in conjunction with the ``group`` option (see :ref:`labeling_group`).
+It causes *all* of the disjoint paths in a line group to be labeled, not just the longest one.
+
+.. code-block:: xml
+
+  <VendorOption name="labelAllGroup">true</VendorOption>
+
+
 
 .. _labeling_space_around:
 
-Overlapping and Separating Labels (<VendorOption name="spaceAround">)
-`````````````````````````````````````````````````````````````````````
+Overlapping and Separating Labels (spaceAround)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-By default geoserver will not put labels "on top of each other". By using the spaceAround option you can allow labels to overlap and you can also add extra space around a label.
+By default GeoServer will not render labels "on top of each other". 
+By using the ``spaceAround`` option you can either allow labels to overlap,
+or add extra space around labels.
+The value supplied for the option is a positive or negative size, in pixels.
 
 .. code-block:: xml
  
   <VendorOption name="spaceAround">10</VendorOption>
 
-.. figure:: img/space_0.gif
+Using the default value of 0, the bounding box of a label cannot overlap the bounding box of another label:
+
+.. figure:: img/space_0.png
    :align: center
 
-Default behavior ("0") - the bounding box of a label cannot overlap the bounding box of another label.
+With a negative ``spaceAround`` value, overlapping is allowed:
 
-.. figure:: img/space_neg.gif
+.. figure:: img/space_neg.png
    :align: center
 
-With a negative spaceAround value, overlapping is allowed.
+With a positive ``spaceAround`` value of 10, each label is at least 20 pixels apart from others:
 
-.. figure:: img/space_10.gif
+.. figure:: img/space_10.png
    :align: center
 
-With a spaceAround value of 10 for all TextSymbolizers, each label will be 20 pixels apart from each other (see below).
+Positive ``spaceAround`` values actually provide twice the space that you might expect. 
+This is because you can specify a spaceAround for one label as 5, and for another label (in another TextSymbolizer) as 3. 
+The total distance between them is 8. 
+Two labels in the first symbolizer ("5") will each be 5 pixels apart from each other, for a total of 10 pixels.
 
-**NOTE**: the value you specify (an integer in pixels) actually provides twice the space that you might expect. This is because you can specify a spaceAround for one label as 5, and for another label (in another TextSymbolizer) as 3. The distance between them will be 8. For two labels in the first symbolizer ("5") they will each be 5 pixels apart from each other, for a total of 10 pixels!
+.. note:: **Interaction between values in different TextSymbolizers**
 
-.. note:: **Interaction with different values in different TextSymbolizers**
-
-  You can have multiple TextSymbolizers in your SLD file, each with a different spaceAround option. This will normally do what you would think if all your spaceAround options are >=0. If you have negative values ('allow overlap') then these labels can overlap labels that you've said should not be overlapping. If you dont like this behavior, its not too difficult to change - feel free to submit a patch!
+  You can have multiple TextSymbolizers in your SLD file, each with a different ``spaceAround`` option. If all the ``spaceAround`` options are >=0, this will do what you would normally expect. If you have negative values ('allow overlap') then these labels can overlap labels that you've said should not be overlapping. If you don't like this behavior, it's not difficult to change - feel free to submit a patch!
 
 .. _labeling_follow_line:
 
 followLine
-``````````
+^^^^^^^^^^
 
-The **followLine** option forces a label to follow the curve of the line. To use this option place the following in your *<TextSymbolizer>*.
+The ``followLine`` option forces a label to follow the curve of the line. To use this option add the following to the ``<TextSymbolizer>``.
+
+.. note:: **Straight Lines**
+
+  You don't need to use followLine for straight lines. GeoServer will automatically follow the orientation of the line. However in this case ``followLine`` can be used to ensure the text isn't rendered if longer than the line.
 
 .. code-block:: xml
   
   <VendorOption name="followLine">true</VendorOption>  
 
-It is required to use *<LinePlacement>* along with this option to ensure that all labels are correctly following the lines:
+It is required to use ``<LinePlacement>`` along with this option to ensure that labels are placed along lines:
 
 .. code-block:: xml
 
@@ -383,11 +420,15 @@ It is required to use *<LinePlacement>* along with this option to ensure that al
 .. _labeling_max_displacement:
 
 maxDisplacement
-```````````````
+^^^^^^^^^^^^^^^
 
-The **maxDisplacement** option controls the displacement of the label along a line. Normally GeoServer would label a line at its center point only, provided the location is not busy with another label, and not label it at all otherwise. When set, the labeller will search for another location within **maxDisplacement** pixels from the pre-computed label point.
+The ``maxDisplacement`` option controls the displacement of the label along a line, around a point and inside a polygon.
 
-When used in conjunction with **repeat**, the value for **maxDisplacement** should always be lower than the value for repeat.
+For lines, normally GeoServer labels a line at its center point only. If this label conflicts with another one it may not be displayed at all. When this option is enabled the labeller will attempt to avoid conflic by using an alternate location within **maxDisplacement** pixels along the line from the pre-computed label point.
+
+If used in conjunction with :ref:`labeling_repeat`, the value for ``maxDisplacement`` should always be **lower** than the value for ``repeat``.
+
+For points this causes the renderer to start circling around the point in search of a empty stop to place the label, step by step increasing the size of the circle until the max displacement is reached. The same happens for polygons, around the polygon labelling point (normally the centroid).
 
 .. code-block:: xml
 
@@ -396,32 +437,24 @@ When used in conjunction with **repeat**, the value for **maxDisplacement** shou
 .. _labeling_repeat:
 
 repeat
-``````
+^^^^^^
 
-The **repeat** option determines how often GeoServer labels a line. Normally GeoServer would label each line only once, regardless of their length. Specify a positive value to make it draw the label every **repeat** pixels.
+The ``repeat`` option determines how often GeoServer displays labels along a line. 
+Normally GeoServer labels each line only once, regardless of length. 
+Specifying a positive value for this option makes the labeller attempt to draw the label every **repeat** pixels.
+For long or complex lines (such as contour lines) this makes labeling more informative.
 
 .. code-block:: xml
 
   <VendorOption name="repeat">100</VendorOption>
 
 
-.. _labeling_all_group:
-
-labelAllGroup
-`````````````
-
-The **labelAllGroup** option makes sure that all of the segments in a line group are labeled instead of just the longest one.
-
-.. code-block:: xml
-
-  <VendorOption name="labelAllGroup">true</VendorOption>
-
 .. _labeling_max_angle_delta:
 
 maxAngleDelta
-`````````````
+^^^^^^^^^^^^^
 
-Designed to use used in conjuection with **followLine**, the **maxAngleDelta** option sets the maximum angle, in degrees, between two subsequent characters in a curved label. Large angles create either visually disconnected words or overlapping characters. It is advised not to use angles larger than 30.
+When used in conjunction with :ref:`labeling_follow_line`, the ``maxAngleDelta`` option sets the maximum angle, in degrees, between two subsequent characters in a curved label. Large angles create either visually disconnected words or overlapping characters. It is advised not to use angles larger than 30.
 
 .. code-block:: xml
 
@@ -430,33 +463,42 @@ Designed to use used in conjuection with **followLine**, the **maxAngleDelta** o
 .. _labeling_autowrap:
 
 autoWrap
-`````````
+^^^^^^^^
 
-The **autoWrap** option wraps labels when they exceed the given value, given in pixels. Make sure to give a dimension wide enough to accommodate the longest word other wise this option will split words over multiple lines.
+The ``autoWrap`` option wraps labels when they exceed the given width (in pixels). 
+The size should be wide enough to accommodate the longest word, otherwise single words will be split over multiple lines.
 
 .. code-block:: xml
 
   <VendorOption name="autoWrap">50</VendorOption>
 
+.. figure:: img/label_autoWrap.png	
+
+*Labeling with autoWrap enabled* 
+
 .. _labeling_force_left_to_right:
 
 forceLeftToRight
-````````````````
+^^^^^^^^^^^^^^^^
 
-The labeller always tries to draw labels so that they can be read, meaning the label does not always follow the line orientation, but sometimes it's flipped 180° instead to allow for normal reading. This may get in the way if the label is a directional arrow, and you're trying to show one way directions (assuming the geometry is oriented along the one way, and that you have a flag to discern one ways from streets with both circulations).
+The renderer tries to draw labels along lines so that the text is upright, for maximum legibility.  
+This means a label may not follow the line orientation, but instead may be rotated 180° to display the text the right way up. 
+In some cases altering the orientation of the label is not desired; for example, if the label is a directional arrow showing the orientation of the line.
 
-The following setting disables label flipping, making the label always follow the natural orientation of the line being labelled:
+The ``forceLeftToRight`` option can be set to ``false`` to disable label flipping, making the label always follow the inherent orientation of the line being labelled:
 
 .. code-block:: xml
 
-  <VendorOption name="forceLeftToRigth">false</VendorOption>
+  <VendorOption name="forceLeftToRight">false</VendorOption>
 
 .. _labeling_conflict_resolution:
 
 conflictResolution
-````````````````````
+^^^^^^^^^^^^^^^^^^
 
-By default labels are subjected to conflict resolution, meaning the renderer will not allow any label to overlap with a label that has been drawn already. Setting this parameter to false pull the label out of the conflict resolution game, meaning the label will be drawn even if it overlaps with other labels, and other labels drawn after it won't mind overlapping with it.
+By default labels are subject to **conflict resolution**, meaning the renderer will not allow any label to overlap with a label that has been already drawn. 
+Setting the ``conflictResolution`` option to ``false`` causes this label to bypass conflict resolution.
+This means the label will be drawn even if it overlaps with other labels, and other labels drawn after it may overlap it.
 
 .. code-block:: xml
 
@@ -464,8 +506,8 @@ By default labels are subjected to conflict resolution, meaning the renderer wil
 
 .. _labeling_goodness_of_fit:
 
-Goodness of Fit
-````````````````
+goodnessOfFit
+^^^^^^^^^^^^^
 
 Geoserver will remove labels if they are a particularly bad fit for the geometry they are labeling.
 
@@ -487,10 +529,11 @@ The default value is 0.5, but it can be modified using:
 
   <VendorOption name="goodnessOfFit">0.3</VendorOption>
   
-Polygon alignment
-````````````````````
+polygonAlign
+^^^^^^^^^^^^
 
-GeoServer normally tries to place horizontal labels within a polygon, and give up in case the label position is busy or if the label does not fit enough in the polygon. This options allows GeoServer to try alternate rotations for the labels.
+GeoServer normally tries to place labels horizontally within a polygon, and gives up if the label position is busy or if the label does not fit enough in the polygon. 
+This option allows GeoServer to try alternate rotations for the labels.
 
 .. code-block:: xml
 
@@ -502,12 +545,69 @@ GeoServer normally tries to place horizontal labels within a polygon, and give u
 
    * - **Option** 
      - **Description**
-   * - manual
-     - The default value, only the rotation manually specified in the ``<Rotation>`` tag will be used
-   * - ortho
-     - If the label does not fit horizontally and the polygon is taller than wider the vertical alignement will also be tried
-   * - mbr
+   * - ``manual``
+     - The default value. Only a rotation manually specified in the ``<Rotation>`` tag will be used
+   * - ``ortho``
+     - If the label does not fit horizontally and the polygon is taller than wider then vertical alignment will also be tried
+   * - ``mbr``
      - If the label does not fit horizontally the minimum bounding rectangle will be computed and a label aligned to it will be tried out as well
      
      
+.. _labeling_graphic_resize:
+
+graphic-resize
+^^^^^^^^^^^^^^
+
+When a ``<Graphic>`` is specified for a label by default it is displayed at its native size
+and aspect ratio.
+The ``graphic-resize`` option instructs the renderer to magnify or stretch the graphic to fully contain the text of the label.
+If this option is used the ``graphic-margin`` option may also be specified.
+
+.. code-block:: xml
+
+  <VendorOption name="graphic-resize">stretch</VendorOption>
+
+
+.. list-table::
+   :widths: 30 70 
+
+   * - **Option** 
+     - **Description**
+   * - ``none``
+     - Graphic is displayed at its native size (default)
+   * - ``proportional``
+     - Graphic size is increased uniformly to contain the label text
+   * - ``stretch``
+     - Graphic size is increased anisotropically to contain the label text
      
+.. cssclass:: no-border
+
+   .. figure:: img/label_graphic-resize_none.png  
+   .. figure:: img/label_graphic-resize_stretch.png
+  
+*Labeling with a Graphic Mark "square" - L) at native size; R) with "graphic-resize"=stretch and "graphic-margin"=3* 
+     
+.. _labeling_graphic_margin:
+
+graphic-margin
+^^^^^^^^^^^^^^
+
+The ``graphic-margin`` options specifies a margin (in pixels) to use around the label text 
+when the ``graphic-resize`` option is specified.
+
+.. code-block:: xml
+
+  <VendorOption name="graphic-margin">margin</VendorOption>
+
+partials
+^^^^^^^^
+
+The ``partials`` options instructs the renderer to render labels that cross the map extent, which
+are normally not painted since there is no guarantee that a map put on the side of the current one
+(tiled rendering) will contain the other half of the label. By enabling "partials" the style editor
+takes responsibility for the other half being there (maybe because the label points have been
+placed by hand and are assured not to conflict with each other, at all zoom levels).
+
+.. code-block:: xml
+
+  <VendorOption name="partials">true</VendorOption>

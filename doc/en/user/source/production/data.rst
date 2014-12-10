@@ -12,7 +12,7 @@ Using an external data directory allows for much easier upgrades, since there is
 Use a spatial database
 **********************
 
-Shapefiles are a very common format for geospatial data. But if you are running GeoServer in a production environment, it is better to use a spatial database such as `PostGIS <http://www.postgis.org>`_.  This is essential if doing transactions (WFS-T). Most spatial databases provide shapefile conversion tools. Although there are many options for spatial databases (see the section on :ref:`data`), PostGIS is recommended. Oracle, DB2, and ArcSDE are also supported.
+Shapefiles are a very common format for geospatial data. But if you are running GeoServer in a production environment, it is better to use a spatial database such as `PostGIS <http://www.postgis.org>`_.  This is essential if doing transactions (WFS-T). Most spatial databases provide shapefile conversion tools. Although there are many options for spatial databases (see the section on :ref:`data_database`), PostGIS is recommended. Oracle, DB2, and ArcSDE are also supported.
 
 Pick the best performing coverage formats
 *****************************************
@@ -51,9 +51,6 @@ Overviews are downsampled version of the same image, that is, a zoomed out versi
 .. code-block:: xml
 
    gdaladdo -r average mytiff.tif 2 4 8 16
-
-For more hands on information on how to use GDAL utilites along with Geoserver, have a look at the 
-`BlueMarble data loading tutorial <http://geoserver.org/display/GEOSDOC/Load+NASA+Blue+Marble+Data>`_. 
 
 As a final note, Geotiff supports various kinds of compression, but we do suggest to not use it. Whilst it allows for much smaller files, the decompression process is expensive and will be performed on each data access, significantly slowing down rendering. In our experience, the decompression time is higher than the pure disk data reading.
 

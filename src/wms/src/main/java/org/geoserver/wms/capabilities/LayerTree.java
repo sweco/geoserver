@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.wms.capabilities;
 
 import java.util.ArrayList;
@@ -18,6 +23,12 @@ class LayerTree {
 
     private Collection<LayerInfo> data;
 
+    public LayerTree() {
+        this.name = "";
+        this.childrens = new ArrayList<LayerTree>();
+        this.data = new ArrayList<LayerInfo>();
+    }
+    
     /**
      * @param name
      *            String
@@ -39,17 +50,21 @@ class LayerTree {
 
         for (Iterator<LayerInfo> it = c.iterator(); it.hasNext();) {
             LayerInfo layer = it.next();
-            // ask for enabled() instead of isEnabled() to account for disabled resource/store
-            if (layer.enabled()) {
-                String wmsPath = layer.getPath() == null ? "" : layer.getPath();
+            add(layer);
+        }
+    }
 
-                if (wmsPath.startsWith("/")) {
-                    wmsPath = wmsPath.substring(1, wmsPath.length());
-                }
+    public void add(LayerInfo layer) {
+        // ask for enabled() instead of isEnabled() to account for disabled resource/store
+        if (layer.enabled()) {
+            String wmsPath = layer.getPath() == null ? "" : layer.getPath();
 
-                String[] treeStructure = wmsPath.split("/");
-                addToNode(this, treeStructure, layer);
+            if (wmsPath.startsWith("/")) {
+                wmsPath = wmsPath.substring(1, wmsPath.length());
             }
+
+            String[] treeStructure = wmsPath.split("/");
+            addToNode(this, treeStructure, layer);
         }
     }
 

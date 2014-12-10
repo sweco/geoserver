@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.feature;
@@ -120,7 +121,7 @@ public class ReprojectingFeatureCollection extends DecoratingFeatureCollection {
                 visitor.visit(it.next());
             }
         } finally {
-            close(it);
+            it.close();
         }
     }
 
@@ -130,24 +131,6 @@ public class ReprojectingFeatureCollection extends DecoratingFeatureCollection {
 
     public SimpleFeatureIterator features() {
         return new ReprojectingFeatureIterator(delegate.features());
-    }
-
-    public Iterator iterator() {
-        return new ReprojectingIterator(delegate.iterator());
-    }
-
-    public void close(SimpleFeatureIterator iterator) {
-        if (iterator instanceof ReprojectingFeatureIterator) {
-            delegate.close(((ReprojectingFeatureIterator) iterator).getDelegate());
-        }
-
-        iterator.close();
-    }
-
-    public void close(Iterator iterator) {
-        if (iterator instanceof ReprojectingIterator) {
-            delegate.close(((ReprojectingIterator) iterator).getDelegate());
-        }
     }
 
     public SimpleFeatureType getFeatureType() {
@@ -218,7 +201,7 @@ public class ReprojectingFeatureCollection extends DecoratingFeatureCollection {
 
     public ReferencedEnvelope getBounds() {
         ReferencedEnvelope bounds = null;
-        Iterator i = iterator();
+        SimpleFeatureIterator i = features();
 
         try {
             if (!i.hasNext()) {
@@ -237,7 +220,7 @@ public class ReprojectingFeatureCollection extends DecoratingFeatureCollection {
 
             return bounds;
         } finally {
-            close(i);
+            i.close();
         }
     }
 
@@ -303,7 +286,10 @@ public class ReprojectingFeatureCollection extends DecoratingFeatureCollection {
         }
 
         try {
-            return SimpleFeatureBuilder.build(schema, attributes, feature.getID());
+            SimpleFeature f = SimpleFeatureBuilder.build(schema, attributes, feature.getID());
+            //copy over the user data from original
+            f.getUserData().putAll(feature.getUserData());
+            return f;
         } catch (IllegalAttributeException e) {
             String msg = "Error creating reprojeced feature";
             throw (IOException) new IOException(msg).initCause(e);
@@ -336,6 +322,7 @@ public class ReprojectingFeatureCollection extends DecoratingFeatureCollection {
         }
 
         public void close() {
+            if (delegate != null) delegate.close();
             delegate = null;
         }
     }

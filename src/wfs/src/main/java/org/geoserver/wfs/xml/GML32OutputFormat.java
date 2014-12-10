@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2011 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.xml;
@@ -8,6 +9,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.dom.DOMSource;
 
 import org.geoserver.catalog.FeatureTypeInfo;
+import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.config.GeoServer;
 import org.geoserver.ows.util.ResponseUtils;
 import org.geoserver.platform.Operation;
@@ -26,6 +29,7 @@ import org.geoserver.wfs.request.FeatureCollectionResponse;
 import org.geoserver.wfs.request.GetFeatureRequest;
 import org.geoserver.wfs.xml.v1_1_0.WFSConfiguration;
 import org.geotools.gml3.v3_2.GML;
+import org.geotools.gml3.v3_2.GMLConfiguration;
 import org.geotools.wfs.v2_0.WFS;
 import org.geotools.xml.Configuration;
 import org.geotools.xml.Encoder;
@@ -73,16 +77,34 @@ public class GML32OutputFormat extends GML3OutputFormat {
 
     @Override
     protected Encoder createEncoder(Configuration configuration, 
-        Map<String, Set<FeatureTypeInfo>> featureTypes, Object request) {
+        Map<String, Set<ResourceInfo>> resources, Object request) {
         
         FeatureTypeSchemaBuilder schemaBuilder = new FeatureTypeSchemaBuilder.GML32(geoServer);
         
+        Map<String, Set<FeatureTypeInfo>> featureTypes = new HashMap<String, Set<FeatureTypeInfo>>();
+        for (Map.Entry<String, Set<ResourceInfo>> entry : resources.entrySet()) {
+            Set<FeatureTypeInfo> fts = new HashSet<FeatureTypeInfo>();
+            for(ResourceInfo ri : entry.getValue()) {
+                if(ri instanceof FeatureTypeInfo) {
+                    fts.add((FeatureTypeInfo) ri);
+                }
+            }
+            
+            if(!fts.isEmpty()) {
+                featureTypes.put(entry.getKey(), fts);
+            }
+        }
+        
         ApplicationSchemaXSD2 xsd = new ApplicationSchemaXSD2(schemaBuilder, featureTypes);
         xsd.setBaseURL(GetFeatureRequest.adapt(request).getBaseURL());
-        
-        ApplicationSchemaConfiguration2 config = new ApplicationSchemaConfiguration2(xsd, 
-            new org.geotools.wfs.v2_0.WFSConfiguration());
-        
+
+        org.geotools.wfs.v2_0.WFSConfiguration wfs = new org.geotools.wfs.v2_0.WFSConfiguration();
+        wfs.getDependency(GMLConfiguration.class).setSrsSyntax(
+            getInfo().getGML().get(WFSInfo.Version.V_20).getSrsNameStyle().toSrsSyntax());
+        ApplicationSchemaConfiguration2 config = new ApplicationSchemaConfiguration2(xsd, wfs);
+        // adding properties from original configuration to allow
+        // hints handling
+        config.getProperties().addAll(configuration.getProperties());
         return new Encoder(config);
     }
 

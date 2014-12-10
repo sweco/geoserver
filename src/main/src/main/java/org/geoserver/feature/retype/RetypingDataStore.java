@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.feature.retype;
@@ -48,9 +49,9 @@ public class RetypingDataStore implements DataStore {
     
     private DataStore wrapped;
 
-    private volatile Map<String, FeatureTypeMap> forwardMap = new ConcurrentHashMap<String, FeatureTypeMap>();
+    protected volatile Map<String, FeatureTypeMap> forwardMap = new ConcurrentHashMap<String, FeatureTypeMap>();
 
-    private volatile Map<String, FeatureTypeMap> backwardsMap = new ConcurrentHashMap<String, FeatureTypeMap>();
+    protected volatile Map<String, FeatureTypeMap> backwardsMap = new ConcurrentHashMap<String, FeatureTypeMap>();
 
     public RetypingDataStore(DataStore wrapped) throws IOException {
         this.wrapped = wrapped;
@@ -66,6 +67,11 @@ public class RetypingDataStore implements DataStore {
     public void updateSchema(String typeName, SimpleFeatureType featureType) throws IOException {
         throw new UnsupportedOperationException(
                 "GeoServer does not support schema updates at the moment");
+    }
+
+    public void removeSchema(String typeName) throws IOException {
+        throw new UnsupportedOperationException(
+                "GeoServer does not support schema removal at the moment");
     }
 
     public FeatureWriter<SimpleFeatureType, SimpleFeature> getFeatureWriter(String typeName,
@@ -329,4 +335,12 @@ public class RetypingDataStore implements DataStore {
     public void updateSchema(Name typeName, SimpleFeatureType featureType) throws IOException {
         updateSchema(typeName.getLocalPart(), featureType);
     }    
+
+    /**
+     * Delegates to {@link #removeSchema(String)} with {@code name.getLocalPart()}
+     *
+     */
+    public void removeSchema(Name typeName) throws IOException {
+        removeSchema(typeName.getLocalPart());
+    }
 }

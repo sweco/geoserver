@@ -1,4 +1,11 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.web.data.store;
+
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -13,9 +20,11 @@ import org.geoserver.catalog.StoreInfo;
 import org.geoserver.data.test.MockData;
 import org.geoserver.web.GeoServerWicketTestSupport;
 import org.geoserver.web.data.workspace.WorkspaceDetachableModel;
+import org.junit.Test;
 
 public class StoreModelTest extends GeoServerWicketTestSupport {
 
+    @Test
     public void testStoreModel() throws Exception {
         DataStoreInfo s = getFeatureTypeInfo(MockData.PRIMITIVEGEOFEATURE).getStore();
         StoreModel<DataStoreInfo> model = new StoreModel<DataStoreInfo>(s);
@@ -27,6 +36,26 @@ public class StoreModelTest extends GeoServerWicketTestSupport {
         assertEquals(s, model.getObject());
     }
 
+    @Test
+    public void testStoreModelSetNull() throws Exception {
+        DataStoreInfo s = getFeatureTypeInfo(MockData.PRIMITIVEGEOFEATURE).getStore();
+        StoreModel<DataStoreInfo> model = new StoreModel<DataStoreInfo>(s);
+
+        model = serializeDeserialize(model);
+        assertEquals(s, model.getObject());
+
+        model.detach();
+        assertEquals(s, model.getObject());
+
+        model.setObject(null);
+        assertNull(model.getObject());
+
+        model = serializeDeserialize(model);
+        model.detach();
+        assertNull(model.getObject());
+    }
+
+    @Test
     public void testStoresModel() throws Exception {
         WorkspaceDetachableModel ws = 
                 new WorkspaceDetachableModel(getCatalog().getWorkspaceByName("sf"));

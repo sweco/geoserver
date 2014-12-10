@@ -1,15 +1,14 @@
-/*
- * Copyright (c) 2001 - 2010 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 
 package org.geoserver.test;
 
-import junit.framework.Test;
-
 import org.geotools.geometry.jts.JTS;
 import org.geotools.referencing.CRS;
+import org.junit.Test;
 import org.opengis.geometry.MismatchedDimensionException;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
@@ -28,7 +27,7 @@ import com.vividsolutions.jts.geom.Point;
  * @author Derrick Wong, Curtin University of Technology
  */
 
-public class BBoxFilterTest extends AbstractAppSchemaWfsTestSupport {
+public class BBoxFilterTest extends AbstractAppSchemaTestSupport {
     private final String WFS_GET_FEATURE = "wfs?request=GetFeature&version=1.1.0&typename=ex:geomContainer";
 
     private final String WFS_GET_FEATURE_LOG = "WFS GetFeature&typename=ex:geomContainerresponse:\n";
@@ -41,15 +40,7 @@ public class BBoxFilterTest extends AbstractAppSchemaWfsTestSupport {
 
     private final String EPSG_4283 = "urn:x-ogc:def:crs:EPSG:4283";
 
-    /**
-     * Read-only test so can use one-time setup.
-     * 
-     */
-    public static Test suite() {
-        return new OneTimeTestSetup(new BBoxFilterTest());
-    }
-
-    protected NamespaceTestData buildTestData() {
+    protected BBoxMockData createTestData() {
         return new BBoxMockData();
     }
 
@@ -57,6 +48,7 @@ public class BBoxFilterTest extends AbstractAppSchemaWfsTestSupport {
      * The following performs a WFS request and obtains all features specified in
      * BBoxTestPropertyfile.properties
      */
+    @Test
     public void testQuery() {
         Document doc = getAsDOM(WFS_GET_FEATURE);
         LOGGER.info(WFS_GET_FEATURE_LOG + prettyString(doc));
@@ -69,8 +61,31 @@ public class BBoxFilterTest extends AbstractAppSchemaWfsTestSupport {
      * The following performs a WFS request specifying a BBOX parameter of axis ordering longitude
      * latitude.
      */
+    @Test
     public void testQueryBboxLongLat() {
         Document doc = getAsDOM(WFS_GET_FEATURE + LONGLAT);
+        LOGGER.info(WFS_GET_FEATURE_LOG + LONGLAT + prettyString(doc));
+        assertXpathEvaluatesTo("0", "/wfs:FeatureCollection/@numberOfFeatures", doc);
+        assertXpathCount(0, "//ex:geomContainer", doc);
+    }
+    
+    /**
+     * This uses long lat bbox, with srsName specified in long lat format (EPSG code). This should return the results.
+     */
+    @Test
+    public void testQueryBboxLongLatEPSGCode() {
+        Document doc = getAsDOM(WFS_GET_FEATURE + LONGLAT + ",EPSG:4326");
+        LOGGER.info(WFS_GET_FEATURE_LOG + LONGLAT + prettyString(doc));
+        assertXpathEvaluatesTo("2", "/wfs:FeatureCollection/@numberOfFeatures", doc);
+        assertXpathCount(2, "//ex:geomContainer", doc);
+    }
+    
+    /**
+     * This uses long lat bbox, with srsName specified in lat long format (URN). This should not return the results.
+     */
+    @Test
+    public void testQueryBboxLongLatURN() {
+        Document doc = getAsDOM(WFS_GET_FEATURE + LONGLAT + ",urn:x-ogc:def:crs:EPSG:4326");
         LOGGER.info(WFS_GET_FEATURE_LOG + LONGLAT + prettyString(doc));
         assertXpathEvaluatesTo("0", "/wfs:FeatureCollection/@numberOfFeatures", doc);
         assertXpathCount(0, "//ex:geomContainer", doc);
@@ -78,12 +93,74 @@ public class BBoxFilterTest extends AbstractAppSchemaWfsTestSupport {
 
     /**
      * The following performs a WFS request specifying a BBOX parameter of axis ordering latitude
-     * longitude. This test should return features if the axis ordering behaves similar to queries
-     * to Simple features.
+     * longitude. This test should return features since WFS 1.1.0 defaults to lat long if unspecified.
      */
+    @Test
     public void testQueryBboxLatLong() {
         Document doc = getAsDOM(WFS_GET_FEATURE + LATLONG);
         LOGGER.info(WFS_GET_FEATURE_LOG + LATLONG + prettyString(doc));
+        assertXpathEvaluatesTo("2", "/wfs:FeatureCollection/@numberOfFeatures", doc);
+        assertXpathCount(2, "//ex:geomContainer", doc);
+    }
+    
+    /**
+     * The following performs a WFS request specifying a BBOX parameter of axis ordering latitude
+     * longitude and srsName in EPSG code format. This test should not return features if the axis ordering behaves similar to queries
+     * to Simple features.
+     */
+    @Test
+    public void testQueryBboxLatLongEPSGCode() {
+        Document doc = getAsDOM(WFS_GET_FEATURE + LATLONG + ",EPSG:4326");
+        LOGGER.info(WFS_GET_FEATURE_LOG + LATLONG + prettyString(doc));
+        assertXpathEvaluatesTo("0", "/wfs:FeatureCollection/@numberOfFeatures", doc);
+        assertXpathCount(0, "//ex:geomContainer", doc);
+    }
+    
+    /**
+     * The following performs a WFS request specifying a BBOX parameter of axis ordering latitude
+     * longitude and srsName in URN format. This test should return features if the axis ordering behaves similar to queries
+     * to Simple features.
+     */
+    @Test
+    public void testQueryBboxLatLongURN() {
+        Document doc = getAsDOM(WFS_GET_FEATURE + LATLONG + ",urn:x-ogc:def:crs:EPSG:4326");
+        LOGGER.info(WFS_GET_FEATURE_LOG + LATLONG + prettyString(doc));
+        assertXpathEvaluatesTo("2", "/wfs:FeatureCollection/@numberOfFeatures", doc);
+        assertXpathCount(2, "//ex:geomContainer", doc);
+    }
+    
+    /**
+     * The following performs a WFS request specifying a BBOX parameter of axis ordering latitude
+     * longitude and srsName in URN format using POST request (GEOS-6216). 
+     * This test should return features if the axis ordering behaves similar to queries
+     * to Simple features.
+     */
+    @Test
+    public void testQueryBboxLatLongPost() {
+        
+        String xml = "<wfs:GetFeature service=\"WFS\" version=\"1.1.0\" " //
+                + "xmlns:ogc=\"http://www.opengis.net/ogc\" " //
+                + "xmlns:wfs=\"http://www.opengis.net/wfs\" " //
+                + "xmlns:gml=\"http://www.opengis.net/gml\" " //
+                + "xmlns:ex=\"http://example.com\" " //
+                + "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" " //
+                + "xsi:schemaLocation=\"" //
+                + "http://www.opengis.net/wfs http://schemas.opengis.net/wfs/1.1.0/wfs.xsd \">" //
+                + "<wfs:Query typeName=\"ex:geomContainer\">" //
+                + "    <ogc:Filter>" //
+                + "        <ogc:BBOX>" //
+                + "            <ogc:PropertyName>ex:geom</ogc:PropertyName>" //
+                + "            <gml:Envelope srsName=\"urn:x-ogc:def:crs:EPSG:4326\">" //
+                + "                  <gml:lowerCorner>-29 130</gml:lowerCorner>" //
+                + "                  <gml:upperCorner>-24 134</gml:upperCorner>" //
+                + "            </gml:Envelope>" //
+                + "        </ogc:BBOX>" //
+                + "    </ogc:Filter>" //
+                + "</wfs:Query>" //
+                + "</wfs:GetFeature>"; //
+        validate(xml);
+        Document doc = postAsDOM("wfs", xml);
+        LOGGER.info(WFS_GET_FEATURE_LOG + " with POST filter " + prettyString(doc));
         assertXpathEvaluatesTo("2", "/wfs:FeatureCollection/@numberOfFeatures", doc);
         assertXpathCount(2, "//ex:geomContainer", doc);
     }
@@ -92,6 +169,7 @@ public class BBoxFilterTest extends AbstractAppSchemaWfsTestSupport {
      * The following performs a WFS request specifying a BBOX parameter of axis ordering longitude
      * latitude along with srs reprojection.
      */
+    @Test
     public void testQueryBboxLatLongSrs4283() throws NoSuchAuthorityCodeException,
             FactoryException, MismatchedDimensionException, TransformException {
         Document doc = getAsDOM(WFS_GET_FEATURE + LATLONG + "&srsName=urn:x-ogc:def:crs:EPSG:4283");

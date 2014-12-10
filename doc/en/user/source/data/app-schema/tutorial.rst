@@ -186,13 +186,13 @@ The first mapping sets the ``gml:id`` to be the feature id specified in the sour
             gsml:GeologicUnit
         </targetAttribute>
         <idExpression>
-            <OCQL>getId()</OCQL>
+            <OCQL>ID</OCQL>
         </idExpression>
     </AttributeMapping>
 
 * ``targetAttribute`` is the XPath to the element for which the mapping applies, in this case, the top-level feature type.
 
-* ``idExpression`` is a special form that can only be used to set the ``gml:id`` on a feature. For database sources, ``getId()`` will synthesise an id from the table or view name, a dot ".", and the primary key of the table. If this is not desirable, any other field or CQL expression can be used, if it evaluates to an `NCName <http://www.w3.org/TR/1999/REC-xml-names-19990114/#NT-NCName>`_.
+* ``idExpression`` is a special form that can only be used to set the ``gml:id`` on a feature. Any field or CQL expression can be used, if it evaluates to an `NCName <http://www.w3.org/TR/1999/REC-xml-names-19990114/#NT-NCName>`_.
 
 
 Ordinary mapping
@@ -330,5 +330,9 @@ Feature chaining has been used to construct the multivalued property ``gsml:occu
 
 Because the mapping files in the tutorial configuration do not contain attribute mappings for all mandatory properties of these feature types, the WFS response is not *schema-valid* against the GeoSciML 2.0 schemas. Schema-validity can be achieved by adding more attribute mappings to the mapping files.
 
-.. note:: The data in this tutorial is fictitious. Some of the text and numbers have been taken from real data, but have been modified to the extent that they have no real-world meaning.
+
+Acknowledgements
+----------------
+
+``gsml_GeologicUnit.properties`` and ``gsml_MappedFeature.properties`` are derived from data provided by the Department of Primary Industries, Victoria, Australia. For the purposes of this tutorial, this data has been modified to the extent that it has no real-world meaning.
 

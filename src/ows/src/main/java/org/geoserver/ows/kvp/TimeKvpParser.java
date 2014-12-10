@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.ows.kvp;
@@ -14,6 +15,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -21,6 +23,8 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.logging.Level;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.geoserver.ows.KvpParser;
 import org.geoserver.platform.GeoServerExtensions;
@@ -36,21 +40,39 @@ import org.geotools.util.DateRange;
  * @author Simone Giannecchini, GeoSolutions SAS
  * @version $Id$
  */
-public class TimeKvpParser extends KvpParser {
-    /**
-     * All patterns that are correct regarding the ISO-8601 norm.
-     */
-    private static final String[] PATTERNS = {
-        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-        "yyyy-MM-dd'T'HH:mm:sss'Z'",
-        "yyyy-MM-dd'T'HH:mm:ss'Z'",
-        "yyyy-MM-dd'T'HH:mm'Z'",
-        "yyyy-MM-dd'T'HH'Z'",
-        "yyyy-MM-dd",
-        "yyyy-MM",
-        "yyyy"
-    };
-    
+public class TimeKvpParser extends KvpParser {    
+    private static enum FormatAndPrecision {
+        MILLISECOND("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Calendar.MILLISECOND),
+        SECOND("yyyy-MM-dd'T'HH:mm:ss'Z'", Calendar.SECOND),
+        MINUTE("yyyy-MM-dd'T'HH:mm'Z'", Calendar.MINUTE),
+        HOUR("yyyy-MM-dd'T'HH'Z'", Calendar.HOUR_OF_DAY),
+        DAY("yyyy-MM-dd", Calendar.DAY_OF_MONTH),
+        MONTH("yyyy-MM", Calendar.MONTH),
+        YEAR("yyyy", Calendar.YEAR);
+
+        public final String format;
+        public final int precision;
+
+        FormatAndPrecision(final String format, int precision) {
+            this.format = format;
+            this.precision = precision;
+        }
+
+        public SimpleDateFormat getFormat() {
+            SimpleDateFormat sdf = new SimpleDateFormat(format);
+            sdf.setTimeZone(UTC_TZ);
+            return sdf;
+        }
+
+        public DateRange expand(Date d) {
+            Calendar c = new GregorianCalendar(UTC_TZ);
+            c.setTime(d);
+            c.add(this.precision, 1);
+            c.add(Calendar.MILLISECOND, -1);
+            return new DateRange(d, c.getTime());
+        }
+    }
+
     /**
      * UTC timezone to serve as reference
      */
@@ -124,6 +146,10 @@ public class TimeKvpParser extends KvpParser {
                 final boolean o1Date= o1 instanceof Date;
                 final boolean o2Date= o2 instanceof Date;
                 
+                if(o1 == o2) {
+                    return 0;
+                }
+                
                 // o1 date
                 if(o1Date){
                     final Date dateLeft=(Date) o1;
@@ -149,7 +175,12 @@ public class TimeKvpParser extends KvpParser {
         for(String date: listDates){
             // is it a date or a period?
             if(date.indexOf("/")<=0){
-                addDate(result,getDate(date));
+                Object o = getFuzzyDate(date);
+                if (o instanceof Date) {
+                    addDate(result, (Date)o);
+                } else {
+                    addPeriod(result, (DateRange)o);
+                }
             } else {
                 // period
                 String[] period = date.split("/");
@@ -157,17 +188,18 @@ public class TimeKvpParser extends KvpParser {
                 // Period like : yyyy-MM-ddTHH:mm:ssZ/yyyy-MM-ddTHH:mm:ssZ/P1D
                 //
                 if (period.length == 3) {
-                    final Date begin = getDate(period[0]);
-                    final Date end   = getDate(period[1]);
+                    final Date begin = beginning(getFuzzyDate(period[0]));
+                    final Date end = end(getFuzzyDate(period[1]));
+                    
                     final long millisIncrement = parsePeriod(period[2]);
                     final long startTime = begin.getTime();
                     final long endTime = end.getTime();
                     long time;
                     int j = 0;
                     while ((time = j * millisIncrement + startTime) <= endTime) {
-                        final Calendar calendar = Calendar.getInstance(UTC_TZ);
+                        final Calendar calendar = new GregorianCalendar(UTC_TZ);
                         calendar.setTimeInMillis(time);
-                        addDate(result,calendar.getTime());
+                        addDate(result, calendar.getTime());
                         j++;
                         
                         // limiting number of elements we can create
@@ -180,9 +212,9 @@ public class TimeKvpParser extends KvpParser {
                 } else if (period.length == 2) {
                         // Period like : yyyy-MM-ddTHH:mm:ssZ/yyyy-MM-ddTHH:mm:ssZ, it is an extension 
                         // of WMS that works with continuos period [Tb, Te].
-                        final Date begin = getDate(period[0]);
-                        final Date end   = getDate(period[1]);
-                        addPeriod(result,new DateRange(begin, end));
+                        final Date begin = beginning(getFuzzyDate(period[0]));
+                        final Date end   = end(getFuzzyDate(period[1]));
+                        addPeriod(result, new DateRange(begin, end));
                 } else {
                     throw new ParseException("Invalid time period: " + Arrays.toString(period), 0);
                 }
@@ -190,33 +222,24 @@ public class TimeKvpParser extends KvpParser {
         }
         
         return new ArrayList(result);
-
     }
-
-    /**
-     * Tries to avoid insertion of multiple time values.
-     * 
-     * @param result
-     * @param time
-     */
-    private static void addDate(Collection result, Date time) {
-        for(Iterator it=result.iterator();it.hasNext();){
-            final Object element=it.next();
-            if(element instanceof Date){
-                // convert
-                final Date local= (Date) element;
-                if(local.equals(time))
-                    return;
-            } else {
-                // convert
-                final DateRange local= (DateRange) element;
-                if(local.contains(time))
-                    return;
-            }
+    
+    private static Date beginning(Object dateOrDateRange) {
+        if (dateOrDateRange instanceof DateRange) {
+            return ((DateRange) dateOrDateRange).getMinValue();
+        } else {
+            return (Date) dateOrDateRange;
         }
-        result.add(time);
     }
-
+    
+    private static Date end(Object dateOrDateRange) {
+        if (dateOrDateRange instanceof DateRange) {
+            return ((DateRange) dateOrDateRange).getMaxValue();
+        } else {
+            return (Date) dateOrDateRange;
+        }
+    }
+    
     /**
      * Tries to avoid insertion of multiple time values.
      * 
@@ -242,7 +265,18 @@ public class TimeKvpParser extends KvpParser {
             }
         }
         result.add(newRange);
-        
+    }
+    
+    private static void addDate(Collection result, Date newDate) {
+        for (Iterator<?> it = result.iterator(); it.hasNext(); ) {
+            final Object element = it.next();
+            if (element instanceof Date) {
+                if (newDate.equals(element)) return;
+            } else if (((DateRange) element).contains(newDate)) {
+                return;
+            }
+        }
+        result.add(newDate);
     }
 
     /**
@@ -253,27 +287,26 @@ public class TimeKvpParser extends KvpParser {
      * @return A date found in the request.
      * @throws ParseException if the string can not be parsed.
      */
-    private static Date getDate(final String value) throws ParseException {
-    	
-    	// special handling for current keyword (we accept both wms and wcs ways)
-    	if(value.equalsIgnoreCase("current") || value.equalsIgnoreCase("now")) {
-    		return null;
-    	}
-        for (int i=0; i<PATTERNS.length; i++) {
-            // rebuild formats at each parse, date formats are not thread safe
-            SimpleDateFormat format = new SimpleDateFormat(PATTERNS[i], Locale.CANADA);
-            format.setTimeZone(UTC_TZ);
-            /* We do not use the standard method DateFormat.parse(String), because if the parsing
-             * stops before the end of the string, the remaining characters are just ignored and
-             * no exception is thrown. So we have to ensure that the whole string is correct for
-             * the format.
-             */
+    static Object getFuzzyDate(final String value) throws ParseException {
+
+        // special handling for current keyword (we accept both wms and wcs ways)
+        if(value.equalsIgnoreCase("current") || value.equalsIgnoreCase("now")) {
+            return null;
+        }
+
+        for (FormatAndPrecision f : FormatAndPrecision.values()) {
             ParsePosition pos = new ParsePosition(0);
-            Date time = format.parse(value, pos);
+            Date time = f.getFormat().parse(value, pos);
             if (pos.getIndex() == value.length()) {
-                return time;
+                DateRange range  = f.expand(time);
+                if (range.getMinValue().equals(range.getMaxValue())) {
+                    return range.getMinValue();
+                } else {
+                    return range;
+                }
             }
         }
+
         throw new ParseException("Invalid date: " + value, 0);
     }
     

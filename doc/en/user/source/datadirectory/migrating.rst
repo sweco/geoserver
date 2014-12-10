@@ -33,24 +33,124 @@ Files renamed
 * ``catalog.xml`` renamed to ``catalog.xml.old``
 * ``services.xml`` renamed to ``services.xml.old``
 
-Reverting from GeoServer 2.0.x to 1.7.x
----------------------------------------
+.. note:: Reverting from GeoServer 2.0.x to 1.7.x
 
-In order to revert the directory to be compatible with 1.7.x again:
+   In order to revert the directory to be compatible with 1.7.x again:
 
-#. Stop GeoServer.
+   #. Stop GeoServer.
 
-#. Delete the following files and directories::
+   #. Delete the following files and directories::
 
-      wfs.xml
-      wcs.xml
-      wms.xml
-      logging.xml
-      global.xml
-      workspaces/*
-      layergroups/*
-      styles/*.xml
+         wfs.xml
+         wcs.xml
+         wms.xml
+         logging.xml
+         global.xml
+         workspaces/*
+         layergroups/*
+         styles/*.xml
 
-#. Rename ``catalog.xml.old`` to ``catalog.xml``.
+   #. Rename ``catalog.xml.old`` to ``catalog.xml``.
 
-#. Rename ``services.xml.old`` to ``services.xml``.
+   #. Rename ``services.xml.old`` to ``services.xml``.
+
+.. _migrating_data_directory_22x:
+
+Migrating between GeoServer 2.1.x and 2.2.x
+-------------------------------------------
+
+The security changes that ship with GeoServer 2.2 require modifications to the ``security`` directory of the 
+GeoServer data directory.
+
+Files and directories added
+```````````````````````````
+
+::
+
+  security/*.xml
+  security/masterpw.*
+  security/geoserver.jceks
+  security/auth/*
+  security/filter/*
+  security/masterpw/*
+  security/pwpolicy/*
+  security/role/*
+  security/usergroup/*
+  
+Files renamed
+`````````````
+
+  * ``security/users.properties`` renamed to ``security/users.properties.old``
+
+.. note:: Reverting from GeoServer 2.2.x and 2.1.x
+
+   In order to restore the GeoServer 2.1 configuration:
+
+   #. Stop GeoServer.
+
+   #. Rename ``users.properties.old`` to ``users.properties``.
+
+   #. Additionally (although not mandatory) delete the following files and directories::
+
+        security/
+          config.xml
+          geoserver.jceks
+          masterpw.xml
+          masterpw.digest
+          masterpw.info
+          auth/
+          filter/
+          masterpw/
+          pwpolicy/
+          role/
+          usergroup/
+
+Migrating between GeoServer 2.2.x and 2.3.x
+-------------------------------------------
+
+The security improvements that ship with GeoServer 2.3 require modifications to the ``security`` directory of the 
+GeoServer data directory.
+
+Files and directories added
+```````````````````````````
+
+::
+
+  security/filter/roleFilter/config.xml
+  
+Files modified
+``````````````
+::
+
+    security/filter/formLogout/config.xml
+    security/config.xml
+  
+Backup files
+````````````
+::
+
+    security/filter/formLogout/config.xml.2.2.x
+    security/config.xml.2.2.x
+  
+.. note:: Reverting from GeoServer 2.3.x
+
+   In order to restore the GeoServer 2.2 configuration:
+
+   #. Stop GeoServer.
+
+   #. Copy ``security/config.xml.2.2.x`` to ``security/config.xml``.
+
+   #. Copy ``security/filter/formLogout/config.xml.2.2.x`` to ``security/filter/formLogout/config.xml``.
+
+   #. Additionally (although not mandatory) delete the following files and directories::
+
+
+        security/
+          filter/
+            roleFilter/
+               config.xml
+            formLogout/
+               config.xml.2.2.x
+          config.xml.2.2.x        
+
+       

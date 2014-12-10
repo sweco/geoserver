@@ -1,15 +1,27 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.flow.controller;
+
+import static org.junit.Assert.*;
 
 import java.lang.Thread.State;
 
-import junit.framework.TestCase;
+import javax.servlet.http.Cookie;
+
+import org.geoserver.ows.Request;
+
+import com.mockrunner.mock.web.MockHttpServletRequest;
+import com.mockrunner.mock.web.MockHttpServletResponse;
 
 /**
  * Base class providing utilities to test flow controllers
  * @author Andrea Aime - OpenGeo
  *
  */
-public abstract class AbstractFlowControllerTest extends TestCase {
+public abstract class AbstractFlowControllerTest {
 
     /**
      * Waits until the thread enters in WAITING or TIMED_WAITING state
@@ -53,6 +65,7 @@ public abstract class AbstractFlowControllerTest extends TestCase {
         }
     }
 
+    
     /**
      * Waits maxWait for the thread to finish by itself, then forcefully kills it
      * @param t
@@ -72,5 +85,34 @@ public abstract class AbstractFlowControllerTest extends TestCase {
         } catch (InterruptedException e) {
             fail("Sometime interrupeted our wait: " + e);
         }
+    }
+
+    protected Request buildCookieRequest(String gsCookieValue) {
+        Request request = new Request();
+        MockHttpServletRequest httpRequest = new MockHttpServletRequest();
+        request.setHttpRequest(httpRequest);
+        request.setHttpResponse(new MockHttpServletResponse());
+        
+        if(gsCookieValue != null) {
+            httpRequest.addCookie(new Cookie(CookieKeyGenerator.COOKIE_NAME, gsCookieValue));
+        }
+        return request;
+    }
+
+    Request buildIpRequest(String ipAddress, String proxyIp) {
+        Request request = new Request();
+        MockHttpServletRequest httpRequest = new MockHttpServletRequest();
+        request.setHttpRequest(httpRequest);
+        request.setHttpResponse(new MockHttpServletResponse());
+
+        if (ipAddress != null && !ipAddress.equals("")) {
+            httpRequest.setRemoteAddr(ipAddress);
+        } else {
+            httpRequest.setRemoteAddr("127.0.0.1");
+        }
+        if (!proxyIp.equals("")) {
+            httpRequest.setHeader("x-forwarded-for", proxyIp + ", " + ipAddress);
+        }
+        return request;
     }
 }

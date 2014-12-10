@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -10,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.geoserver.security.AccessMode;
+import org.geoserver.security.GeoServerSecurityFilterChainProxy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 
@@ -30,7 +32,7 @@ class SecureTreeNode {
     /**
      * The role given to the administrators
      */
-    static final String ROOT_ROLE = "ROLE_ADMINISTRATOR";
+    static final String ROOT_ROLE = GeoServerRole.ADMIN_ROLE.getAuthority();
 
     Map<String, SecureTreeNode> children = new HashMap<String, SecureTreeNode>();
 
@@ -66,10 +68,16 @@ class SecureTreeNode {
      */
     SecureTreeNode() {
         // by default we allow access for everybody in all modes for the root
-        // node,
-        // since we have no parent to fall back onto
+        // node, since we have no parent to fall back onto
+        // -> except for admin access, default is administrator
         for (AccessMode mode : AccessMode.values()) {
-            authorizedRoles.put(mode, EVERYBODY);
+            switch(mode) {
+            case ADMIN:
+                authorizedRoles.put(mode, Collections.singleton(ROOT_ROLE));
+                break;
+            default:
+                authorizedRoles.put(mode, EVERYBODY);
+            }
         }
     }
 
@@ -115,6 +123,9 @@ class SecureTreeNode {
     boolean canAccess(Authentication user, AccessMode mode) {
         Set<String> roles = getAuthorizedRoles(mode);
 
+        if (GeoServerSecurityFilterChainProxy.isSecurityEnabledForCurrentRequest()==false)
+            return true;
+        
         // if we don't know, we ask the parent, otherwise we assume
         // the object is unsecured
         if (roles == null) {

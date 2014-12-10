@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2001 - 2010 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -18,7 +18,8 @@ public class SimpleAttributeFeatureChainMockData extends AbstractAppSchemaMockDa
      */
     public void addContent() {
         addFeatureType(GSML_PREFIX, "MappedFeature", "SimpleAttributeFeatureChainTest.xml",
-                "MappedFeatureWithNestedName.properties", "MappedFeatureNameOne.properties",
-                "MappedFeatureNameTwo.properties");
+                "MappedFeatureNameOne.properties", "MappedFeatureNameTwo.properties",
+                "MappedFeatureWithNestedName.properties", "MappedFeaturePoints.properties",
+                "MappedFeaturePolygons.properties");
     }
 }

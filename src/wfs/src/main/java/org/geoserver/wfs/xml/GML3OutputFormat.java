@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2011 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs.xml;
@@ -40,8 +41,8 @@ import javax.xml.transform.stream.StreamSource;
 
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.FeatureTypeInfo;
+import org.geoserver.catalog.ResourceInfo;
 import org.geoserver.config.GeoServer;
-import org.geoserver.config.GeoServerInfo;
 import org.geoserver.ows.URLMangler.URLType;
 import org.geoserver.platform.Operation;
 import org.geoserver.platform.ServiceException;
@@ -67,7 +68,6 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
     
     GeoServer geoServer;
     Catalog catalog;
-    GeoServerInfo global;
     WFSConfiguration configuration;
     protected static DOMSource xslt;
     
@@ -95,7 +95,6 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
 
         this.geoServer = geoServer;
         this.catalog = geoServer.getCatalog();
-        this.global = geoServer.getGlobal();
         
         this.configuration = configuration;
     }
@@ -115,7 +114,7 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
         GetFeatureRequest request = GetFeatureRequest.adapt(getFeature.getParameters()[0]);
 
         // round up the info objects for each feature collection
-        HashMap<String, Set<FeatureTypeInfo>> ns2metas = new HashMap<String, Set<FeatureTypeInfo>>();
+        HashMap<String, Set<ResourceInfo>> ns2metas = new HashMap<String, Set<ResourceInfo>>();
         for (int fcIndex = 0; fcIndex < featureCollections.size(); fcIndex++) {
             if(request != null) {
                 List<Query> queries = request.getQueries();
@@ -125,7 +124,7 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
                 for (QName name : queryType.getTypeNames()) {
                     // get a feature type name from the query
                     Name featureTypeName = new NameImpl(name.getNamespaceURI(), name.getLocalPart());
-                    FeatureTypeInfo meta = catalog.getFeatureTypeByName(featureTypeName);
+                    ResourceInfo meta = catalog.getResourceByName(featureTypeName, ResourceInfo.class);
                     
                     if (meta == null) {
                         throw new WFSException(request, "Could not find feature type " + featureTypeName
@@ -133,10 +132,10 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
                     }
                     
                     // add it to the map
-                    Set<FeatureTypeInfo> metas = ns2metas.get(featureTypeName.getNamespaceURI());
+                    Set<ResourceInfo> metas = ns2metas.get(featureTypeName.getNamespaceURI());
                     
                     if (metas == null) {
-                        metas = new HashSet<FeatureTypeInfo>();
+                        metas = new HashSet<ResourceInfo>();
                         ns2metas.put(featureTypeName.getNamespaceURI(), metas);
                     }
                     metas.add(meta);
@@ -175,7 +174,18 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
         else {
             configuration.getProperties().add( GMLConfiguration.NO_FEATURE_BOUNDS);
         }
-        
+
+        if (wfs.isCiteCompliant()) {
+            //cite compliance forces us to forgo srsDimension attribute
+            configuration.getProperties().add(GMLConfiguration.NO_SRS_DIMENSION);
+        }
+        else {
+            configuration.getProperties().remove(GMLConfiguration.NO_SRS_DIMENSION);
+        }
+
+        //set up the srsname syntax
+        configuration.setSrsSyntax(wfs.getGML().get(WFSInfo.Version.V_11).getSrsNameStyle().toSrsSyntax());
+
         /*
          * Set property encoding featureMemeber as opposed to featureMembers
          * 
@@ -190,7 +200,7 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
         Object gft = getFeature.getParameters()[0];
         
         Encoder encoder = createEncoder(configuration, ns2metas, gft);
-        encoder.setEncoding(Charset.forName( global.getCharset() ));
+        encoder.setEncoding(Charset.forName( geoServer.getSettings().getCharset() ));
 
         if (wfs.isCanonicalSchemaLocation()) {
             encoder.setSchemaLocation(getWfsNamespace(), getCanonicalWfsSchemaLocation());
@@ -211,18 +221,21 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
 
             StringBuffer typeNames = new StringBuffer();
             for (Iterator m = metas.iterator(); m.hasNext();) {
-                FeatureTypeInfo meta = (FeatureTypeInfo) m.next();
-                FeatureType featureType = meta.getFeatureType();
-                Object userSchemaLocation = featureType.getUserData().get("schemaURI");
-                if (userSchemaLocation != null && userSchemaLocation instanceof Map) {
-                    Map<String, String> schemaURIs = (Map<String, String>) userSchemaLocation;
-                    for (String namespace : schemaURIs.keySet()) {
-                        encoder.setSchemaLocation(namespace, schemaURIs.get(namespace));
-                    }
-                } else {
-                    typeNames.append(meta.getPrefixedName());
-                    if (m.hasNext()) {
-                        typeNames.append(",");
+                ResourceInfo ri = (ResourceInfo) m.next();
+                if(ri instanceof FeatureTypeInfo) {
+                    FeatureTypeInfo meta = (FeatureTypeInfo) ri;
+                    FeatureType featureType = meta.getFeatureType();
+                    Object userSchemaLocation = featureType.getUserData().get("schemaURI");
+                    if (userSchemaLocation != null && userSchemaLocation instanceof Map) {
+                        Map<String, String> schemaURIs = (Map<String, String>) userSchemaLocation;
+                        for (String namespace : schemaURIs.keySet()) {
+                            encoder.setSchemaLocation(namespace, schemaURIs.get(namespace));
+                        }
+                    } else {
+                        typeNames.append(meta.getPrefixedName());
+                        if (m.hasNext()) {
+                            typeNames.append(",");
+                        }
                     }
                 }
             }
@@ -247,7 +260,7 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
     }
     
     protected Encoder createEncoder(Configuration configuration, 
-        Map<String, Set<FeatureTypeInfo>> featureTypes, Object request ) {
+        Map<String, Set<ResourceInfo>> featureTypes, Object request ) {
         return new Encoder(configuration, configuration.schema());
     }
 
@@ -301,7 +314,7 @@ public class GML3OutputFormat extends WFSGetFeatureOutputFormat {
     protected String getRelativeWfsSchemaLocation() {
         return "wfs/1.1.0/wfs.xsd";
     }
-    
+
     public static boolean isComplexFeature(FeatureCollectionResponse results) {
         boolean hasComplex = false;
         for (int fcIndex = 0; fcIndex < results.getFeature().size(); fcIndex++) {

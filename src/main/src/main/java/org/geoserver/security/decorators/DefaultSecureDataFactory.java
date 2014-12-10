@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -10,7 +11,7 @@ import org.geoserver.platform.ExtensionPriority;
 import org.geoserver.security.AccessLevel;
 import org.geoserver.security.Response;
 import org.geoserver.security.WrapperPolicy;
-import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
+import org.geotools.coverage.grid.io.GridCoverage2DReader;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.data.DataAccess;
 import org.geotools.data.DataStore;
@@ -49,9 +50,8 @@ public class DefaultSecureDataFactory implements SecuredObjectFactory {
                 || FeatureStore.class.isAssignableFrom(clazz)
                 || FeatureLocking.class.isAssignableFrom(clazz)
                 || FeatureCollection.class.isAssignableFrom(clazz)
-                || Iterator.class.isAssignableFrom(clazz)
                 || FeatureIterator.class.isAssignableFrom(clazz) 
-                || AbstractGridCoverage2DReader.class.isAssignableFrom(clazz)
+                || GridCoverage2DReader.class.isAssignableFrom(clazz)
                 || AbstractGridFormat.class.isAssignableFrom(clazz)
                 || WebMapServer.class.isAssignableFrom(clazz);
     }
@@ -109,8 +109,6 @@ public class DefaultSecureDataFactory implements SecuredObjectFactory {
             return new SecuredSimpleFeatureCollection((SimpleFeatureCollection) object, policy);
         } else if (FeatureCollection.class.isAssignableFrom(clazz)) {
             return new SecuredFeatureCollection((FeatureCollection) object, policy);
-        } else if (Iterator.class.isAssignableFrom(clazz)) {
-            return new SecuredIterator((Iterator) object, policy);
         } else if (SimpleFeatureIterator.class.isAssignableFrom(clazz)) {
             return new SecuredSimpleFeatureIterator((SimpleFeatureIterator) object); 
         } else if (FeatureIterator.class.isAssignableFrom(clazz)) {
@@ -118,8 +116,8 @@ public class DefaultSecureDataFactory implements SecuredObjectFactory {
         }
         
         // try coverage readers and formats
-        if(AbstractGridCoverage2DReader.class.isAssignableFrom(clazz)) {
-            return new SecuredGridCoverage2DReader((AbstractGridCoverage2DReader) object, policy);
+        if(GridCoverage2DReader.class.isAssignableFrom(clazz)) {
+            return new SecuredGridCoverage2DReader((GridCoverage2DReader) object, policy);
         } else if(AbstractGridFormat.class.isAssignableFrom(clazz)) {
             return new SecuredGridFormat((AbstractGridFormat) object, policy);
         }

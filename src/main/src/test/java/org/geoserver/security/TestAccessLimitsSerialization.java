@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.security;
 
 import java.io.ByteArrayInputStream;
@@ -40,7 +45,7 @@ public class TestAccessLimitsSerialization extends TestCase {
     }
 
     public void testSerializeWorkspaceAccessLimits() throws Exception {
-        WorkspaceAccessLimits limits = new WorkspaceAccessLimits(CatalogMode.HIDE, true, true);
+        WorkspaceAccessLimits limits = new WorkspaceAccessLimits(CatalogMode.HIDE, true, true, true);
 
         testObjectSerialization(limits);
     }

@@ -1,8 +1,14 @@
-/* Copyright (c) 2001 - 2009 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.web.data.store.arcsde;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -32,6 +38,7 @@ import org.geotools.arcsde.session.ISessionPool;
 import org.geotools.arcsde.session.ISessionPoolFactory;
 import org.geotools.arcsde.session.SessionWrapper;
 import org.geotools.arcsde.session.UnavailableConnectionException;
+import org.junit.Test;
 
 /**
  * 
@@ -44,10 +51,6 @@ public class ArcSDECoverageStoreEditPanelTest extends GeoServerWicketTestSupport
     private CoverageStoreInfo storeInfo;
 
     private Form editForm;
-
-    @Override
-    protected void setUpInternal() throws Exception {
-    }
 
     private ArcSDECoverageStoreEditPanel startPanelToEditStore() {
         final Catalog catalog = getCatalog();
@@ -88,6 +91,7 @@ public class ArcSDECoverageStoreEditPanelTest extends GeoServerWicketTestSupport
         return panel;
     }
 
+    @Test
     public void testExtensionPoint() {
         storeInfo = getCatalog().getFactory().createCoverageStore();
         storeInfo.setType(ArcSDERasterFormat.getInstance().getName());
@@ -105,6 +109,7 @@ public class ArcSDECoverageStoreEditPanelTest extends GeoServerWicketTestSupport
         assertTrue(storeEditPanel instanceof ArcSDECoverageStoreEditPanel);
     }
 
+    @Test
     public void testStartupForNew() {
         startPanelForNewStore();
 
@@ -118,6 +123,7 @@ public class ArcSDECoverageStoreEditPanelTest extends GeoServerWicketTestSupport
         tester.assertComponent(base + "tableNamePanel", RasterTableSelectionPanel.class);
     }
 
+    @Test
     public void testStartupForEdit() {
         startPanelToEditStore();
         // print(page, true, true);
@@ -138,6 +144,7 @@ public class ArcSDECoverageStoreEditPanelTest extends GeoServerWicketTestSupport
     /**
      * Connection parameters are not properly set and the refresh raster tables button is hit
      */
+    @Test
     public void testRefreshRasterTableListBadConnectionParams() {
         startPanelForNewStore();
         final FormTester formTester = tester.newFormTester("rasterStoreForm");
@@ -169,6 +176,7 @@ public class ArcSDECoverageStoreEditPanelTest extends GeoServerWicketTestSupport
      * Connection parameters are properly set and the refresh raster tables button is hit, producing
      * the DropDownChoice to be filled up with the table names
      */
+    @Test
     public void testRefreshRasterTableList() {
         startPanelForNewStore();
         final FormTester formTester = tester.newFormTester("rasterStoreForm");

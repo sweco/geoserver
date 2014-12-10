@@ -1,5 +1,6 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wfs;
@@ -12,6 +13,7 @@ import net.opengis.wfs.TransactionType;
 import net.opengis.wfs.UpdateElementType;
 
 import org.geoserver.wfs.request.TransactionRequest;
+import org.geotools.data.Transaction;
 import org.geotools.data.simple.SimpleFeatureCollection;
 
 
@@ -97,5 +99,13 @@ public class TransactionEvent {
 
     public TransactionType getRequest() {
         return TransactionRequest.WFS11.unadapt(request);
+    }
+    
+    /**
+     * Returns the current GeoTools Data {@link Transaction} associated with this event. May be {@code null}
+     * for post-commit events.
+     */
+    public Transaction getTransaction() {
+        return request.getTransaction();
     }
 }

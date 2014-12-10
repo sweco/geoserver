@@ -1,4 +1,5 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
@@ -272,7 +273,7 @@ public class DatabaseUtil {
         INSERT("Insert", ");"), CREATE_OR_REPLACE_PROCEDURE("CREATE OR REPLACE PROCEDURE", "/"), CALL(
                 "CALL", ";"), DELETE("DELETE", ";"), CREATE_TABLE("CREATE TABLE", ";"), CREATE_OR_REPLACE_FORCE_VIEW(
                 "CREATE OR REPLACE FORCE VIEW", ";"), REM("REM", ";"), CREATE_INDEX("CREATE INDEX",
-                ";"), DECLARE("declare", "/"), COMMIT("COMMIT", ";");
+                ";"), DECLARE("declare", "/"), COMMIT("COMMIT", ";"), ALTER("ALTER TABLE",");");
 
         private String prefix;
 

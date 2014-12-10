@@ -1,10 +1,10 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.vfny.geoserver.wcs;
 
-import org.geoserver.config.GeoServerInfo;
 import org.geoserver.platform.ServiceException;
 
 /**
@@ -22,13 +22,23 @@ public class WcsException extends ServiceException {
 	private static final long serialVersionUID = -6110652531274829497L;
 
 	public enum WcsExceptionCode {
-        MissingParameterValue, InvalidParameterValue, NoApplicableCode, UnsupportedCombination, NotEnoughStorage, InvalidUpdateSequence, CurrentUpdateSequence
+        MissingParameterValue, 
+        InvalidParameterValue, 
+        NoApplicableCode, 
+        UnsupportedCombination, 
+        NotEnoughStorage, 
+        InvalidUpdateSequence, 
+        CurrentUpdateSequence,
+        CompressionNotSupported,
+        CompressionInvalid,
+        JpegQualityInvalid,
+        TilingInvalid, 
+        PredictorNotSupported, 
+        PredictorInvalid, 
+        InterleavingInvalid, 
+        InterleavingNotSupported, 
+        InvalidSubsetting,
     }
-
-    /**
-     * The fixed MIME type of a WCS exception.
-     */
-    private static final String SE_XML = "application/vnd.ogc.se_xml";
 
     /**
      * Message constructor.
@@ -84,17 +94,4 @@ public class WcsException extends ServiceException {
         super(e, preMessage, locator);
     }
 
-    /**
-     * Returns the mime type that should be exposed to the client when sending the exception
-     * message.
-     * 
-     * <p>
-     * Defaults to <code>geoserver.getMimeType()</code>
-     * </p>
-     * 
-     * @return
-     */
-    public String getMimeType(GeoServerInfo geoserver) {
-        return SE_XML + "; charset=" + geoserver.getCharset();
-    }
 }

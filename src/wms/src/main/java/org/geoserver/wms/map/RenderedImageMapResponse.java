@@ -1,27 +1,35 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org.  All rights reserved.
- * This code is licensed under the GPL 2.0 license, availible at the root
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.wms.map;
 
-import java.awt.image.BufferedImage;
+import java.awt.Transparency;
+import java.awt.image.IndexColorModel;
 import java.awt.image.RenderedImage;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 
-import javax.media.jai.PlanarImage;
-
 import org.geoserver.platform.Operation;
 import org.geoserver.platform.ServiceException;
 import org.geoserver.wms.GetMapOutputFormat;
+import org.geoserver.wms.GetMapRequest;
 import org.geoserver.wms.MapProducerCapabilities;
 import org.geoserver.wms.RasterCleaner;
 import org.geoserver.wms.WMS;
 import org.geoserver.wms.WMSMapContent;
+import org.geoserver.wms.kvp.PaletteManager;
+import org.geoserver.wms.map.PNGMapResponse.QuantizeMethod;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.image.ImageWorker;
+import org.geotools.image.palette.CachingColorIndexer;
+import org.geotools.image.palette.ColorIndexer;
+import org.geotools.image.palette.ColorIndexerDescriptor;
 import org.geotools.image.palette.InverseColorMapOp;
-import org.geotools.resources.image.ImageUtilities;
+import org.geotools.image.palette.LRUColorIndexer;
+import org.geotools.image.palette.Quantizer;
 import org.springframework.util.Assert;
 
 /**
@@ -125,7 +133,66 @@ public abstract class RenderedImageMapResponse extends AbstractMapResponse {
             imageMap.dispose();
         }
     }
+    
+    /**
+     * Applies a transformation to 8 bits + palette in case the user requested a specific palette or
+     * the palette format has been requested, applying a bitmask or translucent palette inverter
+     * according to the user request and the image structure
 
+     * @param image
+     * @param mapContent
+     * @param palettedFormatName
+     * @param supportsTranslucency If false the code will always apply the bitmask transformer
+     * @return
+     */
+    protected RenderedImage applyPalette(RenderedImage image, WMSMapContent mapContent,
+            String palettedFormatName, boolean supportsTranslucency) {
+        // check to see if we have to see a translucent or bitmask quantizer
+        GetMapRequest request = mapContent.getRequest();
+        QuantizeMethod method = (QuantizeMethod) request.getFormatOptions().get(
+                PaletteManager.QUANTIZER);
+        boolean useBitmaskQuantizer = method == QuantizeMethod.Octree
+                || !supportsTranslucency
+                || (method == null && image.getColorModel().getTransparency() != Transparency.TRANSLUCENT);
+
+
+        // format: split on ';' to handle subtypes like 'image/gif;subtype=animated'
+        final String format = request.getFormat().split(";")[0];
+        // do we have to use the bitmask quantizer?
+        IndexColorModel icm = mapContent.getPalette();
+        if (useBitmaskQuantizer) {
+            // user provided palette?
+            if (icm != null) {
+                image = forceIndexed8Bitmask(image, PaletteManager.getInverseColorMapOp(icm));
+            } else if (palettedFormatName.equalsIgnoreCase(format)) {
+                // or format that needs palette to be applied?
+                image = forceIndexed8Bitmask(image, null);
+            }
+        } else {
+            if (!(image.getColorModel() instanceof IndexColorModel)) {
+                // try to force a RGBA setup
+                image = new ImageWorker(image).rescaleToBytes().forceComponentColorModel()
+                        .getRenderedImage();
+                ColorIndexer indexer = null;
+                
+                // user provided palette?
+                if (mapContent.getPalette() != null) {
+                    indexer = new CachingColorIndexer(new LRUColorIndexer(icm, 1024));
+                } else if (palettedFormatName.equalsIgnoreCase(format)) {
+                    // build the palette and grab the optimized color indexer
+                    indexer = new Quantizer(256).subsample().buildColorIndexer(image);
+                }
+
+                // if we have an indexer transform the image
+                if (indexer != null) {
+                    image = ColorIndexerDescriptor.create(image, indexer, null);
+                }
+            }
+        }
+
+        return image;
+    }
+    
     /**
      * @param originalImage
      * @return

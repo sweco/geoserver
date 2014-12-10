@@ -1,9 +1,13 @@
-/* Copyright (c) 2001 - 2007 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 
 package org.geoserver.wps;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import org.geoserver.catalog.MetadataMap;
 import org.geoserver.config.impl.ServiceInfoImpl;
@@ -32,11 +36,6 @@ public class WPSInfoImpl extends ServiceInfoImpl implements WPSInfo {
     
     static final int DEFAULT_MAX_ASYNCH = Runtime.getRuntime().availableProcessors();
     
-    @Override
-    public String getTitle() {
-        return "Prototype GeoServer WPS";
-    }
-    
     /** 
      * Connection timeout in seconds. 
      * Using a double allows for fractional values, like 
@@ -59,6 +58,19 @@ public class WPSInfoImpl extends ServiceInfoImpl implements WPSInfo {
      */
     Integer maxAsynchronousProcesses = DEFAULT_MAX_ASYNCH;
 
+    /**
+     * List of process groups/factories.
+     */
+    List<ProcessGroupInfo> processGroups = new ArrayList<ProcessGroupInfo>();
+    
+    /**
+     * Where to store the WPS artifacts (inputs, outputs, and so on)
+     */
+    String storageDirectory;
+
+    public WPSInfoImpl() {
+        title = "Prototype GeoServer WPS";
+    }
 
     /**
      * Returns the connection timeout (in seconds). It represents the timeout to be used 
@@ -152,6 +164,24 @@ public class WPSInfoImpl extends ServiceInfoImpl implements WPSInfo {
     public void setMaxAsynchronousProcesses(int maxAsynchronousProcesses) {
         this.maxAsynchronousProcesses = maxAsynchronousProcesses;
     }
-    
-    
+
+    @Override
+    public List<ProcessGroupInfo> getProcessGroups() {
+        return processGroups;
+    }
+
+    public void setProcessGroups(List<ProcessGroupInfo> processGroups) {
+        this.processGroups = processGroups;
+    }
+
+    @Override
+    public String getStorageDirectory() {
+        return storageDirectory;
+    }
+
+    @Override
+    public void setStorageDirectory(String storageDirectory) {
+        this.storageDirectory = storageDirectory;
+
+    }
 }

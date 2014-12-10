@@ -1,3 +1,8 @@
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
+ * This code is licensed under the GPL 2.0 license, available at the root
+ * application directory.
+ */
 package org.geoserver.security;
 
 import java.io.BufferedReader;
@@ -7,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Arrays;
 
 import org.springframework.security.web.FilterInvocation;
 import org.springframework.security.web.access.intercept.FilterInvocationSecurityMetadataSource;
@@ -95,7 +101,11 @@ public class RESTfulDefinitionSource implements FilterInvocationSecurityMetadata
         //force a read of the property file at startup
         dao.reload();
     }
-    
+
+    public void reload() {
+        delegate = null;
+    }
+
     RESTfulPathBasedFilterInvocationDefinitionMap delegate() {
         if (delegate == null || dao.isModified()) {
             synchronized(this) {
@@ -198,11 +208,7 @@ public class RESTfulDefinitionSource implements FilterInvocationSecurityMetadata
                 } 
             }
             if (log.isDebugEnabled()) {
-                log.debug("methodList = " + methodList );
-                if ( methodList != null ) {
-                    for( int ii=0; ii <  methodList.length; ii++ ) 
-                        log.debug("method[" + ii + "]: " +  methodList[ii] );   
-                }
+                log.debug("methodList = " + Arrays.toString(methodList) );
             }
 
             // Should all be lowercase; check each character

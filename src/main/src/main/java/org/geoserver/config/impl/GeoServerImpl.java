@@ -1,8 +1,11 @@
-/* Copyright (c) 2001 - 2008 TOPP - www.openplans.org. All rights reserved.
+/* (c) 2014 Open Source Geospatial Foundation - all rights reserved
+ * (c) 2001 - 2013 OpenPlans
  * This code is licensed under the GPL 2.0 license, available at the root
  * application directory.
  */
 package org.geoserver.config.impl;
+
+import static org.geoserver.ows.util.OwsUtils.resolveCollections;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -11,17 +14,18 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.geoserver.catalog.Catalog;
-import org.geoserver.catalog.impl.CatalogImpl;
 import org.geoserver.catalog.WorkspaceInfo;
+import org.geoserver.catalog.impl.CatalogImpl;
+import org.geoserver.catalog.impl.LocalWorkspaceCatalog;
 import org.geoserver.config.ConfigurationListener;
 import org.geoserver.config.GeoServer;
 import org.geoserver.config.GeoServerFacade;
 import org.geoserver.config.GeoServerFactory;
 import org.geoserver.config.GeoServerInfo;
-import org.geoserver.config.GeoServerLoader;
 import org.geoserver.config.GeoServerLoaderProxy;
 import org.geoserver.config.LoggingInfo;
 import org.geoserver.config.ServiceInfo;
+import org.geoserver.config.SettingsInfo;
 import org.geoserver.ows.LocalWorkspace;
 import org.geoserver.platform.GeoServerExtensions;
 import org.geotools.referencing.CRS;
@@ -81,6 +85,13 @@ public class GeoServerImpl implements GeoServer, ApplicationContextAware {
     
     public void setCatalog(Catalog catalog) {
         this.catalog = catalog;
+        
+        // This instance of check is has to be here because this Geoserver cannot be injected
+        // into LocalWorkspaceCatalog because it causes a circular reference
+        if (catalog instanceof LocalWorkspaceCatalog) {
+            LocalWorkspaceCatalog lwCatalog = (LocalWorkspaceCatalog) catalog;
+            lwCatalog.setGeoServer(this);
+        }
     }
     
     public GeoServerInfo getGlobal() {
@@ -93,7 +104,102 @@ public class GeoServerImpl implements GeoServer, ApplicationContextAware {
         //fire the modification event
         fireGlobalPostModified();
     }
-    
+
+    public SettingsInfo getSettings() {
+        SettingsInfo settings = null;
+        if (LocalWorkspace.get() != null) {
+            settings = getSettings(LocalWorkspace.get());
+        }
+        return settings != null ? settings : getGlobal().getSettings();
+    }
+
+    public SettingsInfo getSettings(WorkspaceInfo workspace) {
+        return facade.getSettings(workspace);
+    }
+
+    public void add(SettingsInfo settings) {
+        validate(settings);
+        resolve(settings);
+        
+        WorkspaceInfo workspace = settings.getWorkspace();
+        if (facade.getSettings(workspace) != null) {
+            throw new IllegalArgumentException("Settings already exist for workspace '" + 
+                workspace.getName() + "'");
+        }
+
+        facade.add(settings);
+        fireSettingsAdded(settings);
+    }
+
+    public void save(SettingsInfo settings) {
+        validate(settings);
+        
+        facade.save(settings);
+        fireSettingsPostModified(settings);
+    }
+
+    public void remove(SettingsInfo settings) {
+        facade.remove(settings);
+
+        fireSettingsRemoved(settings);
+    }
+
+    void validate(SettingsInfo settings) {
+        WorkspaceInfo workspace = settings.getWorkspace();
+        if (workspace == null) {
+            throw new IllegalArgumentException("Settings must be part of a workspace");
+        }
+    }
+
+    void resolve(SettingsInfo settings) {
+        resolveCollections(settings);
+    }
+
+    void fireSettingsAdded(SettingsInfo settings) {
+        for ( ConfigurationListener l : listeners ) {
+            try {
+                l.handleSettingsAdded(settings);
+            }
+            catch( Exception e ) {
+                LOGGER.log(Level.SEVERE, "Error occurred processing a configuration change listener", e);
+            }
+        }
+    }
+
+   public void fireSettingsModified(SettingsInfo settings, List<String> changed, List oldValues, 
+            List newValues) {
+       for ( ConfigurationListener l : listeners ) {
+           try {
+               l.handleSettingsModified(settings, changed, oldValues, newValues);
+           }
+           catch( Exception e ) {
+               LOGGER.log(Level.SEVERE, "Error occurred processing a configuration change listener", e);
+           }
+       }
+    }
+
+    void fireSettingsPostModified(SettingsInfo settings) {
+        for ( ConfigurationListener l : listeners ) {
+            try {
+                l.handleSettingsPostModified(settings);
+            }
+            catch( Exception e ) {
+                LOGGER.log(Level.SEVERE, "Error occurred processing a configuration change listener", e);
+            }
+        }
+    }
+
+    void fireSettingsRemoved(SettingsInfo settings) {
+        for ( ConfigurationListener l : listeners ) {
+            try {
+                l.handleSettingsRemoved(settings);
+            }
+            catch( Exception e ) {
+                LOGGER.log(Level.SEVERE, "Error occurred processing a configuration change listener", e);
+            }
+        }
+    }
+
     public LoggingInfo getLogging() {
         return facade.getLogging();
     }
@@ -115,6 +221,7 @@ public class GeoServerImpl implements GeoServer, ApplicationContextAware {
             throw new IllegalArgumentException( "service with id '" + service.getId() + "' already exists" );
         }
 
+        resolve(service);
         WorkspaceInfo workspace = service.getWorkspace(); 
         if (workspace != null) {
             if (facade.getServiceByName(service.getName(), workspace, ServiceInfo.class) != null) {
@@ -128,14 +235,23 @@ public class GeoServerImpl implements GeoServer, ApplicationContextAware {
         firePostServiceModified(service);
     }
 
+    void resolve(ServiceInfo service) {
+        resolveCollections(service);
+    }
+
     public static <T> T unwrap(T obj) {
         return DefaultGeoServerFacade.unwrap(obj);
     }
     
     public <T extends ServiceInfo> T getService(Class<T> clazz) {
-        T service =
-            LocalWorkspace.get() != null ? facade.getService(LocalWorkspace.get(), clazz) : null;
-        return service != null ? service : facade.getService(clazz);
+        WorkspaceInfo ws = LocalWorkspace.get();
+        T service = ws != null ? facade.getService(ws, clazz) : null;
+        service = service != null ? service : facade.getService(clazz);
+        if(service == null) {
+            LOGGER.log(Level.SEVERE, "Could not locate service of type " + clazz + ", local workspace is " + ws);
+        }
+        
+        return service;
     }
 
     @Override
@@ -312,22 +428,38 @@ public class GeoServerImpl implements GeoServer, ApplicationContextAware {
     }
 
     public void reload() throws Exception {
-        // flush caches
-        reset();
-        
-        // reload configuration
-        GeoServerLoaderProxy loader = GeoServerExtensions.bean(GeoServerLoaderProxy.class);
-        synchronized (org.geoserver.config.GeoServer.CONFIGURATION_LOCK) {
-            getCatalog().getResourcePool().dispose();
-            loader.reload();
-        }
-        
-        // look for pluggable handlers
-        for(GeoServerLifecycleHandler handler : GeoServerExtensions.extensions(GeoServerLifecycleHandler.class)) {
+        // notify start of reload
+        List<GeoServerLifecycleHandler> handlers = GeoServerExtensions
+                .extensions(GeoServerLifecycleHandler.class);
+        for (GeoServerLifecycleHandler handler : handlers) {
             try {
-                handler.onReload();
-            } catch(Throwable t) {
-                LOGGER.log(Level.SEVERE, "A GeoServer lifecycle handler threw an exception during reload", t);
+                handler.beforeReload();
+            } catch (Throwable t) {
+                LOGGER.log(Level.SEVERE,
+                        "A GeoServer lifecycle handler threw an exception during reload", t);
+            }
+        }
+
+        // perform the reload
+        try {
+            // flush caches
+            reset();
+
+            // reload configuration
+            GeoServerLoaderProxy loader = GeoServerExtensions.bean(GeoServerLoaderProxy.class);
+            synchronized (org.geoserver.config.GeoServer.CONFIGURATION_LOCK) {
+                getCatalog().getResourcePool().dispose();
+                loader.reload();
+            }
+        } finally {
+            // notify end of reload
+            for (GeoServerLifecycleHandler handler : handlers) {
+                try {
+                    handler.onReload();
+                } catch (Throwable t) {
+                    LOGGER.log(Level.SEVERE,
+                            "A GeoServer lifecycle handler threw an exception during reload", t);
+                }
             }
         }
     }
