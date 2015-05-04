@@ -195,13 +195,13 @@
     <bean id="storeCoverageProcess" class="org.geoserver.wps.gs.StoreCoverage" >
       <constructor-arg index="0" ref="wpsStorageCleaner"></constructor-arg>
     </bean>
-    <bean id="vectorZonalStatistics" class="org.geotools.process.feature.gs.VectorZonalStatistics" />
-    <bean id="pointBuffersProces" class="org.geotools.process.feature.gs.PointBuffers" />
-    <bean id="rasterZonalStatistics" class="org.geotools.process.raster.gs.RasterZonalStatistics" />
-    <bean id="rangeLookupProcess" class="org.geotools.process.raster.gs.RangeLookupProcess" />
-    <bean id="addCoveragesProcess" class="org.geotools.process.raster.gs.AddCoveragesProcess" />
-    <bean id="coverageClassStats" class="org.geotools.process.raster.gs.CoverageClassStats" />
-    <bean id="featureClassStats" class="org.geotools.process.feature.gs.FeatureClassStats" />
+    <bean id="vectorZonalStatistics" class="org.geotools.process.vector.VectorZonalStatistics" />
+    <bean id="pointBuffersProces" class="org.geotools.process.vector.PointBuffers" />
+    <bean id="rasterZonalStatistics" class="org.geotools.process.raster.RasterZonalStatistics" />
+    <bean id="rangeLookupProcess" class="org.geotools.process.raster.RangeLookupProcess" />
+    <bean id="addCoveragesProcess" class="org.geotools.process.raster.AddCoveragesProcess" />
+    <bean id="coverageClassStats" class="org.geotools.process.raster.CoverageClassStats" />
+    <bean id="featureClassStats" class="org.geotools.process.vector.FeatureClassStats" />
     <bean id="classificationStatsPPIO" class="org.geoserver.wps.gs.ClassificationStatsPPIO"/>
     
     <bean id="georectifyConfiguration" class="org.geoserver.wps.gs.GeorectifyConfiguration" /> 
