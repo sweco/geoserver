@@ -1,7 +1,7 @@
 import sbt._
 
 class GeoServerCSSProject(info: ProjectInfo) extends DefaultProject(info) {
-  val gtVersion="2.7-SNAPSHOT"
+  val gtVersion="2.7.4-sweco"
   val gsVersion="2.1-SNAPSHOT"
 
   override def repositories = super.repositories ++ Set(
