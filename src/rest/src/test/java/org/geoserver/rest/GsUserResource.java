@@ -5,6 +5,9 @@
  */
 package org.geoserver.rest;
 
+import javax.servlet.http.HttpServletResponse;
+
+import org.geoserver.rest.util.RESTUtils;
 import org.geotools.factory.CommonFactoryFinder;
 import org.opengis.filter.FilterFactory;
 import org.opengis.filter.expression.Function;
@@ -20,6 +23,11 @@ public class GsUserResource extends Resource {
         Function function = ff.function("env", ff.literal("GSUSER"), ff.literal("USER_NOT_FOUND"));
         String result = function.evaluate(null, String.class);
 
-        getResponse().setEntity(result, MediaType.TEXT_PLAIN);
+        MediaType type = MediaType.TEXT_PLAIN;
+        getResponse().setEntity(result, type);
+        HttpServletResponse response = RESTUtils.getServletResponse(getResponse());
+        if (response != null) {
+            response.setContentType(type.getName());
+        }
     }
 }

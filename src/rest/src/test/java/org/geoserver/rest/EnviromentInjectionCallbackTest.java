@@ -16,7 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.mockrunner.mock.web.MockHttpServletResponse;
 
 public class EnviromentInjectionCallbackTest extends GeoServerSystemTestSupport {
-    
+
     @Override
         protected void setUpTestData(SystemTestData testData) throws Exception {
             // no test data needed
@@ -31,15 +31,17 @@ public class EnviromentInjectionCallbackTest extends GeoServerSystemTestSupport 
     public void testNoUser() throws Exception {
         MockHttpServletResponse r = getAsServletResponse("/rest/gsuser");
         assertEquals(200, r.getStatusCode());
+        assertNotNull(r.getContentType());
         assertTrue(r.getContentType().startsWith("text/plain"));
         assertEquals("USER_NOT_FOUND", r.getOutputStreamContent());
     }
-    
+
     @Test
     public void testUser() throws Exception {
         login("testUser", "testPassword");
         MockHttpServletResponse r = getAsServletResponse("/rest/gsuser");
         assertEquals(200, r.getStatusCode());
+        assertNotNull(r.getContentType());
         assertTrue(r.getContentType().startsWith("text/plain"));
         assertEquals("testUser", r.getOutputStreamContent());
     }

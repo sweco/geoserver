@@ -17,6 +17,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.geoserver.config.GeoServer;
 import org.geoserver.ows.util.ResponseUtils;
 import org.geoserver.platform.GeoServerExtensions;
+import org.geoserver.rest.util.RESTUtils;
+import org.restlet.Application;
 import org.restlet.Restlet;
 import org.restlet.Router;
 import org.restlet.data.Request;
@@ -37,32 +39,32 @@ public class RESTDispatcher extends AbstractController {
     public static final String METHOD_PUT = "PUT";
     /** HTTP method "DELETE" */
     public static final String METHOD_DELETE = "DELETE";
-    
+
     /**
      * logger
      */
     static Logger LOG = org.geotools.util.logging.Logging.getLogger("org.geoserver.rest");
-    
+
     /**
      * converter for turning servlet requests into resetlet requests.
      */
     ServletConverter myConverter;
-    
+
     /**
      * the root restlet router
      */
     Router myRouter;
-    
+
     /**
      * rest request callbacks
      */
     List<DispatcherCallback> callbacks;
-    
+
     /**
      * geoserver configuration
      */
     GeoServer gs;
-    
+
     public RESTDispatcher(GeoServer gs) {
         this.gs = gs;
         setSupportedMethods(new String[] {
@@ -75,8 +77,15 @@ public class RESTDispatcher extends AbstractController {
 
         myConverter = new GeoServerServletConverter(getServletContext());
         myConverter.setTarget(createRoot());
-        
-        callbacks = 
+
+        Application application = Application.getCurrent();
+        if (application == null) {
+            application = new Application(myConverter.getContext());
+            application.setRoot(myRouter);
+            Application.setCurrent(application);
+        }
+
+        callbacks =
             GeoServerExtensions.extensions(DispatcherCallback.class, getApplicationContext());
     }
 
@@ -94,42 +103,43 @@ public class RESTDispatcher extends AbstractController {
             if ( re == null && e.getCause() instanceof RestletException ) {
                 re = (RestletException) e.getCause();
             }
-            
+
             if ( re != null ) {
                 resp.setStatus( re.getStatus().getCode() );
-                
+
                 String reStr = re.getRepresentation().getText();
                 if ( reStr != null ) {
                     LOG.severe( reStr );
                     resp.setContentType("text/plain");
-                    resp.getOutputStream().write(reStr.getBytes());    
+                    resp.getOutputStream().write(reStr.getBytes());
                 }
-                
+
                 //log the full exception at a higher level
                 LOG.log( Level.SEVERE, "", re );
             }
             else {
                 LOG.log( Level.SEVERE, "", e );
                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                
+
                 if ( e.getMessage() != null ) {
-                    resp.getOutputStream().write( e.getMessage().getBytes() );    
+                    resp.getOutputStream().write( e.getMessage().getBytes() );
                 }
             }
             resp.getOutputStream().flush();
         }
-            
+
         return null;
     }
 
-    public void addRoutes(Map m, Router r){
+    @SuppressWarnings("rawtypes")
+    public void addRoutes(Map m, Router r) {
         Iterator it = m.entrySet().iterator();
 
         while (it.hasNext()){
             Map.Entry entry = (Map.Entry) it.next();
 
-            // LOG.info("Found mapping: " + entry.getKey().toString());
-            Restlet restlet = 
+            //LOG.info("Found mapping: " + entry.getKey().toString());
+            Restlet restlet =
                (getApplicationContext().getBean(entry.getValue().toString()) instanceof Resource)
                ? new BeanResourceFinder(getApplicationContext(), entry.getValue().toString())
                : new BeanDelegatingRestlet(getApplicationContext(), entry.getValue().toString());
@@ -146,15 +156,14 @@ public class RESTDispatcher extends AbstractController {
 
     public Restlet createRoot() {
         if (myRouter == null){
-            myRouter = new Router() {
-                
+            myRouter = new Router(myConverter.getContext()) {
+
                 @Override
-                protected synchronized void init(Request request,
-                        Response response) {
+                protected synchronized void init(Request request, Response response) {
                     super.init(request, response);
 
                     //set the page uri's
-                    
+
                     // http://host:port/appName
                     String baseURL = request.getRootRef().getParentRef().toString();
                     String rootPath = request.getRootRef().toString().substring(baseURL.length());
@@ -163,13 +172,13 @@ public class RESTDispatcher extends AbstractController {
                     if ( request.getResourceRef().getBaseRef() != null ) {
                         basePath = request.getResourceRef().getBaseRef().toString().substring(baseURL.length());
                     }
-                    
+
                     //strip off the extension
                     String extension = ResponseUtils.getExtension(pagePath);
                     if ( extension != null ) {
                         pagePath = pagePath.substring(0, pagePath.length() - extension.length() - 1);
                     }
-                    
+
                     //trim leading slash
                     if ( pagePath.endsWith( "/" ) ) {
                         pagePath = pagePath.substring(0, pagePath.length()-1);
@@ -182,12 +191,12 @@ public class RESTDispatcher extends AbstractController {
                     pageInfo.setPagePath(pagePath);
                     pageInfo.setExtension( extension );
                     request.getAttributes().put( PageInfo.KEY, pageInfo );
-                    
+
                     for (DispatcherCallback callback : callbacks) {
                         callback.init(request, response);
                     }
                 }
-                
+
                 @Override
                 public Restlet getNext(Request request, Response response) {
                     Restlet next = super.getNext(request, response);
@@ -198,7 +207,7 @@ public class RESTDispatcher extends AbstractController {
                     }
                     return next;
                 };
-                
+
                 @Override
                 public void handle(Request request, Response response) {
                     try {
@@ -224,11 +233,7 @@ public class RESTDispatcher extends AbstractController {
             };
 
             //load all the rest mappings and register them with the router
-            Iterator i = 
-                GeoServerExtensions.extensions(RESTMapping.class).iterator();
-
-            while (i.hasNext()){
-                RESTMapping rm = (RESTMapping)i.next();
+            for (RESTMapping rm : GeoServerExtensions.extensions(RESTMapping.class)) {
                 addRoutes(rm.getRoutes(), myRouter);
             }
 
@@ -237,5 +242,6 @@ public class RESTDispatcher extends AbstractController {
         }
 
         return myRouter;
-   }
+    }
+
 }

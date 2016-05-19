@@ -11,7 +11,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.util.HashMap;
@@ -23,12 +25,9 @@ import java.util.logging.Logger;
 import java.util.zip.ZipFile;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.FileUtils;
-import org.geoserver.platform.GeoServerExtensions;
-import org.geoserver.platform.GeoServerResourceLoader;
-import org.geoserver.platform.resource.Paths;
-import org.geoserver.platform.resource.Resource;
 import org.apache.commons.io.FilenameUtils;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CoverageStoreInfo;
@@ -39,40 +38,44 @@ import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.config.GeoServer;
 import org.geoserver.config.GeoServerInfo;
 import org.geoserver.config.SettingsInfo;
+import org.geoserver.platform.GeoServerExtensions;
+import org.geoserver.platform.GeoServerResourceLoader;
+import org.geoserver.platform.resource.Paths;
+import org.geoserver.platform.resource.Resource;
 import org.geoserver.rest.RestletException;
 import org.geotools.util.logging.Logging;
 import org.restlet.data.MediaType;
 import org.restlet.data.Reference;
 import org.restlet.data.Request;
+import org.restlet.data.Response;
 import org.restlet.data.Status;
+import org.restlet.resource.Representation;
 import org.vfny.geoserver.global.ConfigurationException;
+
 import com.noelios.restlet.ext.servlet.ServletCall;
 import com.noelios.restlet.http.HttpRequest;
-import org.restlet.data.Method;
-
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
+import com.noelios.restlet.http.HttpResponse;
 
 /**
  * Utility class for Restlets.
- * 
+ *
  * @author David Winslow, OpenGeo
  * @author Simone Giannecchini, GeoSolutions
  * @author Justin Deoliveira, OpenGeo
  *
  */
 public class RESTUtils {
-    
+
     static Logger LOGGER = Logging.getLogger("org.geoserver.rest.util");
 
     public static final String ROOT_KEY = "root";
-    
+
     public static final String QUIET_ON_NOT_FOUND_KEY = "quietOnNotFound";
-    
+
     /**
      * Returns the underlying HttpServletRequest from a Restlet Request object.
      * <p>
-     * Note that this only returns a value in the case where the Restlet 
+     * Note that this only returns a value in the case where the Restlet
      * request/call is originating from a servlet.
      * </p>
      * @return The HttpServletRequest, or null.
@@ -85,10 +88,30 @@ public class RESTUtils {
                 return call.getRequest();
             }
         }
-        
+
         return null;
     }
-    
+
+    /**
+     * Returns the underlying HttpServletResponse from a Restlet Response object.
+     * <p>
+     * Note that this only returns a value in the case where the Restlet
+     * response/call is originating from a servlet.
+     * </p>
+     * @return The HttpServletResponse, or null.
+     */
+    public static HttpServletResponse getServletResponse( Response response ) {
+        if ( response instanceof HttpResponse ) {
+            HttpResponse httpResponse = (HttpResponse) response;
+            if ( httpResponse.getHttpCall() instanceof ServletCall ) {
+                ServletCall call = (ServletCall) httpResponse.getHttpCall();
+                return call.getResponse();
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Returns the base url of a request.
      */
@@ -102,75 +125,75 @@ public class RESTUtils {
             return ref.getParentRef().getIdentifier();
         }
     }
-    
+
     /**
      * This function gets the stream of the request to copy it into a file.
-     * 
+     *
      * This method will create a "data" folder in GEOSERVER_DATA_DIRECTORY if needed.
-     * 
+     *
      * @deprecated use {@link #handleBinUpload(String, File, Request)}.
      */
     public static File handleBinUpload(String datasetName, String extension,
             Request request) throws IOException, ConfigurationException {
         GeoServerResourceLoader loader = GeoServerExtensions.bean(GeoServerResourceLoader.class);
         Resource data = loader.get("data");
-        
+
         final File dir = data.dir(); // find or create
         return handleBinUpload( datasetName + "." + extension, null, dir, request );
     }
 
     /**
      * Reads content from the body of a request and writes it to a file in the given directory.
-     * 
-     * If the file already exists, the directory content will be deleted recursively 
+     *
+     * If the file already exists, the directory content will be deleted recursively
      * before creating the new file.
-     * 
+     *
      * @param fileName The name of the file to write out.
      * @param directory The directory to write the file to
      * @param request The request.
-     * 
+     *
      * @return The file object representing the newly written file.
-     * 
+     *
      * @throws IOException Any I/O errors that occur.
-     * 
+     *
      * @deprecated use {@link #handleBinUpload(String, File, boolean, Request)}.
      */
     public static File handleBinUpload(String fileName, String workSpace, File directory, Request request)
             throws IOException {
         return handleBinUpload(fileName, directory, true, request, workSpace);
     }
-    
+
     /**
      * Reads content from the body of a request and writes it to a file.
-     * 
+     *
      * @param fileName The name of the file to write out.
      * @param directory The directory to write the file to.
      * @param deleteDirectoryContent Delete directory content if the file already exists.
      * @param request The request.
-     * 
+     *
      * @return The file object representing the newly written file.
-     * 
+     *
      * @throws IOException Any I/O errors that occur.
-     * 
+     *
      * TODO: move this to IOUtils.
      */
     public static File handleBinUpload(String fileName, File directory, boolean deleteDirectoryContent, Request request) throws IOException {
         return handleBinUpload(fileName, directory, deleteDirectoryContent, request, null);
     }
 
-    
+
     /**
      * Reads content from the body of a request and writes it to a file.
-     * 
+     *
      * @param fileName The name of the file to write out.
      * @param directory The directory to write the file to.
      * @param deleteDirectoryContent Delete directory content if the file already exists.
      * @param request The request.
-     * 
+     *
      * @return The file object representing the newly written file.
-     * 
+     *
      * @throws IOException Any I/O errors that occur.
-     * 
+     *
      * TODO: move this to IOUtils.
      */
     public static File handleBinUpload(String fileName, File directory, boolean deleteDirectoryContent,
@@ -202,7 +225,7 @@ public class RESTUtils {
             // Create the directory tree associated to the input file
             newFile.getParentFile().mkdirs();
         }
-        
+
         final ReadableByteChannel source = request.getEntity().getChannel();
         RandomAccessFile raf = null;
         FileChannel outputChannel = null;
@@ -222,40 +245,40 @@ public class RESTUtils {
         }
         return newFile;
     }
-    
+
     /**
      * Handles the upload of a dataset using the URL method.
-     * 
+     *
      * @param datasetName the name of the uploaded dataset.
      * @param extension the extension of the uploaded dataset.
      * @param request the incoming request.
      * @return a {@link File} that points to the final uploaded dataset.
-     * 
+     *
      * @throws IOException
      * @throws ConfigurationException
-     * 
+     *
      * @deprecated use {@link #handleURLUpload(String, File, Request)}.
      */
     public static File handleURLUpload(String datasetName, String workSpace, String extension, Request request) throws IOException, ConfigurationException {
         // Get the dir where to write and create a file there
-        
+
         GeoServerResourceLoader loader = GeoServerExtensions.bean(GeoServerResourceLoader.class);
         Resource data = loader.get("data");
         final File dir = data.dir(); // find or create
         return handleURLUpload(datasetName + "." + extension, workSpace, dir, request);
     }
-    
+
     /**
      * Reads a url from the body of a request, reads the contents of the url and writes it to a file.
-     *   
+     *
      * @param fileName The name of the file to write.
      * @param directory The directory to write the new file to.
      * @param request The request.
-     * 
+     *
      * @return The file object representing the newly written file.
-     * 
+     *
      * @throws IOException Any I/O errors that occur.
-     * 
+     *
      * TODO: move this to IOUtils
      */
     public static File handleURLUpload(String fileName, String workSpace, File directory, Request request)
@@ -274,15 +297,15 @@ public class RESTUtils {
             remapping(workSpace, baseName, itemPath, itemName, storeParams);
         }
 
-        //this may exists already, but we don't fail here since 
+        //this may exists already, but we don't fail here since
         //it might be old and unused, if needed we fail later while copying
         File newFile  = new File(directory,itemPath.toString());
-        
+
         //get the URL for this file to upload
         final InputStream inStream=request.getEntity().getStream();
         final String stringURL=IOUtils.getStringFromStream(inStream);
         final URL fileURL=new URL(stringURL);
-        
+
         ////
         //
         // Now do the real upload
@@ -297,15 +320,15 @@ public class RESTUtils {
             final OutputStream outStream = new FileOutputStream(newFile);
             IOUtils.copyStream(inputStream, outStream, true, true);
         }
-        
+
         return newFile;
     }
-    
+
     /**
      * Handles an upload using the EXTERNAL method.
-     * 
+     *
      * @param request
-     * @throws IOException 
+     * @throws IOException
      */
     public static File handleEXTERNALUpload(Request request) throws IOException {
         //get the URL for this file to upload
@@ -323,14 +346,14 @@ public class RESTUtils {
         if(inputFile == null || !inputFile.exists()) {
             throw new RestletException("Failed to locate the input file " + fileURL, Status.CLIENT_ERROR_BAD_REQUEST);
         } else if(!inputFile.canRead()) {
-            throw new RestletException("Input file is not readable, check filesystem permissions: " + fileURL, 
+            throw new RestletException("Input file is not readable, check filesystem permissions: " + fileURL,
                     Status.CLIENT_ERROR_BAD_REQUEST);
         }
 
         return inputFile;
     }
-    
-    static Set<String> ZIP_MIME_TYPES = new HashSet();
+
+    static Set<String> ZIP_MIME_TYPES = new HashSet<String>();
     static {
         ZIP_MIME_TYPES.add( "application/zip" );
         ZIP_MIME_TYPES.add( "multipart/x-zip" );
@@ -342,36 +365,36 @@ public class RESTUtils {
     public static boolean isZipMediaType( MediaType mediaType ) {
         return ZIP_MIME_TYPES.contains( mediaType.toString() );
     }
-    
+
     /**
      * Unzips a zip a file to a specified directory, deleting the zip file after unpacking.
-     * 
+     *
      * @param zipFile The zip file.
      * @param outputDirectory The directory to unpack the contents to.
      * @param request HTTP request sent.
      * @param files Empty List to be filled with the zip files.
-     * 
+     *
      * @throws IOException Any I/O errors that occur.
-     * 
+     *
      * TODO: move this to IOUtils
      */
     public static void unzipFile( File zipFile, File outputDirectory ) throws IOException {
         unzipFile(zipFile, outputDirectory, null, null, null, null, false);
     }
-    
+
     /**
      * Unzips a zip a file to a specified directory, deleting the zip file after unpacking.
-     * 
+     *
      * @param zipFile The zip file.
      * @param outputDirectory The directory to unpack the contents to.
-     * @param external 
-     * 
+     * @param external
+     *
      * @throws IOException Any I/O errors that occur.
-     * 
+     *
      * TODO: move this to IOUtils
      */
     public static void unzipFile(File zipFile, File outputDirectory, String workspace,
-            String store, Request request, List<File> files, 
+            String store, Request request, List<File> files,
             boolean external) throws IOException {
 
         if (outputDirectory == null) {
@@ -385,16 +408,16 @@ public class RESTUtils {
         IOUtils.inflate(archive, outputDirectory, null, workspace, store, request, files, external);
         IOUtils.deleteFile(zipFile);
     }
-    
+
     /**
      * Unzip a zipped dataset.
-     * 
+     *
      * @param storeName the name of the store to handle.
-     * @param zipFile the zipped archive 
+     * @param zipFile the zipped archive
      * @return null if the zip file does not point to a valid zip file, the output directory otherwise.
-     * 
+     *
      * @deprecated use {@link #unzipFile(File, File)}
-     *  
+     *
      */
     public static File unpackZippedDataset(String storeName, File zipFile) throws IOException, ConfigurationException {
         GeoServerResourceLoader loader = GeoServerExtensions.bean(GeoServerResourceLoader.class);
@@ -418,17 +441,17 @@ public class RESTUtils {
         Object o = request.getAttributes().get(name);
         return decode(o);
     }
-    
+
     public static String getQueryStringValue(Request request, String key) {
         String value = request.getResourceRef().getQueryAsForm().getFirstValue(key);
         return decode(value);
     }
-    
+
     static String decode(Object value) {
         if (value == null) {
             return null;
         }
-        
+
         try {
             return URLDecoder.decode(value.toString(), "UTF-8");
         } catch (UnsupportedEncodingException e) {
@@ -438,7 +461,7 @@ public class RESTUtils {
 
     /**
      * Method for searching an item inside the MetadataMap.
-     * 
+     *
      * @param workspaceName
      * @param storeName
      * @param catalog
@@ -480,7 +503,7 @@ public class RESTUtils {
 
     /**
      * This method is used for extracting the metadata map from the selected store
-     * 
+     *
      * @param storeName
      * @param catalog
      * @return
@@ -500,7 +523,7 @@ public class RESTUtils {
 
     /**
      * This method is used for extracting the metadata map from the selected workspace
-     * 
+     *
      * @param workspaceName
      * @param catalog
      * @return
@@ -516,10 +539,10 @@ public class RESTUtils {
        }
        return null;
     }
-   
+
     /**
      * This method is used for extracting the metadata map from the global settings
-     * 
+     *
      * @return
      */
     public static MetadataMap loadMapFromGlobal() {
@@ -536,22 +559,22 @@ public class RESTUtils {
     /**
      * Extraction of the item from the metadata map
      * @param <T>
-     * 
+     *
      * @param map
      * @return
      */
     public static String extractMapItem(MetadataMap map, String key) {
        if(map != null && !map.isEmpty()){
            String item = map.get(key, String.class);
-           
+
            if (item != null && !item.isEmpty()){
-               
+
                return item;
-           } 
+           }
        }
        return null;
    }
-    
+
     public static String getRootDirectory(String workspaceName, String storeName, Catalog catalog) {
         String rootDir = getItem(workspaceName, storeName, catalog, ROOT_KEY);
         if(rootDir != null){
@@ -580,6 +603,20 @@ public class RESTUtils {
         // Mapping the item path
         for (RESTUploadPathMapper mapper : mappers) {
             mapper.mapItemPath(workspace, store, storeParams, itemPath, initialFileName);
+        }
+    }
+
+    public static void setEntity(Response response, Representation representation) {
+        if (response == null) {
+            return;
+        }
+        response.setEntity(representation);
+        if (representation == null) {
+            return;
+        }
+        HttpServletResponse servletResponse = getServletResponse(response);
+        if (servletResponse != null && representation.getMediaType() != null) {
+            servletResponse.setContentType(representation.getMediaType().getName());
         }
     }
 }

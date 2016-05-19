@@ -27,22 +27,22 @@ import com.thoughtworks.xstream.XStream;
  * Base class for resources which work reflectively from underlying target objects.
  * <h2>HTTP Methods</h2>
  * <p>
- * By default this class allows access via GET, POST, PUT and denies access via DELETE. 
- * Subclasses should override this behavior via the methods 
+ * By default this class allows access via GET, POST, PUT and denies access via DELETE.
+ * Subclasses should override this behavior via the methods
  * {@link #allowGet()}, {@link #allowPost()}, {@link #allowPut()}, and {@link #allowDelete()}
- * as needed. 
+ * as needed.
  * </p>
  * <h2>Object Serialization and Deserialization</h2>
  * <p>
- * A reflective resource corresponds to another class of object, referred here as the 
- * "target" object. During GET requests instances of the target object can be serialized as 
- * HTML, XML, or JSON. During POST and PUT requests instances of the "target" object can be 
+ * A reflective resource corresponds to another class of object, referred here as the
+ * "target" object. During GET requests instances of the target object can be serialized as
+ * HTML, XML, or JSON. During POST and PUT requests instances of the "target" object can be
  * de-serialized as XML or JSON. HTML serialization is achieved via Freemarker, XML and JSON
  * (de)serialization is achieved via XStream. Serialization and de-serialization is performed
- * by the {@link DataFormat} class. The supported formats listed above can be customized as 
+ * by the {@link DataFormat} class. The supported formats listed above can be customized as
  * need be by overriding/extending the {@link #createSupportedFormats()} method.
  * </p>
- * 
+ *
  * @author David Winslow, OpenGeo
  * @author Justin Deoliveira, OpenGeo
  */
@@ -61,13 +61,13 @@ public abstract class ReflectiveResource extends AbstractResource {
     }
 
     /**
-     * Creates a new reflective resource relying on {@link #init(Context, Request, Response)} to 
+     * Creates a new reflective resource relying on {@link #init(Context, Request, Response)} to
      * initialize the resource.
-     * 
+     *
      */
     public ReflectiveResource() {
     }
-    
+
     /**
      * Handles a GET request by serializing the target object.
      * <p>
@@ -79,15 +79,15 @@ public abstract class ReflectiveResource extends AbstractResource {
      *   <li>
      * </ol>
      * </p>
-     * 
-     * @see #handleObjectGet() 
+     *
+     * @see #handleObjectGet()
      */
-    @Override 
+    @Override
     public final void handleGet() {
         DataFormat format = getFormatGet();
         try {
-            getResponse().setEntity(format.toRepresentation(handleObjectGet()));
-        } 
+            setEntity(format.toRepresentation(handleObjectGet()));
+        }
         catch (Exception e) {
             handleException(e);
         }
@@ -99,7 +99,7 @@ public abstract class ReflectiveResource extends AbstractResource {
     protected abstract Object handleObjectGet() throws Exception;
 
     /**
-     * Handles a POST request by de-serializing the content of the request into an instance 
+     * Handles a POST request by de-serializing the content of the request into an instance
      * of the target object.
      * <p>
      * This method operates by:
@@ -109,7 +109,7 @@ public abstract class ReflectiveResource extends AbstractResource {
      *   <li>Passing the target object to {@link #handleObjectPost(Object)}
      * </ol>
      * </p>
-     * 
+     *
      * @see #handleObjectPost(Object)
      */
     @Override
@@ -119,10 +119,10 @@ public abstract class ReflectiveResource extends AbstractResource {
         String location = null;
         try {
             location = handleObjectPost(object);
-        } 
+        }
         catch (Exception e) {
             handleException(e);
-        } 
+        }
         if ( location != null ) {
             // set the Location header by appending the location to the current resource
             String uri = getRequest().getResourceRef().getIdentifier();
@@ -132,48 +132,48 @@ public abstract class ReflectiveResource extends AbstractResource {
             }
             uri = ResponseUtils.appendPath(uri, location);
             getResponse().redirectSeeOther(uri);
-            
+
             // set response 201
             getResponse().setStatus( Status.SUCCESS_CREATED );
         }
         else {
-            
+
         }
     }
 
     /**
      * Handles a de-serialized instance of the target object in a POST request.
      * <p>
-     * Subclasses should override this method as well as {@link #allowPost()} to handle the 
+     * Subclasses should override this method as well as {@link #allowPost()} to handle the
      * POST method.
      * </p>
      * <p>
-     * This method returns the location that the object can be retrieved from after the 
-     * POST. This value is used to set the 'Location' header of the http response by 
+     * This method returns the location that the object can be retrieved from after the
+     * POST. This value is used to set the 'Location' header of the http response by
      * appending this value to the uri used to make the request. For example consider the
      * following:
      * <pre>
      *   protected String handleObjectPost(Object object) {
      *     Foo foo = (Foo) object;
      *     doSomethingWithFoo(foo);
-     *     
+     *
      *     return "foo";
      *   }
      *  </pre>
      *  Along with the POST request to "http://localhost:8080/geoserver/rest/foos". The resulting value
-     *  of the 'Location' header would be "http://localhost:8080/geoserver/rest/foos/foo". 
+     *  of the 'Location' header would be "http://localhost:8080/geoserver/rest/foos/foo".
      * </p>
-     * 
+     *
      * @param object Instance of the target object.
-     * 
-     * @return The location of the resulting resource. 
+     *
+     * @return The location of the resulting resource.
      */
     protected String handleObjectPost(Object object) throws Exception {
         return null;
     }
 
     /**
-     * Handles a PUT request by de-serializing the content of the request into an instance 
+     * Handles a PUT request by de-serializing the content of the request into an instance
      * of the target object.
      * <p>
      * This method operates by:
@@ -183,7 +183,7 @@ public abstract class ReflectiveResource extends AbstractResource {
      *   <li>Passing the target object to {@link #handleObjectPut(Object)}
      * </ol>
      * </p>
-     * 
+     *
      * @see #handleObjectPost(Object)
      */
     @Override
@@ -192,7 +192,7 @@ public abstract class ReflectiveResource extends AbstractResource {
         Object object = format.toObject( getRequest().getEntity() );
         try {
             handleObjectPut(object);
-        } 
+        }
         catch (Exception e) {
             handleException(e);
         }
@@ -201,10 +201,10 @@ public abstract class ReflectiveResource extends AbstractResource {
     /**
      * Handles a de-serialized instance of the target object in a PUT request.
      * <p>
-     * Subclasses should override this method as well as {@link #allowDelete()} to handle the 
+     * Subclasses should override this method as well as {@link #allowDelete()} to handle the
      * PUT method.
      * </p>
-     * @param object Instance of the target object. 
+     * @param object Instance of the target object.
      */
     protected void handleObjectPut(Object object) throws Exception {
     }
@@ -214,39 +214,39 @@ public abstract class ReflectiveResource extends AbstractResource {
      * <p>
      * This method simply delegates to {@link #handleObjectDelete()}. Note that the DELETE method is
      * not allowed by default, so if subclasses which to handle the DELETE method they must override
-     * {@link #allowDelete()}. 
+     * {@link #allowDelete()}.
      * </p>
-     * 
+     *
      * @see #handleObjectDelete()
      */
     @Override
     public final void handleDelete() {
         try {
             handleObjectDelete();
-        } 
+        }
         catch (Exception e) {
             handleException(e);
         }
     }
-    
+
     /**
      * Handles a delete on the target object.
      * <p>
-     * Subclasses should override this method as well as {@link #allowDelete()} to handle the 
+     * Subclasses should override this method as well as {@link #allowDelete()} to handle the
      * DELETE method.
      * </p>
-     * 
+     *
      */
     protected void handleObjectDelete() throws Exception {
     }
-    
+
     /**
      * Creates the list of formats used to serialize and de-serialize instances of the target object.
      *  <p>
      *  Subclasses may override or extend this method to customize the supported formats. By default
-     *  this method supports html, xml, and json. 
+     *  this method supports html, xml, and json.
      *  </p>
-     *  
+     *
      *  @see #createHTMLFormat()
      *  @see #createXMLFormat()
      *  @see #createJSONFormat()
@@ -256,25 +256,25 @@ public abstract class ReflectiveResource extends AbstractResource {
         formats.add(createHTMLFormat(request,response));
         formats.add(createXMLFormat(request,response) );
         formats.add(createJSONFormat(request,response) );
-        
+
         return formats;
     }
 
     /**
      * Creates the data format for serializing objects as HTML.
      * <p>
-     * This implementation returns a new instance of {@link ReflectiveHTMLFormat}. Subclasses 
+     * This implementation returns a new instance of {@link ReflectiveHTMLFormat}. Subclasses
      * may override as need be.
      * </p>
      */
     protected DataFormat createHTMLFormat(Request request,Response response) {
-        return new ReflectiveHTMLFormat(request,response,this); 
+        return new ReflectiveHTMLFormat(request,response,this);
     }
 
     /**
      * Creates the data format for serializing and de-serializing objects as XML.
      * <p>
-     * This implementation returns a new instance of {@link ReflectiveXMLFormat}. Subclasses 
+     * This implementation returns a new instance of {@link ReflectiveXMLFormat}. Subclasses
      * may override as need be.
      * </p>
      */
@@ -287,7 +287,7 @@ public abstract class ReflectiveResource extends AbstractResource {
     /**
      * Creates the data format for serializing and de-serializing objects as JSON.
      * <p>
-     * This implementation returns a new instance of {@link ReflectiveJSONLFormat}. Subclasses 
+     * This implementation returns a new instance of {@link ReflectiveJSONLFormat}. Subclasses
      * may override as need be.
      * </p>
      */
@@ -296,13 +296,13 @@ public abstract class ReflectiveResource extends AbstractResource {
         configureXStream( format.getXStream() );
         return format;
     }
-    
+
     /**
      * Method for subclasses to customize of modify the xstream instance being
      * used to persist and depersist XML and JSON.
      */
     protected void configureXStream( XStream xstream ) {
-        
+
     }
 
     protected String encode(String component) {
@@ -310,7 +310,7 @@ public abstract class ReflectiveResource extends AbstractResource {
             return URLEncoder.encode(component, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             LOG.warning("Unable to URL-encode component: " + component);
-            return component; 
+            return component;
         }
     }
 
@@ -322,7 +322,7 @@ public abstract class ReflectiveResource extends AbstractResource {
         if ( e instanceof RestletException ) {
             throw (RestletException) e ;
         }
-        
+
         throw new RestletException( "", Status.SERVER_ERROR_INTERNAL, e );
     }
 

@@ -21,11 +21,12 @@ import org.restlet.data.Preference;
 import org.restlet.data.Request;
 import org.restlet.data.Response;
 import org.restlet.data.Status;
+import org.restlet.resource.Representation;
 import org.restlet.resource.Resource;
 
 /**
  * Abstract base class for resources.
- * 
+ *
  * @author Justin Deoliveira, OpenGEO
  *
  */
@@ -38,16 +39,16 @@ public abstract class AbstractResource extends Resource {
         MediaTypes.registerExtension( "html", MediaType.TEXT_HTML );
         MediaTypes.registerExtension( "xml", MediaType.APPLICATION_XML );
         MediaTypes.registerExtension( "json", MediaType.APPLICATION_JSON );
-        
+
         MediaTypes.registerSynonym( MediaType.APPLICATION_XML, MediaType.TEXT_XML );
         MediaTypes.registerSynonym( MediaType.APPLICATION_JSON, new MediaType( "text/json") );
     }
-    
+
     /**
      * list of formats used to read and write representations of the resource.
      */
     protected volatile Map<MediaType,DataFormat> formats;
-    
+
     /**
      * Constructs a new resource from context, request, and response.
      */
@@ -58,35 +59,35 @@ public abstract class AbstractResource extends Resource {
     /**
      * Constructs a new resource.
      * <p>
-     * When using this constructor, {@link #init(Context, Request, Response)} needs to be 
+     * When using this constructor, {@link #init(Context, Request, Response)} needs to be
      * called before any other operations.
      * </p>
      */
     protected AbstractResource() {
     }
-    
+
     /**
      * Creates the list of formats used to create and read representations of the resource.
      * <p>
-     * The first entry in the list is considered to be the default format. This format will 
-     * be used when the client does not explicitly specify another format. 
+     * The first entry in the list is considered to be the default format. This format will
+     * be used when the client does not explicitly specify another format.
      * </p>
      */
     protected abstract List<DataFormat> createSupportedFormats(Request request,Response response);
-    
+
     /**
      * Returns the format to use to serialize during a GET request.
      * <p>
-     * To determine the format first the "Accepts" header is checked. If not set then the 
+     * To determine the format first the "Accepts" header is checked. If not set then the
      * "extension" of the resource being requested is used, which originates from the route
      * template under the {format} or {type} variable. IF neither the header or extension is
-     * set the default format is used, ie the first format returned from 
-     * {@link #createSupportedFormats(Request, Response)}.  
+     * set the default format is used, ie the first format returned from
+     * {@link #createSupportedFormats(Request, Response)}.
      * </p>
      */
     protected DataFormat getFormatGet() {
         DataFormat df = null;
-        
+
         //check if the client specified an extension
         String ext = (String) getRequest().getAttributes().get( "format" );
         if ( ext == null ) {
@@ -94,13 +95,13 @@ public abstract class AbstractResource extends Resource {
         }
         if ( ext == null ) {
             //try from the resource uri
-            String uri = getRequest().getResourceRef() != null ? 
+            String uri = getRequest().getResourceRef() != null ?
                 getRequest().getResourceRef().getLastSegment() : null;
             if ( uri != null ) {
                 ext = ResponseUtils.getExtension(uri);
             }
         }
-        
+
         if ( ext != null ) {
             //lookup the media type matching the extension
             MediaType mt = MediaTypes.getMediaTypeForExtension( ext );
@@ -108,7 +109,7 @@ public abstract class AbstractResource extends Resource {
                 df = lookupFormat(mt);
             }
         }
-        
+
         List<Preference<MediaType>> accepts = null;
         boolean acceptsAll = false;
         if ( df == null ) {
@@ -121,20 +122,20 @@ public abstract class AbstractResource extends Resource {
                     acceptsAll = true;
                     continue;
                 }
-                
-                df = lookupFormat( pref.getMetadata() ); 
+
+                df = lookupFormat( pref.getMetadata() );
                 if ( df != null ) {
                     break;
                 }
             }
         }
-        
+
         if ( df == null && acceptsAll ) {
-            //could not find suitable format, if client specifically did not specify 
+            //could not find suitable format, if client specifically did not specify
             // any accepted formats or accepts all media types, just return the first
             df = getFormats().values().iterator().next();
         }
-        
+
         return df;
     }
 
@@ -142,7 +143,7 @@ public abstract class AbstractResource extends Resource {
      * returns the format to use to de-serialize during a POST or PUT request.
      * <p>
      * The format is located by looking up <pre>getRequest().getEntity().getMediaType()</pre> from
-     * the list created by {@link #createSupportedFormats()}. 
+     * the list created by {@link #createSupportedFormats()}.
      * </p>
      */
     protected DataFormat getFormatPostOrPut() {
@@ -171,11 +172,11 @@ public abstract class AbstractResource extends Resource {
                 return format;
             }
         }
-        
+
         throw new RestletException( "Could not determine format. Try setting the Content-type header.",
             Status.CLIENT_ERROR_BAD_REQUEST );
     }
-    
+
     /**
      * Accessor for formats which lazily creates the format map.
      */
@@ -184,10 +185,10 @@ public abstract class AbstractResource extends Resource {
             synchronized (this) {
                 if ( formats == null ) {
                     formats = new LinkedHashMap();
-                    for ( DataFormat format : createSupportedFormats(getRequest(), getResponse()) ) { 
+                    for ( DataFormat format : createSupportedFormats(getRequest(), getResponse()) ) {
                         formats.put( format.getMediaType(), format );
                     }
-                    
+
                     if ( formats.isEmpty() ) {
                         throw new RuntimeException( "Empty format list" );
                     }
@@ -196,14 +197,14 @@ public abstract class AbstractResource extends Resource {
         }
         return formats;
     }
-    
+
     /*
      * Helper method for looking up a format based on a media type.
      */
     DataFormat lookupFormat( MediaType mt ) {
         //exact match
         DataFormat fmt = getFormats().get( mt );
-        
+
         if ( fmt == null ) {
             //check for the case of a media type being "contained"
             for ( MediaType mediaType : getFormats().keySet() ) {
@@ -213,7 +214,7 @@ public abstract class AbstractResource extends Resource {
                 }
             }
         }
-        
+
         if ( fmt == null ) {
             //do a check for synonyms
             for( MediaType syn : MediaTypes.getSynonyms( mt ) ) {
@@ -223,7 +224,7 @@ public abstract class AbstractResource extends Resource {
                 }
             }
         }
-        
+
         if ( fmt == null ) {
             //do a reverse check check for synonyms
             for ( MediaType mediaType : getFormats().keySet() ) {
@@ -234,7 +235,7 @@ public abstract class AbstractResource extends Resource {
                 }
             }
         }
-        
+
         if ( fmt == null ) {
             //do a "contains" check on synonyms
             for( MediaType syn : MediaTypes.getSynonyms( mt ) ) {
@@ -246,15 +247,15 @@ public abstract class AbstractResource extends Resource {
                 }
             }
         }
-        
+
         //TODO: reverse contains check on synonyms
         return fmt;
     }
-    
+
     /**
-     * Returns the object which contains information about the page / resource bring requested. 
+     * Returns the object which contains information about the page / resource bring requested.
      * <p>
-     * This object is created by the rest dispatcher when a request comes in.  
+     * This object is created by the rest dispatcher when a request comes in.
      * </p>
      */
     protected PageInfo getPageInfo() {
@@ -264,38 +265,38 @@ public abstract class AbstractResource extends Resource {
     /**
      * Convenience method for subclasses to look up the (URL-decoded)value of
      * an attribute from the request, ie {@link Request#getAttributes()}.
-     * 
+     *
      * @param attribute THe name of the attribute to lookup.
-     * 
+     *
      * @return The value as a string, or null if the attribute does not exist
      *     or cannot be url-decoded.
      */
     protected String getAttribute(String attribute) {
         return RESTUtils.getAttribute(getRequest(), attribute);
     }
-    
+
     /**
      * Convenience method for subclasses to look up the (URL-decoded) value of a value specified
      * in the request query string.
-     * 
-     * @param key The name of the value to lookup. 
-     * 
+     *
+     * @param key The name of the value to lookup.
+     *
      * @return The converted value, or <code>null</code> if the value was not specified.
      */
     protected String getQueryStringValue(String key) {
         return RESTUtils.getQueryStringValue(getRequest(), key);
     }
-    
+
     /**
      * Convenience method for subclasses to look up the (URL-decoded) value of a value specified
      * in the request query string, converting to the specified type.
-     * 
-     * @param key The name of the value to lookup. 
+     *
+     * @param key The name of the value to lookup.
      * @param clazz The class to convert to.
-     * @param defalt The default value to return if the attribute does not exist or no 
+     * @param defalt The default value to return if the attribute does not exist or no
      *   conversion was possible. May be <code>null</code>
-     * 
-     * @return The converted value, or <code>null</code> if either (a) the value was not 
+     *
+     * @return The converted value, or <code>null</code> if either (a) the value was not
      *   specified or (b) the value could not be converted to the specified type.
      */
     protected <T> T getQueryStringValue(String key, Class<T> clazz, T defalt) {
@@ -309,4 +310,9 @@ public abstract class AbstractResource extends Resource {
 
         return defalt;
     }
+
+    protected void setEntity(Representation representation) {
+        RESTUtils.setEntity(getResponse(), representation);
+    }
+
 }

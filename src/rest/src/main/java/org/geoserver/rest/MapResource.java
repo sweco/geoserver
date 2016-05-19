@@ -17,6 +17,7 @@ import org.restlet.Context;
 import org.restlet.data.Request;
 import org.restlet.data.Response;
 import org.restlet.data.Status;
+import org.restlet.resource.Representation;
 
 /**
  * Base class for resources which transform an underlying target object into a java map.
@@ -28,18 +29,18 @@ public abstract class MapResource extends AbstractResource {
      * logger
      */
     protected static Logger LOG = org.geotools.util.logging.Logging.getLogger("org.geoserver.rest");
-    
+
     public MapResource(Context context, Request request, Response response) {
         super(context, request, response);
     }
-    
+
     public MapResource() {
     }
 
     /**
      * Creates the list of formats for serialization and de-serialization.
      * <p>
-     * This implementation adds support for XML and JSON via the {@link MapXMLFormat} and 
+     * This implementation adds support for XML and JSON via the {@link MapXMLFormat} and
      * {@link MapJSONFormat} classes respectively. Subclasses should override/extend as needed.
      * </p>
      */
@@ -51,7 +52,7 @@ public abstract class MapResource extends AbstractResource {
         formats.add( new MapJSONFormat() );
         return formats;
     }
-    
+
     /**
      * Handles a request using the GET method.
      * <p>
@@ -63,20 +64,21 @@ public abstract class MapResource extends AbstractResource {
         Map map;
         try {
             map = getMap();
-        } 
+        }
         catch (Exception e) {
             throw new RestletException( "", Status.SERVER_ERROR_INTERNAL, e );
         }
         DataFormat format = getFormatGet();
-        getResponse().setEntity(format.toRepresentation(map));
+        Representation representation = format.toRepresentation(map);
+        setEntity(representation);
     }
 
     /**
      * Returns the map representation of the underlying target object in a GET request.
      * <p>
-     * This method is called by {@link #handleGet()}. 
+     * This method is called by {@link #handleGet()}.
      * </p>
-     * 
+     *
      * @return A map representing the properties of the underlying target object.
      */
     public abstract Map getMap() throws Exception;
@@ -84,8 +86,8 @@ public abstract class MapResource extends AbstractResource {
     /**
      * Handles a request using the POST method.
      * <p>
-     * This method operates by de-serializing the map representation of the target object and 
-     * then calling {@link #postMap(Map)}. 
+     * This method operates by de-serializing the map representation of the target object and
+     * then calling {@link #postMap(Map)}.
      * </p>
      */
     @Override
@@ -94,12 +96,12 @@ public abstract class MapResource extends AbstractResource {
         Map map = (Map) format.toObject(getRequest().getEntity());
         try {
             postMap(map);
-        } 
+        }
         catch (Exception e) {
             throw new RestletException( "", Status.SERVER_ERROR_INTERNAL, e );
         }
     }
-    
+
     /**
      * Handles the map result of a POST request.
      * <p>
@@ -110,12 +112,12 @@ public abstract class MapResource extends AbstractResource {
      */
     protected void postMap(Map map) throws Exception {
     }
-    
+
     /**
      * Handles a request using the PUT method.
      * <p>
-     * This method operates by de-serializing the map representation of the target object and 
-     * then calling {@link #putMap(Map)}. 
+     * This method operates by de-serializing the map representation of the target object and
+     * then calling {@link #putMap(Map)}.
      * </p>
      */
     @Override
@@ -124,7 +126,7 @@ public abstract class MapResource extends AbstractResource {
         Map map = (Map) format.toObject(getRequest().getEntity());
         try {
             putMap(map);
-        } 
+        }
         catch (Exception e) {
             throw new RestletException( "", Status.SERVER_ERROR_INTERNAL, e );
         }
