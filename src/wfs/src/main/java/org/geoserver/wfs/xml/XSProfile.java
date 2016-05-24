@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import javax.xml.namespace.QName;
 
@@ -56,10 +57,24 @@ public class XSProfile extends TypeMappingProfile {
         AttributeTypeBuilder ab = new AttributeTypeBuilder();
         ab.setName("date");
         ab.setBinding(Date.class);
-        
+
         additional.put(name(XS.DATETIME), ab.buildType() );
-        profiles.add( new ProfileImpl( additional, Collections.singleton( name( XS.DATETIME))));
-        
+        //profiles.add( new ProfileImpl( additional, Collections.singleton( name( XS.DATETIME))));
+
+        // Sweco: ...and for java.util.UUID
+        AttributeTypeBuilder abUuid = new AttributeTypeBuilder();
+        abUuid.setName("UUID");
+        abUuid.setBinding(UUID.class);
+
+        additional.put(name(XS.STRING), abUuid.buildType() );
+
+        Set extra = new HashSet();
+        extra.add(name(XS.DATETIME));
+        extra.add(name(XS.STRING));
+
+        profiles.add(new ProfileImpl(additional, extra));
+        // Sweco: end patch
+
         //profile.add(name(XS.ANYTYPE)); //Map.class
     }
 
