@@ -13,7 +13,6 @@
   <version>2.7.4-sweco</version>
  </parent>
 
- <groupId>org.geoserver</groupId>
  <artifactId>gs-ows</artifactId>
  <packaging>jar</packaging>
  <name>Open Web Service Module</name>
