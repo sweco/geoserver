@@ -88,6 +88,10 @@
     <bean id="wmsGetFeatureInfoHTML" class="org.geoserver.wms.featureinfo.HTMLFeatureInfoOutputFormat">
       <constructor-arg ref="wms" />
     </bean>
+    
+    <bean id="wmsGetFeatureInfoESRI" class="org.geoserver.wms.featureinfo.ESRIFeatureInfoOutputFormat">
+      <constructor-arg ref="wms" />
+    </bean>
 
 	<!-- GetFeatureInfo JSONP -->
 	<bean id="geoJSONPFeatureInfoResponse"

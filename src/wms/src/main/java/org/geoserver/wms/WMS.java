@@ -864,8 +864,11 @@ public class WMS implements ApplicationContextAware {
                 }
                 WMSCapabilities caps = info.getStore().getWebMapServer(null).getCapabilities();
                 OperationType featureInfo = caps.getRequest().getGetFeatureInfo();
-                if (featureInfo == null || !featureInfo.getFormats()
-                        .contains("application/vnd.ogc.gml")) {
+                if (featureInfo == null) {
+                    return false;
+                }
+                final List<String> infoFormats = featureInfo.getFormats();
+                if (!(infoFormats.contains("application/vnd.ogc.gml") || infoFormats.contains("application/vnd.esri.wms_featureinfo_xml"))) {
                     return false;
                 }
             }
