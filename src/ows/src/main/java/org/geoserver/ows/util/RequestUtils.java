@@ -39,9 +39,19 @@ public class RequestUtils {
      * @deprecated Use {@link ResponseUtils#baseURL(HttpServletRequest)} instead
      */
     public static String baseURL(HttpServletRequest req) {
-        StringBuffer sb = new StringBuffer(req.getScheme());
-        sb.append("://").append(req.getServerName()).append(":").append(req.getServerPort())
-                .append(req.getContextPath()).append("/");
+        // Sweco: QGIS will get confused if standard ports are included in capabilites, so clean up these
+        if (req == null) {
+            return null;
+        }
+        final String scheme = req.getScheme();
+        StringBuffer sb = new StringBuffer(scheme);
+        int serverPort = req.getServerPort();
+        sb.append("://").append(req.getServerName());
+        boolean standardPort = (scheme == "http" && serverPort == 80) || (scheme == "https" && serverPort == 443);
+        if (!standardPort) {
+            sb.append(":").append(serverPort);
+        }
+        sb.append(req.getContextPath()).append("/");
         return sb.toString();
     }
     
