@@ -54,7 +54,7 @@
   <repository>
    <id>boundless</id>
    <name>Boundless Maven Repository</name>
-   <url>https://boundless.artifactoryonline.com/boundless/main/</url>
+   <url>https://repo.boundlessgeo.com/artifactory/main/</url>
    <snapshots>
      <enabled>true</enabled>
    </snapshots>
