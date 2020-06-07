@@ -4,3 +4,4 @@ set GEOSERVER_VERSION=2.8.2
 set MVN_FLAGS=-DskipTests
 set MEDIA=E:\SEMARA\Forsmark\MEDIA\v1.6.2\Underlag
 set SEVENZIP=C:\Program Files\7-Zip\7z.exe
+set TOMCAT_VERSION=8.0.30
