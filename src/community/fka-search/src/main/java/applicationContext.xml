@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
+<beans>
+  <!--
+  Do not use REST-mapping /rest/search since we disable authentication for /rest
+
+  <bean id="fkaSearchRestletMapping" class="org.geoserver.rest.RESTMapping">
+    <property name="routes">
+      <map>
+        <entry>
+          <key><value>/search</value></key>
+          <value>fkaSearchRestlet</value>
+        </entry>
+      </map>
+    </property>
+  </bean>
+  <bean id="fkaSearchRestlet" class="org.geoserver.rest.search.FkaSearchRestlet"/>
+  -->
+
+  <bean id="fkaSearchController" class="org.geoserver.rest.search.FkaSearchController"/>
+
+  <bean id="fkaSearchDispatcherMapping" class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+    <property name="alwaysUseFullPath" value="true"/>
+    <property name="mappings">
+      <props>
+        <prop key="/search">fkaSearchController</prop>
+        <prop key="/search/**">fkaSearchController</prop>
+      </props>
+    </property>
+  </bean>
+</beans>

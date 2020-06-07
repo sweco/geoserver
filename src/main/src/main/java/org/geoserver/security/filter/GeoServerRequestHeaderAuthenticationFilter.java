@@ -10,17 +10,18 @@ import java.io.IOException;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.apache.commons.lang.StringUtils;
 import org.geoserver.security.config.RequestHeaderAuthenticationFilterConfig;
 import org.geoserver.security.config.SecurityNamedServiceConfig;
 
 /**
  * J2EE Authentication Filter
- * 
+ *
  * @author mcr
  *
  */
 public class GeoServerRequestHeaderAuthenticationFilter extends GeoServerPreAuthenticatedUserNameFilter {
-    
+
     private String principalHeaderAttribute;
 
 
@@ -35,15 +36,16 @@ public class GeoServerRequestHeaderAuthenticationFilter extends GeoServerPreAuth
     @Override
     public void initializeFromConfig(SecurityNamedServiceConfig config) throws IOException {
         super.initializeFromConfig(config);
-                        
-        RequestHeaderAuthenticationFilterConfig authConfig = 
+
+        RequestHeaderAuthenticationFilterConfig authConfig =
                 (RequestHeaderAuthenticationFilterConfig) config;
         setPrincipalHeaderAttribute(authConfig.getPrincipalHeaderAttribute());
     }
 
-    
     @Override
     protected String getPreAuthenticatedPrincipalName(HttpServletRequest request) {
-        return request.getHeader(getPrincipalHeaderAttribute());
-    }     
+        // Sweco: return principal name only without domain
+        String principal = request.getHeader(getPrincipalHeaderAttribute());
+        return StringUtils.substringAfterLast(principal, "\\");
+    }
 }

@@ -62,7 +62,7 @@ import com.vividsolutions.jts.geom.Envelope;
 
 /**
  * WMS GetMap operation default implementation.
- * 
+ *
  * @author Gabriel Roldan
  */
 public class GetMap {
@@ -72,7 +72,7 @@ public class GetMap {
     private FilterFactory ff;
 
     private final WMS wms;
-    
+
     private List<GetMapCallback> callbacks;
 
     public GetMap(final WMS wms) {
@@ -84,7 +84,7 @@ public class GetMap {
     public void setFilterFactory(final FilterFactory filterFactory) {
         this.ff = filterFactory;
     }
-    
+
     public void setGetMapCallbacks(List<GetMapCallback> callbacks) {
         this.callbacks.clear();
         this.callbacks.addAll(callbacks);
@@ -94,7 +94,7 @@ public class GetMap {
      * Implements the map production logic for a WMS GetMap request, delegating the encoding to the
      * appropriate output format to a {@link GetMapOutputFormat} appropriate for the required
      * format.
-     * 
+     *
      * <p>
      * Preconditions:
      * <ul>
@@ -102,10 +102,10 @@ public class GetMap {
      * <li>request.getStyles().length == request.getLayers().size()
      * </ul>
      * </p>
-     * 
+     *
      * @param req
      *            a {@link GetMapRequest}
-     * 
+     *
      * @throws ServiceException
      *             if an error occurs creating the map from the provided request
      */
@@ -129,43 +129,43 @@ public class GetMap {
             } else {
                 throw new ServiceException("Internal error ", t);
             }
-        } 
+        }
     }
 
     private GetMapRequest fireInitRequest(GetMapRequest request) {
         for (GetMapCallback callback : callbacks) {
             request = callback.initRequest(request);
-        }        
-        
+        }
+
         return request;
     }
-    
+
     private void fireMapContentInit(WMSMapContent mapContent) {
         for (GetMapCallback callback : callbacks) {
             callback.initMapContent(mapContent);
-        }        
+        }
     }
-    
+
     private WMSMapContent fireBeforeRender(WMSMapContent mapContent) {
         for (GetMapCallback callback : callbacks) {
             mapContent = callback.beforeRender(mapContent);
-        }        
-        
+        }
+
         return mapContent;
     }
-    
+
     private WebMap fireFinished(WebMap result) {
         for (GetMapCallback callback : callbacks) {
             result = callback.finished(result);
-        }        
-        
+        }
+
         return result;
     }
-    
+
     private void fireFailed(Throwable t) {
         for (GetMapCallback callback : callbacks) {
             callback.failed(t);
-        }        
+        }
     }
 
 
@@ -222,10 +222,10 @@ public class GetMap {
             List<RenderedImage> images = new ArrayList<RenderedImage>();
             for (Object currentTime : times) {
                 map = executeInternal(mapContent, request, delegate, Arrays.asList(currentTime), elevations);
-                
+
                 // remove layers to start over again
                 mapContent.layers().clear();
-                
+
                 // collect the layer
                 images.add(((RenderedImageMap)map).getImage());
             }
@@ -236,17 +236,17 @@ public class GetMap {
             List<RenderedImage> images = new ArrayList<RenderedImage>();
             for (Object currentElevation : elevations){
                 map = executeInternal(mapContent, request, delegate, times, Arrays.asList(currentElevation));
-                
+
                 // remove layers to start over again
                 mapContent.layers().clear();
-                
+
                 // collect the layer
                 images.add(((RenderedImageMap)map).getImage());
             }
             RenderedImageList imageList = new RenderedImageList(images);
             return new  RenderedImageMap(mapContent, imageList , map.getMimeType());
         } else {
-            return executeInternal(mapContent, request, delegate, times, elevations);    
+            return executeInternal(mapContent, request, delegate, times, elevations);
         }
 
     }
@@ -263,10 +263,10 @@ public class GetMap {
      */
     WebMap executeInternal(WMSMapContent mapContent, final GetMapRequest request,
             GetMapOutputFormat delegate, List<Object> times, List<Object> elevations) throws IOException {
-        final Envelope envelope = request.getBbox();       
+        final Envelope envelope = request.getBbox();
         final List<MapLayerInfo> layers = request.getLayers();
         final List<Map<String, String>> viewParams = request.getViewParams();
-        
+
         final Style[] styles = request.getStyles().toArray(new Style[] {});
         final Filter[] filters = buildLayersFilters(request.getFilter(), layers);
 
@@ -307,7 +307,7 @@ public class GetMap {
         if (LOGGER.isLoggable(Level.FINE)) {
             LOGGER.fine("setting up map");
         }
-        
+
         fireMapContentInit(mapContent);
 
         // track the external caching strategy for any map layers
@@ -343,9 +343,9 @@ public class GetMap {
                         : Integer.MAX_VALUE;
                 definitionQuery.setMaxFeatures(maxFeatures);
                 featureLayer.setQuery(definitionQuery);
-                
+
                 mapContent.addLayer(featureLayer);
-                
+
                 layer = featureLayer;
             } else if (layerType == MapLayerInfo.TYPE_VECTOR) {
                 FeatureSource<? extends FeatureType, ? extends Feature> source;
@@ -382,17 +382,17 @@ public class GetMap {
                 FeatureLayer featureLayer = new FeatureLayer(source, layerStyle);
                 featureLayer.setTitle(mapLayerInfo.getFeature().prefixedName());
                 featureLayer.getUserData().put("abstract", mapLayerInfo.getDescription());
-                
+
                 // mix the dimension related filter with the layer filter
                 Filter dimensionFilter = wms.getTimeElevationToFilter(times, elevations, mapLayerInfo.getFeature());
-                Filter filter = SimplifyingFilterVisitor.simplify(Filters.and(ff, layerFilter, dimensionFilter)); 
+                Filter filter = SimplifyingFilterVisitor.simplify(Filters.and(ff, layerFilter, dimensionFilter));
 
                 final Query definitionQuery = new Query(source.getSchema().getName().getLocalPart());
                 definitionQuery.setVersion(featureVersion);
                 definitionQuery.setFilter(filter);
-            	if (viewParams != null) {
+                if (viewParams != null) {
                     definitionQuery.setHints(new Hints(Hints.VIRTUAL_TABLE_PARAMETERS, viewParams.get(i)));
-            	}
+                }
 
                 // check for startIndex + offset
                 final Integer startIndex = request.getStartIndex();
@@ -416,7 +416,7 @@ public class GetMap {
 
                 featureLayer.setQuery(definitionQuery);
                 mapContent.addLayer(featureLayer);
-                
+
                 layer = featureLayer;
             } else if (layerType == MapLayerInfo.TYPE_RASTER) {
 
@@ -489,7 +489,7 @@ public class GetMap {
         }
 
         RenderingVariables.setupEnvironmentVariables(mapContent);
-        
+
         // set the buffer value if the admin has set a specific value for some layers
         // in this map
         // GR: question: does setupRenderingBuffer need EnvFunction.setLocalValues to be already
@@ -503,7 +503,7 @@ public class GetMap {
         // /////////////////////////////////////////////////////////
         mapContent = fireBeforeRender(mapContent);
         WebMap map = delegate.produceMap(mapContent);
-        
+
         if (cachingPossible) {
             map.setResponseHeader("Cache-Control", "max-age=" + maxAge + ", must-revalidate");
 
@@ -520,7 +520,7 @@ public class GetMap {
     /**
      * Computes the rendering buffer in case the user did not specify one in the request, and the
      * admin setup some rendering buffer hints in the layer configurations
-     * 
+     *
      * @param map
      * @param layers
      */
@@ -567,7 +567,7 @@ public class GetMap {
 
     /**
      * Computes the rendering buffer for this layer
-     * 
+     *
      * @param style
      * @param scaleDenominator
      * @return
@@ -593,7 +593,7 @@ public class GetMap {
      * <p>
      * With the exception of the SRS and STYLES parameters, for which default values are assigned.
      * </p>
-     * 
+     *
      * @param request
      * @throws ServiceException
      *             if any mandatory parameter has not been set on the request
@@ -607,7 +607,9 @@ public class GetMap {
         }
 
         if (request.getLayers().size() == 0) {
-            throw new ServiceException("No layers have been requested", "LayerNotDefined");
+            // Sweco: layer count can be 0 after security filtering - don't throw exception
+            // this is FKA specific and against WMS service definition
+            //throw new ServiceException("No layers have been requested", "LayerNotDefined");
         }
 
         if (request.getStyles().size() == 0) {
@@ -638,7 +640,7 @@ public class GetMap {
      * If <code>requestFilters != null</code>, it shall contain the same number of elements than
      * <code>layers</code>, as filters are requested one per layer.
      * </p>
-     * 
+     *
      * @param requestFilters
      *            the list of filters sent by the user, or <code>null</code>
      * @param layers
@@ -695,14 +697,14 @@ public class GetMap {
     /**
      * Finds out a {@link GetMapOutputFormat} specialized in generating the requested map format,
      * registered in the spring context.
-     * 
+     *
      * @param outputFormat
      *            a request parameter object wich holds the processed request objects, such as
      *            layers, bbox, outpu format, etc.
-     * 
+     *
      * @return A specialization of <code>GetMapDelegate</code> wich can produce the requested output
      *         map format
-     * 
+     *
      * @throws ServiceException
      *             if no specialization is configured for the output format specified in
      *             <code>request</code> or if it can't be instantiated or the format is not
