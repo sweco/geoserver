@@ -83,7 +83,7 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
     /**
      * The ID of the attribute which contains the role name for a group
      */
-    private String groupRoleAttribute = "cn";
+    protected String groupRoleAttribute = "cn";
 
     private String rolePrefix = "ROLE_";
     private boolean convertToUpperCase = true;
@@ -343,7 +343,7 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
         return userName.iterator().next();
     }
 
-    private void addRolesToSet(SortedSet<GeoServerRole> roles,
+    protected void addRolesToSet(SortedSet<GeoServerRole> roles,
             Set<String> roleNames) {
         for (String roleName : roleNames) {
             try {

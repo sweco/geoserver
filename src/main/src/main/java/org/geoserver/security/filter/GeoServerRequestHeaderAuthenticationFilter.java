@@ -10,7 +10,6 @@ import java.io.IOException;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.apache.commons.lang.StringUtils;
 import org.geoserver.security.config.RequestHeaderAuthenticationFilterConfig;
 import org.geoserver.security.config.SecurityNamedServiceConfig;
 
@@ -44,8 +43,6 @@ public class GeoServerRequestHeaderAuthenticationFilter extends GeoServerPreAuth
 
     @Override
     protected String getPreAuthenticatedPrincipalName(HttpServletRequest request) {
-        // Sweco: return principal name only without domain
-        String principal = request.getHeader(getPrincipalHeaderAttribute());
-        return StringUtils.substringAfterLast(principal, "\\");
+        return request.getHeader(getPrincipalHeaderAttribute());
     }
 }

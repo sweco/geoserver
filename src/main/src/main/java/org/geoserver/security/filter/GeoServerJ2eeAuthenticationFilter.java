@@ -8,8 +8,6 @@ package org.geoserver.security.filter;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.apache.commons.lang.StringUtils;
-
 /**
  * J2EE Authentication Filter
  * 
@@ -19,9 +17,7 @@ import org.apache.commons.lang.StringUtils;
 public class GeoServerJ2eeAuthenticationFilter extends GeoServerJ2eeBaseAuthenticationFilter {
     @Override
     protected String getPreAuthenticatedPrincipalName(HttpServletRequest request) {
-    	String principal = request.getUserPrincipal() == null ? null : request.getUserPrincipal().getName();
-    	// Sweco: return principal name only without domain
-        return StringUtils.substringAfterLast(principal, "\\");
+        return request.getUserPrincipal() == null ? null : request.getUserPrincipal().getName();
     }
 
 }

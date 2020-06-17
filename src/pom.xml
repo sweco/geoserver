@@ -119,12 +119,12 @@
    <dependency>
     <groupId>org.geoserver</groupId>
     <artifactId>gs-main</artifactId>
-    <version>${gs.version}</version>
+    <version>${gs.version.sweco}</version>
    </dependency>
    <dependency>
     <groupId>org.geoserver</groupId>
     <artifactId>gs-main</artifactId>
-    <version>${gs.version}</version>
+    <version>${gs.version.sweco}</version>
     <classifier>tests</classifier>
    </dependency>
    <dependency>
@@ -161,12 +161,12 @@
    <dependency>
     <groupId>org.geoserver</groupId>
     <artifactId>gs-wms</artifactId>
-    <version>${gs.version}</version>
+    <version>${gs.version.sweco}</version>
    </dependency>
    <dependency>
     <groupId>org.geoserver</groupId>
     <artifactId>gs-wms</artifactId>
-    <version>${gs.version}</version>
+    <version>${gs.version.sweco}</version>
     <classifier>tests</classifier>
    </dependency>
    <dependency>
@@ -1629,6 +1629,7 @@
 
  <properties>
   <gs.version>2.8.2</gs.version>
+  <gs.version.sweco>2.8.2-sweco</gs.version.sweco>
   <gt.version>14.2</gt.version>
   <gwc.version>1.8.1</gwc.version>
   <spring.version>3.1.4.RELEASE</spring.version>
