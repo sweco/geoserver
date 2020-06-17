@@ -118,14 +118,6 @@ public class LDAPAuthProviderPanel extends AuthenticationProviderPanel<LDAPSecur
             add(new TextField("groupAdminGroup"));
             add(new TextField("groupSearchBase"));
             add(new TextField("groupSearchFilter"));
-
-            add(new TextField("foreignServerURL"));
-            add(new CheckBox("foreignUseTLS"));
-            add(new TextField("foreignUser"));
-            add(new TextField("foreignPassword"));
-            add(new TextField("foreignDomainPrefix"));
-            add(new TextField("foreignUserFilter"));
-            add(new CheckBox("foreignBind"));
         }
 
         @Override
@@ -135,14 +127,6 @@ public class LDAPAuthProviderPanel extends AuthenticationProviderPanel<LDAPSecur
         	get("groupAdminGroup").setDefaultModelObject(null);
             get("groupSearchBase").setDefaultModelObject(null);
             get("groupSearchFilter").setDefaultModelObject(null);
-
-            get("foreignServerURL").setDefaultModelObject(null);
-            get("foreignUseTLS").setDefaultModelObject(null);
-            get("foreignUser").setDefaultModelObject(null);
-            get("foreignPassword").setDefaultModelObject(null);
-            get("foreignDomainPrefix").setDefaultModelObject(null);
-            get("foreignUserFilter").setDefaultModelObject(null);
-            get("foreignBind").setDefaultModelObject(null);
         }
     }
 

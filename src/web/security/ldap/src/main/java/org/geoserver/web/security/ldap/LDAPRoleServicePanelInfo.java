@@ -5,18 +5,18 @@
  */
 package org.geoserver.web.security.ldap;
 
-import org.geoserver.security.ldap.LDAPRoleService;
-import org.geoserver.security.ldap.LDAPRoleServiceConfig;
-import org.geoserver.web.security.ldap.LDAPRoleServicePanel;
+import org.geoserver.security.ldap.LDAPForeignSecurityPrincipalAwareRoleService;
+import org.geoserver.security.ldap.LDAPForeignSecurityPrincipalAwareRoleServiceConfig;
 import org.geoserver.security.web.role.RoleServicePanelInfo;
 
-public class LDAPRoleServicePanelInfo extends RoleServicePanelInfo<LDAPRoleServiceConfig, LDAPRoleServicePanel> {
+public class LDAPRoleServicePanelInfo extends RoleServicePanelInfo<LDAPForeignSecurityPrincipalAwareRoleServiceConfig, LDAPRoleServicePanel> {
 
-public LDAPRoleServicePanelInfo() {
-    setComponentClass(LDAPRoleServicePanel.class);
-    setServiceClass(LDAPRoleService.class);
-    setServiceConfigClass(LDAPRoleServiceConfig.class);
-}
+    private static final long serialVersionUID = 1L;
 
+    public LDAPRoleServicePanelInfo() {
+        setComponentClass(LDAPRoleServicePanel.class);
+        setServiceClass(LDAPForeignSecurityPrincipalAwareRoleService.class);
+        setServiceConfigClass(LDAPForeignSecurityPrincipalAwareRoleServiceConfig.class);
+    }
 
 }

@@ -14,35 +14,46 @@ import org.apache.wicket.markup.html.form.PasswordTextField;
 import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
-import org.geoserver.security.ldap.LDAPRoleServiceConfig;
+import org.geoserver.security.ldap.LDAPForeignSecurityPrincipalAwareRoleServiceConfig;
 import org.geoserver.security.web.role.RoleServicePanel;
-import org.geoserver.web.security.ldap.LDAPAuthProviderPanel.AuthorizationPanel;
-import org.geoserver.web.security.ldap.LDAPAuthProviderPanel.LDAPAuthorizationPanel;
-import org.geoserver.web.security.ldap.LDAPAuthProviderPanel.UserGroupAuthorizationPanel;
 
-public class LDAPRoleServicePanel extends RoleServicePanel<LDAPRoleServiceConfig> {
+public class LDAPRoleServicePanel extends RoleServicePanel<LDAPForeignSecurityPrincipalAwareRoleServiceConfig> {
 
-    
-        class LDAPAuthenticationPanel extends FormComponentPanel {
+    private static final long serialVersionUID = 1L;
+
+    class LDAPAuthenticationPanel extends FormComponentPanel {
+
+        private static final long serialVersionUID = 1L;
+        private final String usernameField;
+        private final String passwordField;
+        public LDAPAuthenticationPanel(String id, String usernameField, String passwordField) {
+            super(id, new Model());
+            this.usernameField = usernameField;
+            this.passwordField = passwordField;
+            add(new TextField(usernameField));
         
-            public LDAPAuthenticationPanel(String id) {
-                super(id, new Model());
-                add(new TextField("user"));
-            
-                PasswordTextField pwdField = new PasswordTextField("password");
-                // avoid reseting the password which results in an
-                // empty password on saving a modified configuration
-                pwdField.setResetPassword(false);
-                add(pwdField);
-            }
-            
-            public void resetModel() {
-                get("user").setDefaultModelObject(null);
-                get("password").setDefaultModelObject(null);
-            }
+            PasswordTextField pwdField = new PasswordTextField(passwordField);
+            // avoid reseting the password which results in an
+            // empty password on saving a modified configuration
+            pwdField.setResetPassword(false);
+            add(pwdField);
         }
-    
-    public LDAPRoleServicePanel(String id, IModel<LDAPRoleServiceConfig> model) {
+
+        public void resetModel() {
+            get(usernameField).setDefaultModelObject(null);
+            get(passwordField).setDefaultModelObject(null);
+        }
+    }
+
+    class LDAPForeignAuthenticationPanel extends LDAPAuthenticationPanel {
+
+        private static final long serialVersionUID = 1L;
+        public LDAPForeignAuthenticationPanel(String id, String usernameField, String passwordField) {
+            super(id, usernameField, passwordField);
+        }
+    }
+
+    public LDAPRoleServicePanel(String id, IModel<LDAPForeignSecurityPrincipalAwareRoleServiceConfig> model) {
         super(id, model);
         add(new TextField("serverURL").setRequired(true));
         add(new CheckBox("useTLS"));
@@ -63,9 +74,34 @@ public class LDAPRoleServicePanel extends RoleServicePanel<LDAPRoleServiceConfig
                 target.addComponent(c);
             }
         });
-        LDAPAuthenticationPanel authPanel = new LDAPAuthenticationPanel("authenticationPanel");
+
+        LDAPAuthenticationPanel authPanel = new LDAPAuthenticationPanel("authenticationPanel", "user", "password");
         authPanel.setVisible(model.getObject().isBindBeforeGroupSearch());
         add(new WebMarkupContainer("authenticationPanelContainer")
             .add(authPanel).setOutputMarkupId(true));
+
+        add(new TextField("foreignServerURL"));
+        add(new CheckBox("foreignUseTLS"));
+        add(new TextField("foreignDomainPrefix"));
+        add(new TextField("foreignUserFilter"));
+        add(new AjaxCheckBox("foreignBind") {
+            @Override
+            protected void onUpdate(AjaxRequestTarget target) {
+                WebMarkupContainer c = (WebMarkupContainer) 
+                        LDAPRoleServicePanel.this.get("foreignAuthenticationPanelContainer");
+
+                //reset any values that were set
+                LDAPAuthenticationPanel ldapAuthenticationPanel = (LDAPAuthenticationPanel)c.get("foreignAuthenticationPanel");
+                ldapAuthenticationPanel.resetModel();
+                ldapAuthenticationPanel.setVisible(getModelObject().booleanValue());
+                target.addComponent(c);
+            }
+        });
+
+        LDAPForeignAuthenticationPanel foreignAuthPanel = new LDAPForeignAuthenticationPanel("foreignAuthenticationPanel", "foreignUser", "foreignPassword");
+        boolean visible = model.getObject().isForeignBind() != null && model.getObject().isForeignBind().booleanValue();
+        foreignAuthPanel.setVisible(visible);
+        add(new WebMarkupContainer("foreignAuthenticationPanelContainer")
+            .add(foreignAuthPanel).setOutputMarkupId(true));
     }
 }

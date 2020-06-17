@@ -60,6 +60,50 @@
           </ul>
          </fieldset>
       </li>
+      <li>
+        <fieldset>
+          <legend>
+            <span><wicket:message key="foreignLdapSettings"></wicket:message></span>
+          </legend>
+          <li>
+            <label for="foreignServerURL"><wicket:message key="foreignServerURL"></wicket:message></label>
+            <input id="foreignServerURL" wicket:id="foreignServerURL" type="text" class="text"></input>
+          </li>
+          <li>
+            <input id="foreignUseTLS" wicket:id="foreignUseTLS" type="checkbox" class="field checkbox"></input>
+            <label for="foreignUseTLS" class="choice"><wicket:message key="foreignUseTLS"></wicket:message></label>
+          </li>
+          <li>
+            <label for="foreignDomainPrefix"><wicket:message key="foreignDomainPrefix"></wicket:message></label>
+            <input id="foreignDomainPrefix" wicket:id="foreignDomainPrefix" type="text"></input>
+          </li>
+          <li>
+            <label for="foreignUserFilter"><wicket:message key="foreignUserFilter"></wicket:message></label>
+            <input id="foreignUserFilter" wicket:id="foreignUserFilter" type="text"></input>
+          </li>
+        </fieldset>
+      </li>
+      <li>
+         <fieldset>
+          <legend>
+            <span><wicket:message key="authentication"></wicket:message></span>
+          </legend>
+          <ul>
+           <li>
+            <input id="foreignBind" wicket:id="foreignBind" type="checkbox" class="field checkbox"></input>
+            <label for="foreignBind" class="choice">
+              <wicket:message key="foreignBind"></wicket:message>
+            </label>
+           </li>
+           <li>
+            <div wicket:id="foreignAuthenticationPanelContainer">
+              <div wicket:id="foreignAuthenticationPanel">
+              </div>
+            </div>
+           </li>
+          </ul>
+         </fieldset>
+      </li>
     </ul>
 </wicket:extend>
 </body>
