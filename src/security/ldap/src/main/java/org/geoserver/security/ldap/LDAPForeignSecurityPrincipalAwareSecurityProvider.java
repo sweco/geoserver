@@ -2,7 +2,6 @@ package org.geoserver.security.ldap;
 
 import java.io.IOException;
 
-import org.geoserver.config.util.XStreamPersister;
 import org.geoserver.security.GeoServerRoleService;
 import org.geoserver.security.GeoServerSecurityManager;
 import org.geoserver.security.config.SecurityNamedServiceConfig;
@@ -16,11 +15,6 @@ public class LDAPForeignSecurityPrincipalAwareSecurityProvider extends LDAPSecur
 
     public LDAPForeignSecurityPrincipalAwareSecurityProvider(GeoServerSecurityManager securityManager) {
         super(securityManager);
-    }
-
-    @Override
-    public void configure(XStreamPersister xp) {
-        xp.getXStream().alias("ldap", LDAPForeignSecurityPrincipalAwareRoleServiceConfig.class);
     }
 
     @Override

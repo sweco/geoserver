@@ -23,7 +23,7 @@ public class LDAPRoleServiceTest extends LDAPBaseTest {
     GeoServerRoleService service;
     
     public void createRoleService(boolean userFilter) throws IOException {
-        service = new LDAPRoleService();
+        service = new LDAPForeignSecurityPrincipalAwareRoleService();
         if(userFilter) {
             config.setGroupSearchFilter("member={1},dc=example,dc=com");
             config.setUserFilter("uid={0}");
@@ -225,6 +225,6 @@ public class LDAPRoleServiceTest extends LDAPBaseTest {
     @Override
     protected void createConfig()
     {
-        config = new LDAPRoleServiceConfig();
+        config = new LDAPForeignSecurityPrincipalAwareRoleServiceConfig();
     }
 }

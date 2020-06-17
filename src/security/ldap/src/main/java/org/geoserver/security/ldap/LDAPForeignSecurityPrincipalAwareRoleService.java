@@ -41,11 +41,9 @@ public class LDAPForeignSecurityPrincipalAwareRoleService extends LDAPRoleServic
     LdapContextSource foreignLdapContext;
     SpringSecurityLdapTemplate foreignTemplate;
 
-    // search base for ldap groups that are to be mapped to GeoServer roles
-    String foreignGroupSearchBase;
     String foreignUser, foreignPassword;
-    String foreignDomainPrefix;// = "EUR\\";
-    String foreignUserFilter;// = "(sAMAccountName={0})";
+    String foreignDomainPrefix;
+    String foreignUserFilter;
 
     @Override
     public void initializeFromConfig(final SecurityNamedServiceConfig config)
@@ -53,20 +51,20 @@ public class LDAPForeignSecurityPrincipalAwareRoleService extends LDAPRoleServic
         super.initializeFromConfig(config);
 
         final LDAPForeignSecurityPrincipalAwareRoleServiceConfig ldapConfig = (LDAPForeignSecurityPrincipalAwareRoleServiceConfig) config;
-        foreignLdapContext = createForeignLdapContext(ldapConfig);
-        foreignDomainPrefix = ldapConfig.getForeignDomainPrefix();
-        foreignUserFilter = ldapConfig.getForeignUserFilter();
-
-        if (ldapConfig.isForeignBind()) {
-            // authenticate before LDAP searches
-            foreignUser = ldapConfig.getForeignUser();
-            foreignPassword = ldapConfig.getForeignPassword();
-            foreignTemplate = new BindingLdapTemplate(foreignLdapContext);
-        } else {
-            // TODO: currently dead code
-            foreignTemplate = new SpringSecurityLdapTemplate(foreignLdapContext);
+        if (ldapConfig.getForeignServerURL() != null) {
+            foreignLdapContext = createForeignLdapContext(ldapConfig);
+            foreignDomainPrefix = ldapConfig.getForeignDomainPrefix();
+            foreignUserFilter = ldapConfig.getForeignUserFilter();
+    
+            if (ldapConfig.isForeignBind()) {
+                // authenticate before LDAP searches
+                foreignUser = ldapConfig.getForeignUser();
+                foreignPassword = ldapConfig.getForeignPassword();
+                foreignTemplate = new BindingLdapTemplate(foreignLdapContext);
+            } else {
+                foreignTemplate = new SpringSecurityLdapTemplate(foreignLdapContext);
+            }
         }
-
     }
 
     private LdapContextSource createForeignLdapContext(final LDAPForeignSecurityPrincipalAwareRoleServiceConfig ldapConfig) {
@@ -96,9 +94,14 @@ public class LDAPForeignSecurityPrincipalAwareRoleService extends LDAPRoleServic
         if (username == null) {
             return Collections.emptySortedSet();
         }
-        final String unqualifiedUser = StringUtils.substringAfter(username, "\\");
+        final String unqualifiedUser;
+        if (StringUtils.contains(username, "\\")) {
+            unqualifiedUser = StringUtils.substringAfter(username, "\\");
+        } else {
+            unqualifiedUser = username;
+        }
         final SortedSet<GeoServerRole> roles;
-        if (username.startsWith(foreignDomainPrefix)) {
+        if (foreignDomainPrefix != null && username.startsWith(foreignDomainPrefix)) {
             final SortedSet<GeoServerRole> rolesForFsp = new TreeSet<GeoServerRole>();
             final List<String> userDnAndSid = new Vector<String>();
             userDnAndSid.add(unqualifiedUser);

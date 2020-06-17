@@ -43,7 +43,7 @@ public abstract class LDAPBaseTest {
         GeoServerResourceLoader resourceLoader = new GeoServerResourceLoader(
                 tempFolder);
         securityManager = new GeoServerSecurityManager(new GeoServerDataDirectory(resourceLoader));
-        securityProvider = new LDAPSecurityProvider(securityManager);
+        securityProvider = new LDAPForeignSecurityPrincipalAwareSecurityProvider(securityManager);
         
         createConfig();
         config.setServerURL(ldapServerUrl + "/" + basePath);

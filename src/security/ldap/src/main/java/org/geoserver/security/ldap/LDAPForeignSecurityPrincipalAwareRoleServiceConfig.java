@@ -7,25 +7,18 @@ import org.geoserver.security.config.SecurityRoleServiceConfig;
  *
  * @author Martin Kalén {@literal <martin.kalen@sweco.se>}
  */
-public class LDAPForeignSecurityPrincipalAwareRoleServiceConfig extends LDAPRoleServiceConfig implements SecurityRoleServiceConfig {
+public class LDAPForeignSecurityPrincipalAwareRoleServiceConfig extends LDAPRoleServiceConfig implements SecurityRoleServiceConfig { 
 
     private static final long serialVersionUID = 1L;
 
     private String foreignServerURL;
     private Boolean foreignUseTLS;
 
-    //private String groupSearchBase;
-    //private String groupSearchFilter;
-
-    // bind to the server before extracting groups
-    // some LDAP server require this (e.g. ActiveDirectory)
-    //Boolean bindBeforeGroupSearch;
-
-    // LDAP user name and password for authenticated resolving of
-    // foreign domain objectSid
+    // LDAP connection info for authenticated resolving of foreign objectSid
     private String foreignUser;
     private String foreignPassword;
     private Boolean foreignBind;
+
     private String foreignDomainPrefix;
     private String foreignUserFilter;
 

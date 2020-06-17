@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import javax.naming.directory.DirContext;
 
+import org.apache.commons.lang.StringUtils;
 import org.geoserver.security.GeoServerRoleService;
 import org.geoserver.security.GeoServerRoleStore;
 import org.geoserver.security.config.SecurityNamedServiceConfig;
@@ -92,8 +93,9 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
     private String groupAdminGroup;
 
     Pattern lookForMembershipAttribute = Pattern.compile(
-            //"^\\(*([a-z]+)=(.*?)\\{([01])\\}(.*?)\\)*$", Pattern.CASE_INSENSITIVE);
-            // Sweco: support OIDs and combined complex filters
+            "^\\(*([a-z]+)=(.*?)\\{([01])\\}(.*?)\\)*$", Pattern.CASE_INSENSITIVE);
+    // Sweco: support OIDs and combined complex filters
+    Pattern lookForMembershipAttributeWithOid = Pattern.compile(
             "^.*\\(*([a-z0-9\\.:]+)=(.*?)\\{([01])\\}(.*?)\\)*.*$", Pattern.CASE_INSENSITIVE);
 
     @Override
@@ -116,7 +118,7 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
         this.groupSearchBase = ldapConfig.getGroupSearchBase();
         if (isNotEmpty(ldapConfig.getGroupSearchFilter())) {
             this.groupSearchFilter = ldapConfig.getGroupSearchFilter();
-            Matcher m = lookForMembershipAttribute.matcher(groupSearchFilter);
+            Matcher m = getMembershipAttributeMatcher(groupSearchFilter);
             if (m.matches()) {
                 groupMembershipAttribute = m.group(1);
                 lookupUserForDn = m.group(3).equals("1");
@@ -136,7 +138,7 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
         }
         if (isNotEmpty(ldapConfig.getUserFilter())) {
             this.userFilter = ldapConfig.getUserFilter();
-            Matcher m = lookForMembershipAttribute.matcher(userFilter);
+            Matcher m = getMembershipAttributeMatcher(userFilter);
             if (m.matches()) {
                 userNameAttribute = m.group(1);
                 userNamePattern = Pattern.compile("^"
@@ -144,6 +146,19 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
                         + Pattern.quote(m.group(4)) + "$");
             }
         }
+    }
+
+    private Matcher getMembershipAttributeMatcher(String filter) {
+        if (filter == null) {
+            return null;
+        }
+        Matcher m;
+        if (StringUtils.contains(filter, ":")) {
+            m = lookForMembershipAttributeWithOid.matcher(filter);
+        } else {
+            m = lookForMembershipAttribute.matcher(filter);
+        }
+        return m;
     }
 
     private boolean isNotEmpty(String property) {

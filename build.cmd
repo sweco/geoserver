@@ -19,6 +19,14 @@ IF ERRORLEVEL 1 GOTO error
 copy /y %GEOSERVER_SRC%\src\security\ldap\target\gs-sec-ldap-%GEOSERVER_VERSION%.jar %MEDIA%\
 IF ERRORLEVEL 1 GOTO error
 
+echo gs-web-sec-ldap
+cd /d %GEOSERVER_SRC%\src\web\security\ldap
+IF ERRORLEVEL 1 GOTO error
+call mvn %MVN_FLAGS% package >NUL
+IF ERRORLEVEL 1 GOTO error
+copy /y %GEOSERVER_SRC%\src\web\security\ldap\target\gs-web-sec-ldap-%GEOSERVER_VERSION%.jar %MEDIA%\
+IF ERRORLEVEL 1 GOTO error
+
 echo gs-restconfig
 cd /d %GEOSERVER_SRC%\src\restconfig
 IF ERRORLEVEL 1 GOTO error

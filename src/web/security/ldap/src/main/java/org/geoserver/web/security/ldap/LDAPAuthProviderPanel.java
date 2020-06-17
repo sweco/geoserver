@@ -28,7 +28,7 @@ import org.apache.wicket.model.Model;
 import org.apache.wicket.model.StringResourceModel;
 import org.geoserver.security.ldap.GeoserverLdapBindAuthenticator;
 import org.geoserver.security.ldap.LDAPAuthenticationProvider;
-import org.geoserver.security.ldap.LDAPSecurityProvider;
+import org.geoserver.security.ldap.LDAPForeignSecurityPrincipalAwareSecurityProvider;
 import org.geoserver.security.ldap.LDAPSecurityServiceConfig;
 import org.geoserver.security.web.auth.AuthenticationProviderPanel;
 import org.geoserver.security.web.usergroup.UserGroupServiceChoice;
@@ -118,6 +118,14 @@ public class LDAPAuthProviderPanel extends AuthenticationProviderPanel<LDAPSecur
             add(new TextField("groupAdminGroup"));
             add(new TextField("groupSearchBase"));
             add(new TextField("groupSearchFilter"));
+
+            add(new TextField("foreignServerURL"));
+            add(new CheckBox("foreignUseTLS"));
+            add(new TextField("foreignUser"));
+            add(new TextField("foreignPassword"));
+            add(new TextField("foreignDomainPrefix"));
+            add(new TextField("foreignUserFilter"));
+            add(new CheckBox("foreignBind"));
         }
 
         @Override
@@ -127,6 +135,14 @@ public class LDAPAuthProviderPanel extends AuthenticationProviderPanel<LDAPSecur
         	get("groupAdminGroup").setDefaultModelObject(null);
             get("groupSearchBase").setDefaultModelObject(null);
             get("groupSearchFilter").setDefaultModelObject(null);
+
+            get("foreignServerURL").setDefaultModelObject(null);
+            get("foreignUseTLS").setDefaultModelObject(null);
+            get("foreignUser").setDefaultModelObject(null);
+            get("foreignPassword").setDefaultModelObject(null);
+            get("foreignDomainPrefix").setDefaultModelObject(null);
+            get("foreignUserFilter").setDefaultModelObject(null);
+            get("foreignBind").setDefaultModelObject(null);
         }
     }
 
@@ -173,7 +189,7 @@ public class LDAPAuthProviderPanel extends AuthenticationProviderPanel<LDAPSecur
                             return;
                         }
                         
-                        LDAPSecurityProvider provider = new LDAPSecurityProvider(getSecurityManager());
+                        LDAPForeignSecurityPrincipalAwareSecurityProvider provider = new LDAPForeignSecurityPrincipalAwareSecurityProvider(getSecurityManager());
                         LDAPAuthenticationProvider authProvider = (LDAPAuthenticationProvider) provider
                                 .createAuthenticationProvider(ldapConfig);
                         Authentication authentication = authProvider
