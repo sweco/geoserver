@@ -93,10 +93,14 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
     private String groupAdminGroup;
 
     Pattern lookForMembershipAttribute = Pattern.compile(
-            "^\\(*([a-z]+)=(.*?)\\{([01])\\}(.*?)\\)*$", Pattern.CASE_INSENSITIVE);
-    // Sweco: support OIDs and combined complex filters
+            "^([a-z]*)=(.*?)\\{([0-2])\\}(.*?)\\)*$", Pattern.CASE_INSENSITIVE);
+    // Sweco: Combined complex filter support
+    Pattern lookForMembershipAttributeCombined = Pattern.compile(
+            "^.*\\(+([a-z]+)=(.*?)\\{([0-2])\\}(.*?)\\)*$", Pattern.CASE_INSENSITIVE);
+    // Sweco: OID support
     Pattern lookForMembershipAttributeWithOid = Pattern.compile(
-            "^.*\\(*([a-z0-9\\.:]+)=(.*?)\\{([01])\\}(.*?)\\)*.*$", Pattern.CASE_INSENSITIVE);
+            "^.*?\\(*([a-z]+)[0-9\\.:]+=(.*?)\\{([0-2])\\}(.*?)\\)*$", Pattern.CASE_INSENSITIVE);
+            //"^.*\\(*([a-z0-9\\.:]+)=(.*?)\\{([0-2])\\}(.*?)\\)*.*$", Pattern.CASE_INSENSITIVE);
 
     @Override
     public void initializeFromConfig(SecurityNamedServiceConfig config)
@@ -148,13 +152,15 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
         }
     }
 
-    private Matcher getMembershipAttributeMatcher(String filter) {
+    public Matcher getMembershipAttributeMatcher(String filter) {
         if (filter == null) {
             return null;
         }
         Matcher m;
         if (StringUtils.contains(filter, ":")) {
             m = lookForMembershipAttributeWithOid.matcher(filter);
+        } else if (StringUtils.contains(filter, "(")) {
+            m = lookForMembershipAttributeCombined.matcher(filter);
         } else {
             m = lookForMembershipAttribute.matcher(filter);
         }

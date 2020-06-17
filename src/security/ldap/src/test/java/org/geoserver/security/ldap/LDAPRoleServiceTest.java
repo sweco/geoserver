@@ -12,6 +12,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
 import java.util.SortedSet;
+import java.util.regex.Matcher;
 
 import org.geoserver.security.GeoServerRoleService;
 import org.geoserver.security.impl.GeoServerRole;
@@ -32,12 +33,31 @@ public class LDAPRoleServiceTest extends LDAPBaseTest {
         }
         service.initializeFromConfig(config);
     }
-    
+
     @Before
     public void setUp() throws Exception {
         super.setUp();
     }    
-    
+
+    @Test
+    public void testLookForMembershipAttribute() throws Exception {
+        createRoleService(false);
+        assertMembershipAttribute("member", "member={0}");
+        assertMembershipAttribute("member", "member={1}");
+        assertMembershipAttribute("member", "member={2}");
+        assertMembershipAttribute("member", "member=cn={0}");
+        assertMembershipAttribute("member", "(member={0})");
+        assertMembershipAttribute("member", "(member=cn={0})");
+        assertMembershipAttribute("member", "(&(name=B-Foo-*)(member={0})");
+        assertMembershipAttribute("member", "(&(name=B-Foo-*)(member=cn={0})");
+
+        assertMembershipAttribute("member", "member:1.2.840.113556.1.4.1941:={0}");
+        assertMembershipAttribute("member", "(member:1.2.840.113556.1.4.1941:={0})");
+        assertMembershipAttribute("member", "(&(name=B-Foo-*)(member:1.2.840.113556.1.4.1941:={0}))");
+        assertMembershipAttribute("member", "(&(name=B-Foo-*)(|(member:1.2.840.113556.1.4.1941:={0})(objectSID={2})))");
+        assertMembershipAttribute("member", "(&(name=B-Foo-*)(|(member:1.2.840.113556.1.4.1941:=cn={0})(objectSID={2})))");
+    }
+
     @Test
     public void testGetRoles() throws Exception {
         Assume.assumeTrue(LDAPTestUtils.initLdapServer(true, ldapServerUrl,
@@ -45,7 +65,7 @@ public class LDAPRoleServiceTest extends LDAPBaseTest {
         
         checkAllRoles();
     }
-    
+
     @Test
     public void testGetRolesAuthenticated() throws Exception {
         Assume.assumeTrue(LDAPTestUtils.initLdapServer(false, ldapServerUrl,
@@ -207,9 +227,7 @@ public class LDAPRoleServiceTest extends LDAPBaseTest {
         assertTrue(role.toString().startsWith("ROLE_"));
         assertEquals(role.toString().toUpperCase(), role.toString());
     }
-    
-    
-    
+
     private void checkUserRoles(String username, boolean userFilter) throws IOException {
         createRoleService(userFilter);
         SortedSet<GeoServerRole> allRoles = service.getRoles();
@@ -221,10 +239,20 @@ public class LDAPRoleServiceTest extends LDAPBaseTest {
         assertTrue(role.toString().startsWith("ROLE_"));
         assertEquals(role.toString().toUpperCase(), role.toString());
     }
-    
+
+    private void assertMembershipAttribute(String expected, String filter) {
+        Matcher m = ((LDAPForeignSecurityPrincipalAwareRoleService)service).getMembershipAttributeMatcher(filter);
+        String actual = null;
+        if (m.matches()) {
+            actual = m.group(1);
+        }
+        assertEquals(expected, actual);
+    }
+
     @Override
     protected void createConfig()
     {
         config = new LDAPForeignSecurityPrincipalAwareRoleServiceConfig();
     }
+
 }
