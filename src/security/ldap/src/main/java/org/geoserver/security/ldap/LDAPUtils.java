@@ -27,6 +27,8 @@ import org.springframework.security.ldap.authentication.SpringSecurityAuthentica
  */
 public class LDAPUtils {
 
+    private static final int HEX = 16;
+
     /**
      * Creates an LdapContext from a configuration object.
      * 
@@ -96,4 +98,48 @@ public class LDAPUtils {
         }
         return authTemplate;
     }
+
+    /**
+     * Returns decoded SID string from SID binary attribute value.
+     * The String value is: S-Revision-Authority-SubAuthority[n]...
+     *
+     * Based on code from here - https://ldapwiki.com/wiki/ObjectSID
+     * (in turn based on http://forums.oracle.com/forums/thread.jspa?threadID=1155740&tstart=0)
+     * and here - https://github.com/spring-projects/spring-ldap/blob/master/core/src/main/java/org/springframework/ldap/support/LdapUtils.java
+     */
+    public static String decodeSID(byte[] sid) {
+        final StringBuilder strSid = new StringBuilder("S-");
+
+        // get byte(0) - revision level
+        final int revision = sid[0];
+        strSid.append(Integer.toString(revision));
+
+        //next byte byte(1) - count of sub-authorities
+        final int countSubAuths = sid[1] & 0xFF;
+
+        //byte(2-7) - 48 bit authority ([Big-Endian])
+        long authority = 0;
+        //String rid = "";
+        for(int i = 2; i <= 7; i++) {
+            authority |= ((long)sid[i]) << (8 * (5 - (i - 2)));
+        }
+        strSid.append("-");
+        strSid.append(Long.toHexString(authority));
+
+        //iterate all the sub-auths and then countSubAuths x 32 bit sub authorities ([Little-Endian])
+        int offset = 8;
+        int size = 4; //4 bytes for each sub auth
+        for(int j = 0; j < countSubAuths; j++) {
+            long subAuthority = 0;
+            for(int k = 0; k < size; k++) {
+                subAuthority |= (long)(sid[offset + k] & 0xFF) << (8 * k);
+            }
+            // format it
+            strSid.append("-");
+            strSid.append(subAuthority);
+            offset += size;
+        }
+        return strSid.toString();
+    }
+
 }

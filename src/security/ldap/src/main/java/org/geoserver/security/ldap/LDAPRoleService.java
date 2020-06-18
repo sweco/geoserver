@@ -29,6 +29,7 @@ import org.geoserver.security.impl.AbstractGeoServerSecurityService;
 import org.geoserver.security.impl.GeoServerRole;
 import org.geotools.util.logging.Logging;
 import org.springframework.ldap.core.AuthenticatedLdapEntryContextCallback;
+import org.springframework.ldap.core.AuthenticationErrorCallback;
 import org.springframework.ldap.core.DirContextOperations;
 import org.springframework.ldap.core.DistinguishedName;
 import org.springframework.ldap.core.LdapEntryIdentification;
@@ -302,8 +303,12 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
      */
     private void authenticateIfNeeded(AuthenticatedLdapEntryContextCallback callback) {
         if (user != null && password != null) {
-            template.authenticate(DistinguishedName.EMPTY_PATH, user, password,
-                    callback);
+            template.authenticate(DistinguishedName.EMPTY_PATH, user, password, callback, new AuthenticationErrorCallback() {
+                @Override
+                public void execute(Exception e) {
+                    LOGGER.log(Level.WARNING, "Could not authenticate against LDAP server", e);
+                }
+            });
         } else {
             callback.executeWithContext(null, null);
         }

@@ -56,6 +56,7 @@ public class LDAPRoleServiceTest extends LDAPBaseTest {
         assertMembershipAttribute("member", "(&(name=B-Foo-*)(member:1.2.840.113556.1.4.1941:={0}))");
         assertMembershipAttribute("member", "(&(name=B-Foo-*)(|(member:1.2.840.113556.1.4.1941:={0})(objectSID={2})))");
         assertMembershipAttribute("member", "(&(name=B-Foo-*)(|(member:1.2.840.113556.1.4.1941:=cn={0})(objectSID={2})))");
+        assertMembershipAttribute("member", "(&(name=B-Cartan-*)(|(member:1.2.840.113556.1.4.1941:={0})(member:1.2.840.113556.1.4.1941:=cn={2},CN=ForeignSecurityPrincipals,DC=corp,DC=com)))");
     }
 
     @Test
