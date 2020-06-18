@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.Vector;
+import java.util.logging.Level;
 
 import javax.naming.directory.DirContext;
 import javax.net.ssl.HostnameVerifier;
@@ -120,7 +121,7 @@ public class LDAPForeignSecurityPrincipalAwareRoleService extends LDAPRoleServic
                         userDnAndSid.add(dn);
                         userDnAndSid.add(sid);
                     } catch (Exception e) {
-                        // not found, use username instead
+                        LOGGER.log(Level.FINE, "User " + username + " not found during FSP lookup", e);
                     }
                 }
             });
