@@ -141,7 +141,7 @@ public class FkaSearchController extends AbstractController {
                 IOUtils.write("Search Controller failed", out);
                 out.flush();
             } catch (IOException e) {
-                LOGGER.log(Level.WARNING, "handlePost expcetion", e);
+                LOGGER.log(Level.WARNING, "handlePost exception", e);
             } finally {
                 IOUtils.closeQuietly(out);
             }
@@ -158,7 +158,7 @@ public class FkaSearchController extends AbstractController {
             builder.endObject();
             builder.close();
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "writeResponse expcetion", e);
+            LOGGER.log(Level.WARNING, "writeResponse exception", e);
         } finally {
             IOUtils.closeQuietly(out);
         }
@@ -184,7 +184,7 @@ public class FkaSearchController extends AbstractController {
             in = req.getInputStream();
             json = (JSONObject) JSONSerializer.toJSON(IOUtils.toString(in, REQUEST_ENCODING));
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "getRequestJSON expcetion", e);
+            LOGGER.log(Level.WARNING, "getRequestJSON exception", e);
         } finally {
             IOUtils.closeQuietly(in);
         }
@@ -322,7 +322,7 @@ public class FkaSearchController extends AbstractController {
             repr.write(out);
         } catch (IOException e) {
             resp.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
-            LOGGER.log(Level.WARNING, "handleGet expcetion", e);
+            LOGGER.log(Level.WARNING, "handleGet exception", e);
         } finally {
             IOUtils.closeQuietly(out);
         }
