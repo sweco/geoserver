@@ -301,7 +301,7 @@ public class LDAPRoleService extends AbstractGeoServerSecurityService implements
      *
      * @param callback
      */
-    private void authenticateIfNeeded(AuthenticatedLdapEntryContextCallback callback) {
+    protected void authenticateIfNeeded(AuthenticatedLdapEntryContextCallback callback) {
         if (user != null && password != null) {
             template.authenticate(DistinguishedName.EMPTY_PATH, user, password, callback, new AuthenticationErrorCallback() {
                 @Override

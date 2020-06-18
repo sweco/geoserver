@@ -122,7 +122,7 @@ public class LDAPForeignSecurityPrincipalAwareRoleService extends LDAPRoleServic
             userDnAndSid.add(unqualifiedUser);
             userDnAndSid.add(unqualifiedUser);
             LOGGER.log(Level.FINE, "Lookup objectSid for foreign user " + username);
-            authenticateIfNeeded(new AuthenticatedLdapEntryContextCallback() {
+            foreignAuthenticateIfNeeded(new AuthenticatedLdapEntryContextCallback() {
                 @Override
                 public void executeWithContext(DirContext ctx, LdapEntryIdentification ldapEntryIdentification) {
                     try {
@@ -164,7 +164,7 @@ public class LDAPForeignSecurityPrincipalAwareRoleService extends LDAPRoleServic
      *
      * @param callback
      */
-    private void authenticateIfNeeded(AuthenticatedLdapEntryContextCallback callback) {
+    private void foreignAuthenticateIfNeeded(AuthenticatedLdapEntryContextCallback callback) {
         if (foreignUser != null && foreignPassword != null) {
             foreignTemplate.authenticate(DistinguishedName.EMPTY_PATH, foreignUser, foreignPassword, callback, new AuthenticationErrorCallback() {
                 @Override
