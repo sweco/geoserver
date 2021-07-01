@@ -1,4 +1,5 @@
 build-full.bat
+local-build.bat
 target
 .settings
 .classpath
