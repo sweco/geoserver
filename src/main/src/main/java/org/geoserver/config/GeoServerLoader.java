@@ -708,7 +708,8 @@ public abstract class GeoServerLoader {
                 LOGGER.info( "Loaded service '" +  s.getId() + "', " + (s.isEnabled()?"enabled":"disabled") );
             }
             catch( Throwable t ) {
-                LOGGER.log(Level.SEVERE, "Failed to load the service configuration in directory: " + directory.getPath(), t);
+                // Sweco: Patch to support logging of failed service load in the default workspace
+                LOGGER.log(Level.SEVERE, "Failed to load the service configuration in directory: " + (directory == null ? "(default)" : directory.getPath()), t);
             }
         }
     }
